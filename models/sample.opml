@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<opml version="1.0">
+    <head>
+        <title>rando subscriptions in feedly Cloud</title>
+    </head>
+    <body>
+        <outline text="Sports" title="Sports">
+            <outline type="rss" text="Cincinnati - Reds" title="Cincinnati - Reds" xmlUrl="http://rssfeeds.cincinnati.com/cincinnati-sports-reds&amp;x=1" htmlUrl="http://api-internal.usatoday.com.akadns.net"/>
+            <outline type="rss" text="Bucs Dugout -  All Posts" title="Bucs Dugout -  All Posts" xmlUrl="http://www.bucsdugout.com/rss/current" htmlUrl="https://www.bucsdugout.com/"/>
+        </outline>
+        <outline type="rss" text="Dodgers - Los Angeles Times" title="Dodgers - Los Angeles Times" xmlUrl="http://www.latimes.com/sports/dodgers/rss2.0.xml" htmlUrl="http://www.latimes.com/sports/dodgers/rss2.0.xml"/>
+        <outline type="rss" text="Nationals Journal" title="Nationals Journal" xmlUrl="http://feeds.washingtonpost.com/rss/rss_nationals-journal" htmlUrl="http://www.washingtonpost.com/blogs/nationals-journal"/>
+        <outline type="rss" text="NYT baseball" title="NYT baseball" xmlUrl="http://rss.nytimes.com/services/xml/rss/nyt/Baseball.xml" htmlUrl="https://www.nytimes.com/section/sports/baseball?partner=rss&amp;emc=rss"/>
+        <outline type="rss" text="Baseball - NY Daily News" title="Baseball - NY Daily News" xmlUrl="http://feeds.nydailynews.com/nydnrss/sports/baseball" htmlUrl="http://www.nydailynews.com/cmlink/NYDN.Sports.Baseball.Article.rss"/>
+        <outline type="rss" text="TOR Homepage News" title="TOR Homepage News" xmlUrl="http://partner.mlb.com/partnerxml/gen/news/rss/tor.xml" htmlUrl="http://mlb.mlb.com"/>
+        <outline type="rss" text="KC Homepage News" title="KC Homepage News" xmlUrl="http://partner.mlb.com/partnerxml/gen/news/rss/kc.xml" htmlUrl="http://mlb.mlb.com"/>
+        <outline type="rss" text="Cleveland Indians" title="Cleveland Indians" xmlUrl="http://blog.cleveland.com/tribe_impact/atom.xml" htmlUrl="http://www.cleveland.com/tribe/index.ssf/"/>
+        <outline type="rss" text="Twins" title="Twins" xmlUrl="http://feeds.twincities.com/mngi/rss/CustomRssServlet/569/201033.xml" htmlUrl="http://www.twincities.com/twins/"/>
+        <outline type="rss" text="Pittsburgh Post-Gazette Pirates feed" title="Pittsburgh Post-Gazette Pirates feed" xmlUrl="http://www.post-gazette.com/rss/sports/pirates" htmlUrl="http://www.post-gazette.com"/>
+        <outline type="rss" text="Mets stories from Newsday" title="Mets stories from Newsday" xmlUrl="http://www.newsday.com/cmlink/1.1252001" htmlUrl="https://www.newsday.com/cmlink/1.1252001"/>
+        <outline type="rss" text="Yankees stories from Newsday" title="Yankees stories from Newsday" xmlUrl="http://www.newsday.com/cmlink/1.1252006" htmlUrl="https://www.newsday.com/cmlink/1.1252006"/>
+        <outline type="rss" text="TEX Homepage News" title="TEX Homepage News" xmlUrl="http://partner.mlb.com/partnerxml/gen/news/rss/tex.xml" htmlUrl="http://mlb.mlb.com"/>
+        <outline type="rss" text="Braves" title="Braves" xmlUrl="http://www.ajc.com/list/rss/sports/baseball/atlanta-braves-news/aGpN/" htmlUrl="http://www.ajc.com/list/sports/baseball/atlanta-braves/aGpN/"/>
+        <outline type="rss" text="JSOnline.com Brewers" title="JSOnline.com Brewers" xmlUrl="http://www.jsonline.com/rss/?c=y&amp;path=/sports/brewers" htmlUrl="http://www.jsonline.com/sports/brewers"/>
+    </body>
+</opml>
