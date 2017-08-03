@@ -1,0 +1,39 @@
+#[sync]
+#time="15:20"
+#interval="15"
+
+#[service]
+#enable_plugins = true
+#enable_admin_socket = true
+
+#[[plugins]]
+#name = "evernote"
+#binary_path= ".config/lib"
+#custom_config_pair = "key-id"
+
+#[[plugins]]
+#name = "pinboard"
+#lib_path = "pinboard"
+
+[admin]
+enable = true
+socket_path = "/tmp/syndication.socket"
+
+[server]
+auth_secret = "secret"
+http_port = 8080
+tls_port = 443
+enable_http_requests_log = true
+enable_panic_print_stack = true
+enable_tls = false
+
+[security]
+auth_secret="secret"
+#auth_secret_file_path="$HOME/.config/syndication/secret"
+
+[database]
+
+  [database.sqlite]
+  enable = true
+  connection ="/tmp/syndication.db"
+

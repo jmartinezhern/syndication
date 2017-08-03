@@ -1,0 +1,54 @@
+<rss>
+  <channel>
+    <title>RSS Test</title>
+    <link>http://localhost:8090</link>
+    <description>Testing rss feeds</description>
+    <language>en</language>
+    <lastBuildDate></lastBuildDate>
+    <item>
+      <title>Item 1</title>
+      <link>http://localhost:8090/item_1</link>
+      <description>Single test item</description>
+      <author>chavamee</author>
+      <guid>item1@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:8090/rss.xml</source>
+    </item>
+    <item>
+      <title>Item 2</title>
+      <link>http://localhost:8090/item_2</link>
+      <description>Single test item</description>
+      <author>chavamee</author>
+      <guid>item2@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:8090/rss.xml</source>
+    </item>
+    <item>
+      <title>Item 3</title>
+      <link>http://localhost:8090/item_3</link>
+      <description>Single test item</description>
+      <author>chavamee</author>
+      <guid>item3@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:8090/rss.xml</source>
+    </item>
+    <item>
+      <title>Item 4</title>
+      <link>http://localhost:8090/item_4</link>
+      <description>Single test item</description>
+      <author>chavamee</author>
+      <guid>item4@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:8090/rss.xml</source>
+    </item>
+    <item>
+      <title>Item 5</title>
+      <link>http://localhost:8090/item_5</link>
+      <description>Single test item</description>
+      <author>chavamee</author>
+      <guid>item5@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:8090/rss.xml</source>
+    </item>
+  </channel>
+</rss>
