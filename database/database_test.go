@@ -23,10 +23,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/chavamee/syndication/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/varddum/syndication/models"
 )
 
 type (
@@ -384,7 +384,7 @@ func (suite *DatabaseTestSuite) TestNewEntry() {
 	entry := models.Entry{
 		Title:       "Test Entry",
 		Description: "Testing entry",
-		Author:      "chavamee",
+		Author:      "varddum",
 		Link:        "http://example.com",
 		Mark:        models.Unread,
 		Feed:        feed,
@@ -417,7 +417,7 @@ func (suite *DatabaseTestSuite) TestNewEntryWithEmptyFeed() {
 		Title:       "Test Entry",
 		Link:        "http://example.com",
 		Description: "Testing entry",
-		Author:      "chavamee",
+		Author:      "varddum",
 		Mark:        models.Unread,
 	}
 
@@ -435,7 +435,7 @@ func (suite *DatabaseTestSuite) TestNewEntryWithBadFeed() {
 	entry := models.Entry{
 		Title:       "Test Entry",
 		Description: "Testing entry",
-		Author:      "chavamee",
+		Author:      "varddum",
 		Mark:        models.Unread,
 		Feed: models.Feed{
 			UUID: uuid.NewV4().String(),
@@ -465,7 +465,7 @@ func (suite *DatabaseTestSuite) TestEntriesFromFeed() {
 	entry := models.Entry{
 		Title:       "Test Entry",
 		Description: "Testing entry",
-		Author:      "chavamee",
+		Author:      "varddum",
 		Link:        "http://example.com",
 		Mark:        models.Unread,
 		Feed:        feed,
@@ -580,7 +580,7 @@ func (suite *DatabaseTestSuite) TestEntriesFromCategory() {
 			entry = models.Entry{
 				Title:       "First Feed Test Entry " + strconv.Itoa(i),
 				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "chavamee",
+				Author:      "varddum",
 				Link:        "http://example.com",
 				Mark:        models.Unread,
 				Feed:        firstFeed,
@@ -590,7 +590,7 @@ func (suite *DatabaseTestSuite) TestEntriesFromCategory() {
 				entry = models.Entry{
 					Title:       "Second Feed Test Entry " + strconv.Itoa(i),
 					Description: "Testing entry " + strconv.Itoa(i),
-					Author:      "chavamee",
+					Author:      "varddum",
 					Link:        "http://example.com",
 					Mark:        models.Unread,
 					Feed:        secondFeed,
@@ -599,7 +599,7 @@ func (suite *DatabaseTestSuite) TestEntriesFromCategory() {
 				entry = models.Entry{
 					Title:       "Third Feed Test Entry " + strconv.Itoa(i),
 					Description: "Testing entry " + strconv.Itoa(i),
-					Author:      "chavamee",
+					Author:      "varddum",
 					Link:        "http://example.com",
 					Mark:        models.Unread,
 					Feed:        thirdFeed,
@@ -675,7 +675,7 @@ func (suite *DatabaseTestSuite) TestMarkCategory() {
 			entry = models.Entry{
 				Title:       "First Feed Test Entry " + strconv.Itoa(i),
 				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "chavamee",
+				Author:      "varddum",
 				Link:        "http://example.com",
 				Mark:        models.Unread,
 				Feed:        firstFeed,
@@ -684,7 +684,7 @@ func (suite *DatabaseTestSuite) TestMarkCategory() {
 			entry = models.Entry{
 				Title:       "Second Feed Test Entry " + strconv.Itoa(i),
 				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "chavamee",
+				Author:      "varddum",
 				Link:        "http://example.com",
 				Mark:        models.Read,
 				Feed:        secondFeed,
@@ -751,7 +751,7 @@ func (suite *DatabaseTestSuite) TestMarkFeed() {
 			entry = models.Entry{
 				Title:       "First Feed Test Entry " + strconv.Itoa(i),
 				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "chavamee",
+				Author:      "varddum",
 				Link:        "http://example.com",
 				Mark:        models.Unread,
 				Feed:        firstFeed,
@@ -760,7 +760,7 @@ func (suite *DatabaseTestSuite) TestMarkFeed() {
 			entry = models.Entry{
 				Title:       "Second Feed Test Entry " + strconv.Itoa(i),
 				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "chavamee",
+				Author:      "varddum",
 				Link:        "http://example.com",
 				Mark:        models.Read,
 				Feed:        secondFeed,

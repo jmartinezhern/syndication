@@ -29,13 +29,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chavamee/syndication/config"
-	"github.com/chavamee/syndication/database"
-	"github.com/chavamee/syndication/models"
-	"github.com/chavamee/syndication/sync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/varddum/syndication/config"
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/models"
+	"github.com/varddum/syndication/sync"
 )
 
 const TestDBPath = "/tmp/syndication-test-server.db"
@@ -116,7 +116,7 @@ func (suite *ServerTestSuite) SetupTest() {
       <title>Item 1</title>
       <link>http://localhost:8080/item_1</link>
       <description>Single test item</description>
-      <author>chavamee</author>
+      <author>varddum</author>
       <guid>item1@test</guid>
       <pubDate></pubDate>
       <source>http://localhost:8080/rss.xml</source>
@@ -125,7 +125,7 @@ func (suite *ServerTestSuite) SetupTest() {
       <title>Item 2</title>
       <link>http://localhost:8080/item_2</link>
       <description>Single test item</description>
-      <author>chavamee</author>
+      <author>varddum</author>
       <guid>item2@test</guid>
       <pubDate></pubDate>
       <source>http://localhost:8080/rss.xml</source>
@@ -134,7 +134,7 @@ func (suite *ServerTestSuite) SetupTest() {
       <title>Item 3</title>
       <link>http://localhost:8080/item_3</link>
       <description>Single test item</description>
-      <author>chavamee</author>
+      <author>varddum</author>
       <guid>item3@test</guid>
       <pubDate></pubDate>
       <source>http://localhost:8080/rss.xml</source>
@@ -143,7 +143,7 @@ func (suite *ServerTestSuite) SetupTest() {
       <title>Item 4</title>
       <link>http://localhost:8080/item_4</link>
       <description>Single test item</description>
-      <author>chavamee</author>
+      <author>varddum</author>
       <guid>item4@test</guid>
       <pubDate></pubDate>
       <source>http://localhost:8080/rss.xml</source>
@@ -152,7 +152,7 @@ func (suite *ServerTestSuite) SetupTest() {
       <title>Item 5</title>
       <link>http://localhost:8080/item_5</link>
       <description>Single test item</description>
-      <author>chavamee</author>
+      <author>varddum</author>
       <guid>item5@test</guid>
       <pubDate></pubDate>
       <source>http://localhost:8080/rss.xml</source>

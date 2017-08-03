@@ -20,13 +20,13 @@ package main
 import (
 	"os"
 
-	"github.com/chavamee/syndication/admin"
-	"github.com/chavamee/syndication/config"
-	"github.com/chavamee/syndication/database"
-	"github.com/chavamee/syndication/server"
-	"github.com/chavamee/syndication/sync"
 	"github.com/fatih/color"
 	"github.com/urfave/cli"
+	"github.com/varddum/syndication/admin"
+	"github.com/varddum/syndication/config"
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/server"
+	"github.com/varddum/syndication/sync"
 )
 
 func findSystemConfig() (config.Config, error) {

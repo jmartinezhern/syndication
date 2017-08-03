@@ -27,9 +27,9 @@ import (
 
 	"github.com/mmcdole/gofeed"
 
-	"github.com/chavamee/syndication/database"
-	"github.com/chavamee/syndication/models"
 	"github.com/stretchr/testify/suite"
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/models"
 )
 
 const TestDatabasePath = "/tmp/syndication-test-sync.db"
@@ -49,7 +49,7 @@ type (
 
 func (suite *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("If-None-Match") != RSSFeedEtag {
-		http.FileServer(http.Dir(os.Getenv("GOPATH")+"/src/github.com/chavamee/syndication/sync/")).ServeHTTP(w, r)
+		http.FileServer(http.Dir(os.Getenv("GOPATH")+"/src/github.com/varddum/syndication/sync/")).ServeHTTP(w, r)
 	}
 }
 
@@ -83,7 +83,7 @@ func (suite *SyncTestSuite) TearDownTest() {
 }
 
 func (suite *SyncTestSuite) TestFetchFeed() {
-	f, err := ioutil.ReadFile(os.Getenv("GOPATH") + "/src/github.com/chavamee/syndication/sync/rss.xml")
+	f, err := ioutil.ReadFile(os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/sync/rss.xml")
 	suite.Require().Nil(err)
 
 	fp := gofeed.NewParser()

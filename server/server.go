@@ -26,10 +26,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/chavamee/syndication/config"
-	"github.com/chavamee/syndication/database"
-	"github.com/chavamee/syndication/models"
-	"github.com/chavamee/syndication/sync"
+	"github.com/varddum/syndication/config"
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/models"
+	"github.com/varddum/syndication/sync"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"

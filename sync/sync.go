@@ -22,8 +22,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/chavamee/syndication/database"
-	"github.com/chavamee/syndication/models"
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/models"
 
 	"github.com/jasonlvhit/gocron"
 	"github.com/mmcdole/gofeed"

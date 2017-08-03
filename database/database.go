@@ -33,7 +33,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/scrypt"
 
-	"github.com/chavamee/syndication/models"
+	"github.com/varddum/syndication/models"
 )
 
 // Password salt and Hash byte sizes

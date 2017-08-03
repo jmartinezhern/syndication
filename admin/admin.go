@@ -27,8 +27,8 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/chavamee/syndication/database"
 	log "github.com/sirupsen/logrus"
+	"github.com/varddum/syndication/database"
 )
 
 type (
