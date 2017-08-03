@@ -1,0 +1,9 @@
+database:
+  connection: /tmp/syndication.db
+  type: sqlite3
+host:
+  address: localhost
+  port: 8080
+sync:
+  interval: 15m0s
+  delete_after: 30
