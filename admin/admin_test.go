@@ -23,9 +23,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/chavamee/syndication/database"
-	"github.com/chavamee/syndication/models"
 	"github.com/stretchr/testify/suite"
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/models"
 )
 
 type (

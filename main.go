@@ -19,6 +19,7 @@ package main
 
 import (
 	"os"
+	"os/user"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli"
@@ -42,15 +43,41 @@ func findSystemConfig() (config.Config, error) {
 	return conf, nil
 }
 
+func findUserConfig() (config.Config, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return config.Config{}, err
+	}
+
+	configPath := currentUser.HomeDir + "/.config/" + config.UserConfigRelativePath
+	if _, err = os.Stat(configPath); err != nil {
+		return config.Config{}, err
+	}
+
+	conf, err := config.NewConfig(configPath)
+	if err != nil {
+		return config.Config{}, err
+	}
+
+	return conf, nil
+}
+
 func startApp(c *cli.Context) error {
 	var conf config.Config
 	var err error
 
 	if c.String("config") == "" {
-		conf, err = findSystemConfig()
+		conf, err = findUserConfig()
 		if err != nil {
-			color.Red(err.Error())
-			return err
+			color.Yellow(err.Error())
+			color.Yellow("Trying system configuration")
+			conf, err = findSystemConfig()
+		}
+
+		if err != nil {
+			color.Yellow(err.Error())
+			color.Red("Failed to find a configuration file.")
+			return nil
 		}
 	} else {
 		conf, err = config.NewConfig(c.String("config"))
@@ -64,6 +91,7 @@ func startApp(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
 	sync := sync.NewSync(db)
 	sync.Start()
 
@@ -87,12 +115,12 @@ func main() {
 	app := cli.NewApp()
 
 	app.Name = "syndication"
-	app.Usage = "A Super Simple RSS server"
+	app.Usage = "An flexible RSS server"
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "config",
-			Usage: "Path to configuration file to use",
+			Usage: "Path to a configuration file",
 		},
 		cli.StringFlag{
 			Name:  "socket",
@@ -110,5 +138,8 @@ func main() {
 
 	app.Action = startApp
 
-	app.Run(os.Args)
+	err := app.Run(os.Args)
+	if err != nil {
+		color.Red(err.Error())
+	}
 }

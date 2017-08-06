@@ -193,7 +193,6 @@ func (suite *ServerTestSuite) TestNewFeed() {
 	dbFeed, err := suite.db.Feed(respFeed.UUID, &suite.user)
 	suite.Require().Nil(err)
 	suite.Equal(dbFeed.Title, respFeed.Title)
-
 }
 
 func (suite *ServerTestSuite) TestGetFeeds() {
@@ -998,7 +997,7 @@ func (suite *ServerTestSuite) TestGetStatsForCategory() {
 }
 
 func (suite *ServerTestSuite) TestAddFeedsToCategory() {
-
+	// TODO
 }
 
 func TestServerRegister(t *testing.T) {

@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	SystemConfigPath = "/etc/syndication/config.toml"
+	SystemConfigPath       = "/etc/syndication/config.toml"
+	UserConfigRelativePath = "syndication/config.toml"
 )
 
 type (
