@@ -229,7 +229,7 @@ func (s *Server) EditFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feed.UUID = c.Param("feedID")
+	feed.APIID = c.Param("feedID")
 
 	err = s.db.EditFeed(&feed, &user)
 	if err != nil {
@@ -317,7 +317,7 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 		}
 	}
 
-	entries, err := s.db.EntriesFromFeed(feed.UUID, true, withMarker, &user)
+	entries, err := s.db.EntriesFromFeed(feed.APIID, true, withMarker, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -424,7 +424,7 @@ func (s *Server) EditCategory(c echo.Context) error {
 	}
 
 	ctg := models.Category{}
-	ctg.UUID = c.Param("categoryID")
+	ctg.APIID = c.Param("categoryID")
 
 	if err = c.Bind(&ctg); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
@@ -648,7 +648,7 @@ func (s *Server) GetStatsForEntries(c echo.Context) error {
 func (s *Server) getUser(c *echo.Context) (models.User, error) {
 	userClaim := (*c).Get("user").(*jwt.Token)
 	claims := userClaim.Claims.(jwt.MapClaims)
-	user, err := s.db.UserWithUUID(claims["id"].(string))
+	user, err := s.db.UserWithAPIID(claims["id"].(string))
 	if err != nil {
 		return models.User{}, err
 	}

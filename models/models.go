@@ -60,19 +60,19 @@ type (
 		UpdatedAt time.Time  `json:"updated_at,omitempty"`
 		DeletedAt *time.Time `json:"deleted_at,omitempty" sql:"index"`
 
-		UUID string `json:"id"`
+		APIID string `json:"id"`
 
 		Categories []Category `json:"categories,omitempty"`
 		Feeds      []Feed     `json:"feeds,omitempty"`
 		Entries    []Entry    `json:"entries,omitempty"`
 		APIKeys    []APIKey   `json:"-"`
 
-		Username                  string `json:"username,required"`
-		Email                     string `json:"email,optional"`
-		PasswordHash              []byte `json:"-"`
-		PasswordSalt              []byte `json:"-"`
-		UncategorizedCategoryUUID string `json:"-"`
-		SavedCategoryUUID         string `json:"-"`
+		Username                   string `json:"username,required"`
+		Email                      string `json:"email,optional"`
+		PasswordHash               []byte `json:"-"`
+		PasswordSalt               []byte `json:"-"`
+		UncategorizedCategoryAPIID string `json:"-"`
+		SavedCategoryAPIID         string `json:"-"`
 	}
 
 	Category struct {
@@ -80,7 +80,7 @@ type (
 		CreatedAt time.Time `json:"created_at,omitempty"`
 		UpdatedAt time.Time `json:"updated_at,omitempty"`
 
-		UUID string `json:"id"`
+		APIID string `json:"id"`
 
 		User   User `json:"-"`
 		UserID uint `json:"-"`
@@ -95,7 +95,7 @@ type (
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 
-		UUID string `json:"id"`
+		APIID string `json:"id"`
 
 		Category   Category
 		CategoryID uint `json:"-"`
@@ -120,7 +120,7 @@ type (
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 
-		UUID string `json:"id"`
+		APIID string `json:"id"`
 
 		EntryID uint `json:"-"`
 
@@ -132,7 +132,7 @@ type (
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 
-		UUID string `json:"id"`
+		APIID string `json:"id"`
 
 		User   User `json:"-"`
 		UserID uint `json:"-"`

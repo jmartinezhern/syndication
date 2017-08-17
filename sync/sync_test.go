@@ -109,12 +109,12 @@ func (suite *SyncTestSuite) TestFeedWithNonMatchingEtag() {
 
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	entries, err := suite.db.EntriesFromFeed(feed.UUID, true, models.Any, &suite.user)
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
 	suite.Require().Nil(err)
 	suite.Len(entries, 5)
 }
@@ -128,12 +128,12 @@ func (suite *SyncTestSuite) TestFeedWithMatchingEtag() {
 
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	entries, err := suite.db.EntriesFromFeed(feed.UUID, true, models.Any, &suite.user)
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
 	suite.Require().Nil(err)
 	suite.Len(entries, 0)
 }
@@ -149,12 +149,12 @@ func (suite *SyncTestSuite) TestFeedWithNewEntriesWithGUIDs() {
 
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	entries, err := suite.db.EntriesFromFeed(feed.UUID, true, models.Any, &suite.user)
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
 	suite.Require().Nil(err)
 	suite.Len(entries, 5)
 
@@ -163,7 +163,7 @@ func (suite *SyncTestSuite) TestFeedWithNewEntriesWithGUIDs() {
 	err = suite.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	entries, err = suite.db.EntriesFromFeed(feed.UUID, true, models.Any, &suite.user)
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
 	suite.Require().Nil(err)
 	suite.Len(entries, 5)
 }
@@ -176,12 +176,12 @@ func (suite *SyncTestSuite) TestFeedWithNewEntriesWithoutGUIDs() {
 
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	entries, err := suite.db.EntriesFromFeed(feed.UUID, true, models.Any, &suite.user)
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
 	suite.Require().Nil(err)
 	suite.Len(entries, 5)
 }
