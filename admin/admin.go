@@ -140,8 +140,6 @@ func (a *Admin) NewUser(args args, r *Response) error {
 
 // DeleteUser deletes a user
 func (a *Admin) DeleteUser(args args, r *Response) error {
-	var userID string
-
 	r.Status = BadArgument
 	r.Error = "Bad first argument"
 
@@ -150,7 +148,7 @@ func (a *Admin) DeleteUser(args args, r *Response) error {
 		return nil
 	}
 
-	userID = aVal.String()
+	userID := aVal.String()
 
 	err := a.db.DeleteUser(userID)
 	if err != nil {
@@ -168,9 +166,6 @@ func (a *Admin) DeleteUser(args args, r *Response) error {
 
 // ChangeUserName changes a user's name
 func (a *Admin) ChangeUserName(args args, r *Response) error {
-	var userID string
-	var newName string
-
 	r.Status = BadArgument
 
 	aVal := reflect.ValueOf(args["userID"])
@@ -185,8 +180,8 @@ func (a *Admin) ChangeUserName(args args, r *Response) error {
 		return nil
 	}
 
-	userID = aVal.String()
-	newName = bVal.String()
+	userID := aVal.String()
+	newName := bVal.String()
 
 	err := a.db.ChangeUserName(userID, newName)
 	if err != nil {
@@ -204,9 +199,6 @@ func (a *Admin) ChangeUserName(args args, r *Response) error {
 
 // ChangeUserPassword changes a user's password.
 func (a *Admin) ChangeUserPassword(args args, r *Response) error {
-	var userID string
-	var newPassword string
-
 	r.Status = BadArgument
 
 	aVal := reflect.ValueOf(args["userID"])
@@ -221,8 +213,8 @@ func (a *Admin) ChangeUserPassword(args args, r *Response) error {
 		return nil
 	}
 
-	userID = aVal.String()
-	newPassword = bVal.String()
+	userID := aVal.String()
+	newPassword := bVal.String()
 
 	err := a.db.ChangeUserPassword(userID, newPassword)
 	if err != nil {
@@ -243,15 +235,13 @@ func (a *Admin) GetUsers(args args, r *Response) error {
 	r.Status = OK
 	r.Error = "OK"
 
-	r.Result = a.db.Users("id,created_at,updated_at,uuid,email,username")
+	r.Result = a.db.Users("id,created_at,updated_at,api_id,email,username")
 
 	return nil
 }
 
 // GetUser returns all information on a user.
 func (a *Admin) GetUser(args args, r *Response) error {
-	var userID string
-
 	r.Status = OK
 
 	aVal := reflect.ValueOf(args["userID"])
@@ -260,9 +250,9 @@ func (a *Admin) GetUser(args args, r *Response) error {
 		return nil
 	}
 
-	userID = aVal.String()
+	userID := aVal.String()
 
-	user, err := a.db.UserWithUUID(userID)
+	user, err := a.db.UserWithAPIID(userID)
 	if err != nil {
 		dbError := err.(database.DBError)
 		r.Status = DatabaseError

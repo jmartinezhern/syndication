@@ -21,16 +21,18 @@ package database
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"io"
+	mathRand "math/rand"
+	"strconv"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/jinzhu/gorm"
 	// GORM dialect packages
-	"github.com/dgrijalva/jwt-go"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/scrypt"
 
 	"github.com/varddum/syndication/models"
@@ -73,9 +75,27 @@ func NewDB(dbType, conn string) (db *DB, err error) {
 	return
 }
 
+var lastTimeIDWasCreated int64
+var random32Int uint32
+
 // Close ends connections with the database
 func (db *DB) Close() error {
 	return db.db.Close()
+}
+
+func createAPIID() string {
+	currentTime := time.Now().Unix()
+	duplicateTime := (lastTimeIDWasCreated == currentTime)
+	lastTimeIDWasCreated = currentTime
+
+	if !duplicateTime {
+		random32Int = mathRand.Uint32() % 16
+	} else {
+		random32Int++
+	}
+
+	idStr := strconv.FormatInt(currentTime+int64(random32Int), 10)
+	return base64.StdEncoding.EncodeToString([]byte(idStr))
 }
 
 func createPasswordHashAndSalt(password string) (hash []byte, salt []byte, err error) {
@@ -106,21 +126,21 @@ func (db *DB) NewUser(username, password string) error {
 	}
 
 	// Construct the user system categories
-	unctgUUID := uuid.NewV4().String()
+	unctgAPIID := createAPIID()
 	user.Categories = append(user.Categories, models.Category{
-		UUID: unctgUUID,
-		Name: models.Uncategorized,
+		APIID: unctgAPIID,
+		Name:  models.Uncategorized,
 	})
-	user.UncategorizedCategoryUUID = unctgUUID
+	user.UncategorizedCategoryAPIID = unctgAPIID
 
-	savedUUID := uuid.NewV4().String()
+	savedAPIID := createAPIID()
 	user.Categories = append(user.Categories, models.Category{
-		UUID: savedUUID,
-		Name: "Saved",
+		APIID: savedAPIID,
+		Name:  "Saved",
 	})
-	user.SavedCategoryUUID = savedUUID
+	user.SavedCategoryAPIID = savedAPIID
 
-	user.UUID = uuid.NewV4().String()
+	user.APIID = createAPIID()
 	user.PasswordHash = hash
 	user.PasswordSalt = salt
 	user.Username = username
@@ -132,7 +152,7 @@ func (db *DB) NewUser(username, password string) error {
 // DeleteUser deletes a User object
 func (db *DB) DeleteUser(userID string) error {
 	user := &models.User{}
-	if db.db.Where("uuid = ?", userID).First(user).RecordNotFound() {
+	if db.db.Where("api_id = ?", userID).First(user).RecordNotFound() {
 		return BadRequest{"User does not exists"}
 	}
 
@@ -143,7 +163,7 @@ func (db *DB) DeleteUser(userID string) error {
 // ChangeUserName for user with userID
 func (db *DB) ChangeUserName(userID, newName string) error {
 	user := &models.User{}
-	if db.db.Where("uuid = ?", userID).First(user).RecordNotFound() {
+	if db.db.Where("api_id = ?", userID).First(user).RecordNotFound() {
 		return BadRequest{"User does not exists"}
 	}
 
@@ -154,7 +174,7 @@ func (db *DB) ChangeUserName(userID, newName string) error {
 // ChangeUserPassword for user with userID
 func (db *DB) ChangeUserPassword(userID, newPassword string) error {
 	user := &models.User{}
-	if db.db.Where("uuid = ?", userID).First(user).RecordNotFound() {
+	if db.db.Where("api_id = ?", userID).First(user).RecordNotFound() {
 		return BadRequest{"User does not exists"}
 	}
 
@@ -174,7 +194,7 @@ func (db *DB) ChangeUserPassword(userID, newPassword string) error {
 // The parameter fields provides a way to select
 // which fields are populated in the returned models.
 func (db *DB) Users(fields ...string) (users []models.User) {
-	selectFields := "id,uuid"
+	selectFields := "id,api_id"
 	if len(fields) != 0 {
 		for _, field := range fields {
 			selectFields = selectFields + "," + field
@@ -184,10 +204,10 @@ func (db *DB) Users(fields ...string) (users []models.User) {
 	return
 }
 
-// UserPrimaryKey returns the SQL primary key of a User with a uuid
-func (db *DB) UserPrimaryKey(uuid string) (uint, error) {
+// UserPrimaryKey returns the SQL primary key of a User with an api_id
+func (db *DB) UserPrimaryKey(apiID string) (uint, error) {
 	user := &models.User{}
-	if db.db.First(user, "uuid = ?", uuid).RecordNotFound() {
+	if db.db.First(user, "api_id = ?", apiID).RecordNotFound() {
 		return 0, NotFound{"User does not exist"}
 	}
 	return user.ID, nil
@@ -201,9 +221,9 @@ func (db *DB) UserWithName(username string) (user models.User, err error) {
 	return
 }
 
-// UserWithUUID returns a User with id
-func (db *DB) UserWithUUID(uuid string) (user models.User, err error) {
-	if db.db.First(&user, "UUID = ?", uuid).RecordNotFound() {
+// UserWithAPIID returns a User with id
+func (db *DB) UserWithAPIID(apiID string) (user models.User, err error) {
+	if db.db.First(&user, "api_id = ?", apiID).RecordNotFound() {
 		err = NotFound{"User does not exist"}
 	}
 	return
@@ -235,7 +255,7 @@ func (db *DB) NewAPIKey(secret string, user *models.User) (models.APIKey, error)
 	token := jwt.New(jwt.SigningMethodHS256)
 
 	claims := token.Claims.(jwt.MapClaims)
-	claims["id"] = user.UUID
+	claims["id"] = user.APIID
 	claims["admin"] = false
 	claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
@@ -267,12 +287,12 @@ func (db *DB) KeyBelongsToUser(key *models.APIKey, user *models.User) (bool, err
 
 // NewFeed creates a new Feed object owned by user
 func (db *DB) NewFeed(feed *models.Feed, user *models.User) error {
-	feed.UUID = uuid.NewV4().String()
+	feed.APIID = createAPIID()
 
 	var err error
 	var ctg models.Category
-	if feed.Category.UUID != "" {
-		ctg, err = db.Category(feed.Category.UUID, user)
+	if feed.Category.APIID != "" {
+		ctg, err = db.Category(feed.Category.APIID, user)
 		if err != nil {
 			return BadRequest{"Feed has invalid category"}
 		}
@@ -282,7 +302,7 @@ func (db *DB) NewFeed(feed *models.Feed, user *models.User) error {
 
 	feed.Category = ctg
 	feed.CategoryID = ctg.ID
-	feed.Category.UUID = ctg.UUID
+	feed.Category.APIID = ctg.APIID
 
 	db.db.Model(user).Association("Feeds").Append(feed)
 	db.db.Model(&ctg).Association("Feeds").Append(feed)
@@ -309,7 +329,7 @@ func (db *DB) FeedsFromCategory(categoryID string, user *models.User) (feeds []m
 
 // Feed returns a Feed with id and owned by user
 func (db *DB) Feed(id string, user *models.User) (feed models.Feed, err error) {
-	if db.db.Model(user).Where("uuid = ?", id).Related(&feed).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", id).Related(&feed).RecordNotFound() {
 		err = NotFound{"Feed does not exist"}
 		return
 	}
@@ -321,7 +341,7 @@ func (db *DB) Feed(id string, user *models.User) (feed models.Feed, err error) {
 // DeleteFeed with id and owned by user
 func (db *DB) DeleteFeed(id string, user *models.User) error {
 	foundFeed := &models.Feed{}
-	if !db.db.Model(user).Where("uuid = ?", id).Related(foundFeed).RecordNotFound() {
+	if !db.db.Model(user).Where("api_id = ?", id).Related(foundFeed).RecordNotFound() {
 		db.db.Delete(foundFeed)
 		return nil
 	}
@@ -331,7 +351,7 @@ func (db *DB) DeleteFeed(id string, user *models.User) error {
 // EditFeed owned by user
 func (db *DB) EditFeed(feed *models.Feed, user *models.User) error {
 	foundFeed := &models.Feed{}
-	if !db.db.Model(user).Related(foundFeed, "uuid = ?", feed.UUID).RecordNotFound() {
+	if !db.db.Model(user).Where("api_id = ?", feed.APIID).Related(foundFeed).RecordNotFound() {
 		foundFeed.Title = feed.Title
 		db.db.Model(feed).Save(foundFeed)
 		return nil
@@ -347,7 +367,7 @@ func (db *DB) NewCategory(ctg *models.Category, user *models.User) error {
 
 	tmpCtg := &models.Category{}
 	if db.db.Model(user).Where("name = ?", ctg.Name).Related(tmpCtg).RecordNotFound() {
-		ctg.UUID = uuid.NewV4().String()
+		ctg.APIID = createAPIID()
 		db.db.Model(user).Association("Categories").Append(ctg)
 		return nil
 	}
@@ -358,7 +378,7 @@ func (db *DB) NewCategory(ctg *models.Category, user *models.User) error {
 // EditCategory owned by user
 func (db *DB) EditCategory(ctg *models.Category, user *models.User) error {
 	foundCtg := &models.Category{}
-	if !db.db.Model(user).Where("uuid = ?", ctg.UUID).Related(foundCtg).RecordNotFound() {
+	if !db.db.Model(user).Where("api_id = ?", ctg.APIID).Related(foundCtg).RecordNotFound() {
 		foundCtg.Name = ctg.Name
 		db.db.Model(ctg).Save(foundCtg)
 		return nil
@@ -368,12 +388,12 @@ func (db *DB) EditCategory(ctg *models.Category, user *models.User) error {
 
 // DeleteCategory with id and owned by user
 func (db *DB) DeleteCategory(id string, user *models.User) error {
-	if id == user.UncategorizedCategoryUUID || id == user.SavedCategoryUUID {
+	if id == user.UncategorizedCategoryAPIID || id == user.SavedCategoryAPIID {
 		return BadRequest{"Cannot delete system categories"}
 	}
 
 	ctg := &models.Category{}
-	if db.db.Model(user).Where("uuid = ?", id).Related(ctg).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", id).Related(ctg).RecordNotFound() {
 		return NotFound{"Category does not exist"}
 	}
 
@@ -383,7 +403,7 @@ func (db *DB) DeleteCategory(id string, user *models.User) error {
 
 // Category returns a Category with id and owned by user
 func (db *DB) Category(id string, user *models.User) (ctg models.Category, err error) {
-	if db.db.Model(user).Where("uuid = ?", id).Related(&ctg).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", id).Related(&ctg).RecordNotFound() {
 		err = NotFound{"Category does not exist"}
 	}
 	return
@@ -398,7 +418,7 @@ func (db *DB) Categories(user *models.User) (categories []models.Category) {
 // ChangeFeedCategory changes the category a feed belongs to
 func (db *DB) ChangeFeedCategory(feedID string, ctgID string, user *models.User) error {
 	feed := &models.Feed{}
-	if db.db.Model(user).Where("uuid = ?", feedID).Related(feed).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", feedID).Related(feed).RecordNotFound() {
 		return NotFound{"Feed does not exist"}
 	}
 
@@ -411,7 +431,7 @@ func (db *DB) ChangeFeedCategory(feedID string, ctgID string, user *models.User)
 	db.db.Model(prevCtg).Association("Feeds").Delete(feed)
 
 	newCtg := &models.Category{}
-	if db.db.Model(user).Where("uuid = ?", ctgID).Related(newCtg).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", ctgID).Related(newCtg).RecordNotFound() {
 		return NotFound{"Category does not exist"}
 	}
 
@@ -422,16 +442,16 @@ func (db *DB) ChangeFeedCategory(feedID string, ctgID string, user *models.User)
 
 // NewEntry creates a new Entry object owned by user
 func (db *DB) NewEntry(entry *models.Entry, user *models.User) error {
-	if entry.Feed.UUID == "" {
+	if entry.Feed.APIID == "" {
 		return BadRequest{"Entry should have a feed"}
 	}
 
 	feed := models.Feed{}
-	if db.db.Model(user).Where("uuid = ?", entry.Feed.UUID).Related(&feed).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", entry.Feed.APIID).Related(&feed).RecordNotFound() {
 		return NotFound{"Feed does not exist"}
 	}
 
-	entry.UUID = uuid.NewV4().String()
+	entry.APIID = createAPIID()
 	entry.Feed = feed
 	entry.FeedID = feed.ID
 
@@ -442,9 +462,9 @@ func (db *DB) NewEntry(entry *models.Entry, user *models.User) error {
 }
 
 // NewEntries creates multiple new Entry objects which
-// are all owned by feed with feedUUID and user
+// are all owned by feed with feedAPIID and user
 func (db *DB) NewEntries(entries []models.Entry, feed models.Feed, user *models.User) error {
-	if feed.UUID == "" {
+	if feed.APIID == "" {
 		return BadRequest{"Entry should have a feed"}
 	}
 
@@ -452,12 +472,12 @@ func (db *DB) NewEntries(entries []models.Entry, feed models.Feed, user *models.
 		return nil
 	}
 
-	if db.db.Model(user).Where("uuid = ?", feed.UUID).Related(&feed).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", feed.APIID).Related(&feed).RecordNotFound() {
 		return NotFound{"Feed does not exist"}
 	}
 
 	for _, entry := range entries {
-		entry.UUID = uuid.NewV4().String()
+		entry.APIID = createAPIID()
 		entry.Feed = feed
 		entry.FeedID = feed.ID
 
@@ -470,7 +490,7 @@ func (db *DB) NewEntries(entries []models.Entry, feed models.Feed, user *models.
 
 // Entry returns an Entry with id and owned by user
 func (db *DB) Entry(id string, user *models.User) (entry models.Entry, err error) {
-	if db.db.Model(user).Where("uuid = ?", id).Related(&entry).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", id).Related(&entry).RecordNotFound() {
 		err = NotFound{"Feed does not exists"}
 		return
 	}
@@ -508,7 +528,7 @@ func (db *DB) EntriesFromFeed(feedID string, orderByDesc bool, marker models.Mar
 	}
 
 	feed := &models.Feed{}
-	if db.db.Model(user).Where("uuid = ?", feedID).Related(feed).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", feedID).Related(feed).RecordNotFound() {
 		err = NotFound{"Feed not found"}
 		return
 	}
@@ -531,7 +551,7 @@ func (db *DB) EntriesFromCategory(categoryID string, orderByDesc bool, marker mo
 	}
 
 	category := &models.Category{}
-	if db.db.Model(user).Where("uuid = ?", categoryID).Related(category).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", categoryID).Related(category).RecordNotFound() {
 		err = NotFound{"Category not found"}
 		return
 	}
@@ -568,7 +588,7 @@ func (db *DB) EntriesFromTag(tagID string, makrer models.Marker, orderByDesc boo
 // CategoryStats returns all Stats for a Category with the given id and that is owned by user
 func (db *DB) CategoryStats(id string, user *models.User) (stats models.Stats, err error) {
 	ctg := &models.Category{}
-	if db.db.Model(user).Where("uuid = ?", id).Related(ctg).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", id).Related(ctg).RecordNotFound() {
 		err = NotFound{"Category not found"}
 		return
 	}
@@ -593,7 +613,7 @@ func (db *DB) CategoryStats(id string, user *models.User) (stats models.Stats, e
 // FeedStats returns all Stats for a Feed with the given id and that is owned by user
 func (db *DB) FeedStats(id string, user *models.User) (stats models.Stats, err error) {
 	feed := &models.Feed{}
-	if db.db.Model(user).Where("uuid = ?", id).Related(feed).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", id).Related(feed).RecordNotFound() {
 		err = NotFound{"Feed not found"}
 		return
 	}

@@ -199,7 +199,7 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 
 // SyncCategory owned by user.
 func (s *Sync) SyncCategory(category *models.Category, user *models.User) error {
-	feeds, err := s.db.FeedsFromCategory(category.UUID, user)
+	feeds, err := s.db.FeedsFromCategory(category.APIID, user)
 	if err != nil {
 		return err
 	}

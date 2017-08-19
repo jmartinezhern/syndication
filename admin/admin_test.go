@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -58,13 +59,17 @@ func (suite *AdminTestSuite) SetupTest() {
 }
 
 func (suite *AdminTestSuite) TearDownTest() {
-	err := suite.conn.Close()
-	suite.Nil(err)
+	stopLock := sync.Mutex{}
+	stopLock.Lock()
 	suite.admin.Stop(true)
-	err = suite.db.Close()
+	stopLock.Unlock()
+	err := suite.db.Close()
 	suite.Nil(err)
 
 	err = os.Remove(suite.db.Connection)
+	suite.Nil(err)
+
+	err = suite.conn.Close()
 	suite.Nil(err)
 }
 
@@ -89,7 +94,7 @@ func (suite *AdminTestSuite) TestNewUser() {
 
 	suite.Equal(users[0].Username, "GoTest")
 	suite.NotEmpty(users[0].ID)
-	suite.NotEmpty(users[0].UUID)
+	suite.NotEmpty(users[0].APIID)
 }
 
 func (suite *AdminTestSuite) TestGetUsers() {
@@ -122,7 +127,7 @@ func (suite *AdminTestSuite) TestGetUsers() {
 	suite.Require().Nil(err)
 	suite.Require().Equal(OK, result.Status)
 	suite.Require().Len(result.Result, 1)
-	suite.NotEmpty(result.Result[0].UUID)
+	suite.NotEmpty(result.Result[0].APIID)
 }
 
 func (suite *AdminTestSuite) TestGetUser() {
@@ -135,7 +140,7 @@ func (suite *AdminTestSuite) TestGetUser() {
 	cmd := Request{
 		Command: "GetUser",
 		Arguments: map[string]interface{}{
-			"userID": user.UUID,
+			"userID": user.APIID,
 		},
 	}
 
@@ -160,7 +165,7 @@ func (suite *AdminTestSuite) TestGetUser() {
 	err = json.Unmarshal(buff, result)
 
 	suite.Require().Nil(err)
-	suite.NotEmpty(result.Result.UUID)
+	suite.NotEmpty(result.Result.APIID)
 }
 
 func (suite *AdminTestSuite) TestDeleteUser() {
@@ -175,7 +180,7 @@ func (suite *AdminTestSuite) TestDeleteUser() {
 	cmd := Request{
 		Command: "DeleteUser",
 		Arguments: map[string]interface{}{
-			"userID": user.UUID,
+			"userID": user.APIID,
 		},
 	}
 
@@ -216,7 +221,7 @@ func (suite *AdminTestSuite) TestChangeUserName() {
 	req := Request{
 		Command: "ChangeUserName",
 		Arguments: map[string]interface{}{
-			"userID":  user.UUID,
+			"userID":  user.APIID,
 			"newName": "gopher",
 		},
 	}
@@ -237,7 +242,7 @@ func (suite *AdminTestSuite) TestChangeUserName() {
 	suite.Require().Nil(err)
 	suite.Equal(OK, resp.Status)
 
-	user, err = suite.db.UserWithUUID(user.UUID)
+	user, err = suite.db.UserWithAPIID(user.APIID)
 	suite.Equal("gopher", user.Username)
 }
 
@@ -247,12 +252,12 @@ func (suite *AdminTestSuite) TestChangeUserPassword() {
 
 	user, err := suite.db.UserWithName("GoTest")
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(user.UUID)
+	suite.Require().NotEmpty(user.APIID)
 
 	req := Request{
 		Command: "ChangeUserPassword",
 		Arguments: map[string]interface{}{
-			"userID":      user.UUID,
+			"userID":      user.APIID,
 			"newPassword": "gopher",
 		},
 	}
@@ -275,7 +280,7 @@ func (suite *AdminTestSuite) TestChangeUserPassword() {
 
 	user, err = suite.db.Authenticate("GoTest", "gopher")
 	suite.Nil(err)
-	suite.NotEmpty(user.UUID)
+	suite.NotEmpty(user.APIID)
 }
 
 func TestAdminTestSuite(t *testing.T) {

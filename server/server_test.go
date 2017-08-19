@@ -187,10 +187,10 @@ func (suite *ServerTestSuite) TestNewFeed() {
 	err = json.NewDecoder(resp.Body).Decode(respFeed)
 	suite.Require().Nil(err)
 
-	suite.Require().NotEmpty(respFeed.UUID)
+	suite.Require().NotEmpty(respFeed.APIID)
 	suite.NotEmpty(respFeed.Title)
 
-	dbFeed, err := suite.db.Feed(respFeed.UUID, &suite.user)
+	dbFeed, err := suite.db.Feed(respFeed.APIID, &suite.user)
 	suite.Require().Nil(err)
 	suite.Equal(dbFeed.Title, respFeed.Title)
 }
@@ -204,7 +204,7 @@ func (suite *ServerTestSuite) TestGetFeeds() {
 		err := suite.db.NewFeed(&feed, &suite.user)
 		suite.Require().Nil(err)
 		suite.Require().NotZero(feed.ID)
-		suite.Require().NotEmpty(feed.UUID)
+		suite.Require().NotEmpty(feed.APIID)
 	}
 
 	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds", nil)
@@ -239,9 +239,9 @@ func (suite *ServerTestSuite) TestGetFeed() {
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds/"+feed.UUID, nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds/"+feed.APIID, nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -259,7 +259,7 @@ func (suite *ServerTestSuite) TestGetFeed() {
 	suite.Require().Nil(err)
 
 	suite.Equal(respFeed.Title, feed.Title)
-	suite.Equal(respFeed.UUID, feed.UUID)
+	suite.Equal(respFeed.APIID, feed.APIID)
 }
 
 func (suite *ServerTestSuite) TestEditFeed() {
@@ -267,10 +267,10 @@ func (suite *ServerTestSuite) TestEditFeed() {
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	payload := []byte(`{"title": "EFF Updates"}`)
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/feeds/"+feed.UUID, bytes.NewBuffer(payload))
+	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/feeds/"+feed.APIID, bytes.NewBuffer(payload))
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -283,7 +283,7 @@ func (suite *ServerTestSuite) TestEditFeed() {
 
 	suite.Equal(204, resp.StatusCode)
 
-	respFeed, err := suite.db.Feed(feed.UUID, &suite.user)
+	respFeed, err := suite.db.Feed(feed.APIID, &suite.user)
 	suite.Nil(err)
 	suite.Equal(respFeed.Title, "EFF Updates")
 }
@@ -293,9 +293,9 @@ func (suite *ServerTestSuite) TestDeleteFeed() {
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
-	req, err := http.NewRequest("DELETE", "http://localhost:8080/v1/feeds/"+feed.UUID, nil)
+	req, err := http.NewRequest("DELETE", "http://localhost:8080/v1/feeds/"+feed.APIID, nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -308,7 +308,7 @@ func (suite *ServerTestSuite) TestDeleteFeed() {
 
 	suite.Equal(204, resp.StatusCode)
 
-	_, err = suite.db.Feed(feed.UUID, &suite.user)
+	_, err = suite.db.Feed(feed.APIID, &suite.user)
 	suite.NotNil(err)
 	suite.IsType(database.NotFound{}, err)
 }
@@ -321,12 +321,12 @@ func (suite *ServerTestSuite) TestGetEntriesFromFeed() {
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.server.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds/"+feed.UUID+"/entries", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds/"+feed.APIID+"/entries", nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -357,20 +357,20 @@ func (suite *ServerTestSuite) TestMarkFeed() {
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.server.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	entries, err := suite.db.EntriesFromFeed(feed.UUID, true, models.Unread, &suite.user)
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Unread, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 5)
 
-	entries, err = suite.db.EntriesFromFeed(feed.UUID, true, models.Read, &suite.user)
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Read, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 0)
 
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/feeds/"+feed.UUID+"/mark?as=read", nil)
+	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/feeds/"+feed.APIID+"/mark?as=read", nil)
 
 	suite.Nil(err)
 
@@ -384,11 +384,11 @@ func (suite *ServerTestSuite) TestMarkFeed() {
 
 	suite.Equal(204, resp.StatusCode)
 
-	entries, err = suite.db.EntriesFromFeed(feed.UUID, true, models.Unread, &suite.user)
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Unread, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 0)
 
-	entries, err = suite.db.EntriesFromFeed(feed.UUID, true, models.Read, &suite.user)
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Read, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 5)
 }
@@ -411,10 +411,10 @@ func (suite *ServerTestSuite) TestNewCategory() {
 	err = json.NewDecoder(resp.Body).Decode(respCtg)
 	suite.Require().Nil(err)
 
-	suite.Require().NotEmpty(respCtg.UUID)
+	suite.Require().NotEmpty(respCtg.APIID)
 	suite.NotEmpty(respCtg.Name)
 
-	dbCtg, err := suite.db.Category(respCtg.UUID, &suite.user)
+	dbCtg, err := suite.db.Category(respCtg.APIID, &suite.user)
 	suite.Nil(err)
 	suite.Equal(dbCtg.Name, respCtg.Name)
 }
@@ -427,7 +427,7 @@ func (suite *ServerTestSuite) TestGetCategories() {
 		err := suite.db.NewCategory(&ctg, &suite.user)
 		suite.Require().Nil(err)
 		suite.Require().NotZero(ctg.ID)
-		suite.Require().NotEmpty(ctg.UUID)
+		suite.Require().NotEmpty(ctg.APIID)
 	}
 
 	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories", nil)
@@ -459,9 +459,9 @@ func (suite *ServerTestSuite) TestGetCategory() {
 	err := suite.db.NewCategory(&ctg, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(ctg.ID)
-	suite.Require().NotEmpty(ctg.UUID)
+	suite.Require().NotEmpty(ctg.APIID)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+ctg.UUID, nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+ctg.APIID, nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -479,7 +479,7 @@ func (suite *ServerTestSuite) TestGetCategory() {
 	suite.Require().Nil(err)
 
 	suite.Equal(respCtg.Name, ctg.Name)
-	suite.Equal(respCtg.UUID, ctg.UUID)
+	suite.Equal(respCtg.APIID, ctg.APIID)
 }
 
 func (suite *ServerTestSuite) TestEditCategory() {
@@ -487,10 +487,10 @@ func (suite *ServerTestSuite) TestEditCategory() {
 	err := suite.db.NewCategory(&ctg, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(ctg.ID)
-	suite.Require().NotEmpty(ctg.UUID)
+	suite.Require().NotEmpty(ctg.APIID)
 
 	payload := []byte(`{"name": "World News"}`)
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/categories/"+ctg.UUID, bytes.NewBuffer(payload))
+	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/categories/"+ctg.APIID, bytes.NewBuffer(payload))
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -503,7 +503,7 @@ func (suite *ServerTestSuite) TestEditCategory() {
 
 	suite.Equal(204, resp.StatusCode)
 
-	editedCtg, err := suite.db.Category(ctg.UUID, &suite.user)
+	editedCtg, err := suite.db.Category(ctg.APIID, &suite.user)
 	suite.Require().Nil(err)
 	suite.Equal(editedCtg.Name, "World News")
 }
@@ -513,9 +513,9 @@ func (suite *ServerTestSuite) TestDeleteCategory() {
 	err := suite.db.NewCategory(&ctg, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(ctg.ID)
-	suite.Require().NotEmpty(ctg.UUID)
+	suite.Require().NotEmpty(ctg.APIID)
 
-	req, err := http.NewRequest("DELETE", "http://localhost:8080/v1/categories/"+ctg.UUID, nil)
+	req, err := http.NewRequest("DELETE", "http://localhost:8080/v1/categories/"+ctg.APIID, nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -528,7 +528,7 @@ func (suite *ServerTestSuite) TestDeleteCategory() {
 
 	suite.Equal(204, resp.StatusCode)
 
-	_, err = suite.db.Category(ctg.UUID, &suite.user)
+	_, err = suite.db.Category(ctg.APIID, &suite.user)
 	suite.NotNil(err)
 	suite.IsType(database.NotFound{}, err)
 }
@@ -540,7 +540,7 @@ func (suite *ServerTestSuite) TestGetFeedsFromCategory() {
 
 	err := suite.db.NewCategory(&category, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(category.UUID)
+	suite.Require().NotEmpty(category.APIID)
 
 	feed := models.Feed{
 		Title:        "Test feed",
@@ -551,7 +551,7 @@ func (suite *ServerTestSuite) TestGetFeedsFromCategory() {
 	err = suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.UUID+"/feeds", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.APIID+"/feeds", nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -583,7 +583,7 @@ func (suite *ServerTestSuite) TestGetEntriesFromCategory() {
 
 	err := suite.db.NewCategory(&category, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(category.UUID)
+	suite.Require().NotEmpty(category.APIID)
 	suite.Require().NotZero(category.ID)
 
 	feed := models.Feed{
@@ -595,12 +595,12 @@ func (suite *ServerTestSuite) TestGetEntriesFromCategory() {
 	err = suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.server.sync.SyncCategory(&category, &suite.user)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.UUID+"/entries", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.APIID+"/entries", nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -632,7 +632,7 @@ func (suite *ServerTestSuite) TestMarkCategory() {
 
 	err := suite.db.NewCategory(&category, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(category.UUID)
+	suite.Require().NotEmpty(category.APIID)
 
 	feed := models.Feed{
 		Subscription: suite.ts.URL,
@@ -643,20 +643,20 @@ func (suite *ServerTestSuite) TestMarkCategory() {
 	err = suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.server.sync.SyncCategory(&category, &suite.user)
 	suite.Require().Nil(err)
 
-	entries, err := suite.db.EntriesFromCategory(category.UUID, true, models.Unread, &suite.user)
+	entries, err := suite.db.EntriesFromCategory(category.APIID, true, models.Unread, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 5)
 
-	entries, err = suite.db.EntriesFromCategory(category.UUID, true, models.Read, &suite.user)
+	entries, err = suite.db.EntriesFromCategory(category.APIID, true, models.Read, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 0)
 
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/categories/"+category.UUID+"/mark?as=read", nil)
+	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/categories/"+category.APIID+"/mark?as=read", nil)
 
 	suite.Nil(err)
 
@@ -670,11 +670,11 @@ func (suite *ServerTestSuite) TestMarkCategory() {
 
 	suite.Equal(204, resp.StatusCode)
 
-	entries, err = suite.db.EntriesFromCategory(category.UUID, true, models.Unread, &suite.user)
+	entries, err = suite.db.EntriesFromCategory(category.APIID, true, models.Unread, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 0)
 
-	entries, err = suite.db.EntriesFromCategory(category.UUID, true, models.Read, &suite.user)
+	entries, err = suite.db.EntriesFromCategory(category.APIID, true, models.Read, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 5)
 }
@@ -687,7 +687,7 @@ func (suite *ServerTestSuite) TestGetEntries() {
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.server.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
@@ -724,7 +724,7 @@ func (suite *ServerTestSuite) TestGetEntry() {
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	entry := models.Entry{
 		Title:  "The Espionage Acts Troubling Origins",
@@ -736,9 +736,9 @@ func (suite *ServerTestSuite) TestGetEntry() {
 	err = suite.db.NewEntry(&entry, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(entry.ID)
-	suite.Require().NotEmpty(entry.UUID)
+	suite.Require().NotEmpty(entry.APIID)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/entries/"+entry.UUID, nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/entries/"+entry.APIID, nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -756,7 +756,7 @@ func (suite *ServerTestSuite) TestGetEntry() {
 	suite.Require().Nil(err)
 
 	suite.Equal(entry.Title, respEntry.Title)
-	suite.Equal(entry.UUID, respEntry.UUID)
+	suite.Equal(entry.APIID, respEntry.APIID)
 }
 
 func (suite *ServerTestSuite) TestMarkEntry() {
@@ -767,20 +767,20 @@ func (suite *ServerTestSuite) TestMarkEntry() {
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.server.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	entries, err := suite.db.EntriesFromFeed(feed.UUID, true, models.Read, &suite.user)
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Read, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 0)
 
-	entries, err = suite.db.EntriesFromFeed(feed.UUID, true, models.Unread, &suite.user)
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Unread, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 5)
 
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/entries/"+entries[0].UUID+"/mark?as=read", nil)
+	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/entries/"+entries[0].APIID+"/mark?as=read", nil)
 
 	suite.Nil(err)
 
@@ -794,11 +794,11 @@ func (suite *ServerTestSuite) TestMarkEntry() {
 
 	suite.Equal(204, resp.StatusCode)
 
-	entries, err = suite.db.EntriesFromFeed(feed.UUID, true, models.Unread, &suite.user)
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Unread, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 4)
 
-	entries, err = suite.db.EntriesFromFeed(feed.UUID, true, models.Read, &suite.user)
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Read, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 1)
 }
@@ -811,7 +811,7 @@ func (suite *ServerTestSuite) TestGetStatsForFeed() {
 
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	for i := 0; i < 3; i++ {
 		entry := models.Entry{
@@ -840,7 +840,7 @@ func (suite *ServerTestSuite) TestGetStatsForFeed() {
 		suite.Require().Nil(err)
 	}
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds/"+feed.UUID+"/stats", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds/"+feed.APIID+"/stats", nil)
 
 	suite.Nil(err)
 
@@ -872,7 +872,7 @@ func (suite *ServerTestSuite) TestGetStats() {
 
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	for i := 0; i < 3; i++ {
 		entry := models.Entry{
@@ -932,7 +932,7 @@ func (suite *ServerTestSuite) TestGetStatsForCategory() {
 
 	err := suite.db.NewCategory(&category, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(category.UUID)
+	suite.Require().NotEmpty(category.APIID)
 
 	feed := models.Feed{
 		Title:        "News",
@@ -943,7 +943,7 @@ func (suite *ServerTestSuite) TestGetStatsForCategory() {
 
 	err = suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.UUID)
+	suite.Require().NotEmpty(feed.APIID)
 
 	for i := 0; i < 3; i++ {
 		entry := models.Entry{
@@ -972,7 +972,7 @@ func (suite *ServerTestSuite) TestGetStatsForCategory() {
 		suite.Require().Nil(err)
 	}
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.UUID+"/stats", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.APIID+"/stats", nil)
 
 	suite.Nil(err)
 
@@ -1032,7 +1032,7 @@ func TestServerRegister(t *testing.T) {
 
 	assert.Equal(t, "GoTest", users[0].Username)
 	assert.NotEmpty(t, users[0].ID)
-	assert.NotEmpty(t, users[0].UUID)
+	assert.NotEmpty(t, users[0].APIID)
 
 	err = regResp.Body.Close()
 	require.Nil(t, err)
