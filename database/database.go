@@ -463,7 +463,7 @@ func (db *DB) NewEntry(entry *models.Entry, user *models.User) error {
 
 // NewEntries creates multiple new Entry objects which
 // are all owned by feed with feedAPIID and user
-func (db *DB) NewEntries(entries []models.Entry, feed models.Feed, user *models.User) error {
+func (db *DB) NewEntries(entries []models.Entry, feed *models.Feed, user *models.User) error {
 	if feed.APIID == "" {
 		return BadRequest{"Entry should have a feed"}
 	}
@@ -472,17 +472,15 @@ func (db *DB) NewEntries(entries []models.Entry, feed models.Feed, user *models.
 		return nil
 	}
 
-	if db.db.Model(user).Where("api_id = ?", feed.APIID).Related(&feed).RecordNotFound() {
+	if db.db.Model(user).Where("api_id = ?", feed.APIID).Related(feed).RecordNotFound() {
 		return NotFound{"Feed does not exist"}
 	}
 
 	for _, entry := range entries {
 		entry.APIID = createAPIID()
-		entry.Feed = feed
-		entry.FeedID = feed.ID
 
 		db.db.Model(user).Association("Entries").Append(&entry)
-		db.db.Model(&feed).Association("Entries").Append(&entry)
+		db.db.Model(feed).Association("Entries").Append(&entry)
 	}
 
 	return nil

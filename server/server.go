@@ -46,7 +46,6 @@ const DefaultTLSPort = "443"
 type (
 	// EntryQueryParams maps query parameters used when GETting entries resources
 	EntryQueryParams struct {
-		Update bool   `query:"update"`
 		Marker string `query:"withMarker"`
 		Saved  bool   `query:"saved"`
 	}
@@ -171,15 +170,12 @@ func (s *Server) NewFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err = sync.FetchFeed(&feed)
+	err = s.db.NewFeed(&feed, &user)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
-			Reason:  "UnreachableFeed",
-			Message: "The given feed could not be reached",
-		})
+		return newError(err, &c)
 	}
 
-	err = s.db.NewFeed(&feed, &user)
+	err = s.sync.SyncFeed(&feed, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -314,13 +310,6 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 		withMarker = models.Any
 	}
 
-	if params.Update && !params.Saved && (withMarker == models.Unread || withMarker == models.Any) {
-		err = s.sync.SyncFeed(&feed, &user)
-		if err != nil {
-			return newError(err, &c)
-		}
-	}
-
 	entries, err := s.db.EntriesFromFeed(feed.APIID, true, withMarker, &user)
 	if err != nil {
 		return newError(err, &c)
@@ -358,14 +347,7 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 		withMarker = models.Any
 	}
 
-	if params.Update && params.Saved == true && withMarker == models.Unread {
-		err = s.sync.SyncCategory(&ctg, &user)
-		if err != nil {
-			return newError(err, &c)
-		}
-	}
-
-	entries, err := s.db.EntriesFromCategory(c.Param("categoryID"), true, withMarker, &user)
+	entries, err := s.db.EntriesFromCategory(ctg.APIID, true, withMarker, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -595,13 +577,6 @@ func (s *Server) GetEntries(c echo.Context) error {
 	withMarker := models.MarkerFromString(params.Marker)
 	if withMarker == models.None {
 		withMarker = models.Any
-	}
-
-	if params.Update && !params.Saved && (withMarker == models.Unread || withMarker == models.Any) {
-		err = s.sync.SyncUser(&user)
-		if err != nil {
-			return newError(err, &c)
-		}
 	}
 
 	entries, err := s.db.Entries(true, withMarker, &user)

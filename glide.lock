@@ -1,5 +1,5 @@
-hash: 9233b73841467ccf63dfc707ec67f4b3f720dbf6edcc68be62b89f005efe51c6
-updated: 2017-08-26T10:57:17.507774324-05:00
+hash: f2f24d6f9dada60a57686533584452cbbf2f37314c2fa3c851fd948262b0a672
+updated: 2017-09-03T16:26:02.151477065-05:00
 imports:
 - name: github.com/andybalholm/cascadia
   version: 349dd0209470eabd9514242c688c403c0926d266
@@ -11,8 +11,6 @@ imports:
   version: 570b54cabe6b8eb0bc2dfce68d964677d63b5260
 - name: github.com/go-sql-driver/mysql
   version: 26471af196a17ee75a22e6481b5a5897fb16b081
-- name: github.com/jasonlvhit/gocron
-  version: 42a5804d37aa0b9239b265e894a16b8edbf52d54
 - name: github.com/jinzhu/gorm
   version: 5174cc5c242a728b435ea2be8a2f7f998e15429b
   subpackages:

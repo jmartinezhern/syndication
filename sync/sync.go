@@ -25,16 +25,14 @@ import (
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 
-	"github.com/jasonlvhit/gocron"
 	"github.com/mmcdole/gofeed"
 	log "github.com/sirupsen/logrus"
 )
 
 // Sync represents a syncing worker.
 type Sync struct {
-	scheduler   *gocron.Scheduler
-	cronChannel chan bool
-	db          *database.DB
+	ticker *time.Ticker
+	db     *database.DB
 }
 
 func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.Entry, error) {
@@ -56,14 +54,14 @@ func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.E
 		return nil, err
 	}
 
-	if resp.ContentLength <= 0 {
-		return nil, nil
-	}
-
 	fp := gofeed.NewParser()
 	fetchedFeed, err := fp.Parse(resp.Body)
 
 	if err != nil {
+		if req.ContentLength <= 0 {
+			return nil, nil
+		}
+
 		return nil, err
 	}
 
@@ -119,9 +117,6 @@ func convertItemsToEntries(feed models.Feed, item *gofeed.Item) models.Entry {
 		Link:        item.Link,
 		GUID:        item.GUID,
 		Mark:        models.Unread,
-
-		Feed:   feed,
-		FeedID: feed.ID,
 	}
 
 	if item.Author != nil {
@@ -133,7 +128,9 @@ func convertItemsToEntries(feed models.Feed, item *gofeed.Item) models.Entry {
 
 // FetchFeed fetches a feed and populates a Feed model.
 func FetchFeed(feed *models.Feed) error {
-	client := &http.Client{}
+	client := &http.Client{
+		CheckRedirect: (func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse }),
+	}
 	req, err := http.NewRequest("GET", feed.Subscription, nil)
 	if err != nil {
 		return err
@@ -188,7 +185,7 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 		return err
 	}
 
-	err = s.db.NewEntries(entries, *feed, user)
+	err = s.db.NewEntries(entries, feed, user)
 	if err != nil {
 		return err
 	}
@@ -197,6 +194,7 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -231,22 +229,29 @@ func (s *Sync) SyncUser(user *models.User) error {
 	return nil
 }
 
+func (s *Sync) scheduleTask() {
+	go func() {
+		for {
+			s.SyncUsers()
+			<-s.ticker.C
+		}
+	}()
+}
+
 // Start a syncer
 func (s *Sync) Start() {
-	s.scheduler.Every(5).Minutes().Do(s.SyncUsers)
-	s.scheduler.RunAll()
-	s.cronChannel = s.scheduler.Start()
+	s.ticker = time.NewTicker(time.Minute * 5)
+	s.scheduleTask()
 }
 
 // Stop a syncer
 func (s *Sync) Stop() {
-	s.cronChannel <- true
+	s.ticker.Stop()
 }
 
 // NewSync creates a new Sync object
 func NewSync(db *database.DB) *Sync {
 	return &Sync{
-		db:        db,
-		scheduler: gocron.NewScheduler(),
+		db: db,
 	}
 }
