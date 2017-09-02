@@ -38,7 +38,10 @@ type Sync struct {
 }
 
 func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.Entry, error) {
-	client := &http.Client{}
+	client := &http.Client{
+		CheckRedirect: (func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse }),
+	}
+
 	req, err := http.NewRequest("GET", feed.Subscription, nil)
 	if err != nil {
 		return nil, err

@@ -126,6 +126,10 @@ func (s *Server) Stop() error {
 	return s.handle.Shutdown(ctx)
 }
 
+func (s *Server) OptionsHandler(c echo.Context) error {
+	return c.NoContent(200)
+}
+
 // Login a user
 func (s *Server) Login(c echo.Context) error {
 	username := c.FormValue("username")
@@ -310,7 +314,7 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 		withMarker = models.Any
 	}
 
-	if params.Update && params.Saved == true && withMarker == models.Unread {
+	if params.Update && !params.Saved && (withMarker == models.Unread || withMarker == models.Any) {
 		err = s.sync.SyncFeed(&feed, &user)
 		if err != nil {
 			return newError(err, &c)
@@ -323,7 +327,7 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 	}
 
 	type Entries struct {
-		Entries []models.Entry
+		Entries []models.Entry `json:"entries"`
 	}
 
 	return c.JSON(http.StatusOK, Entries{
@@ -367,7 +371,7 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 	}
 
 	type Entries struct {
-		Entries []models.Entry
+		Entries []models.Entry `json:"entries"`
 	}
 
 	return c.JSON(http.StatusOK, Entries{
@@ -592,7 +596,8 @@ func (s *Server) GetEntries(c echo.Context) error {
 	if withMarker == models.None {
 		withMarker = models.Any
 	}
-	if params.Update && params.Saved == true && withMarker == models.Unread {
+
+	if params.Update && !params.Saved && (withMarker == models.Unread || withMarker == models.Any) {
 		err = s.sync.SyncUser(&user)
 		if err != nil {
 			return newError(err, &c)
@@ -605,7 +610,7 @@ func (s *Server) GetEntries(c echo.Context) error {
 	}
 
 	type Entries struct {
-		Entries []models.Entry
+		Entries []models.Entry `json:"entries"`
 	}
 
 	return c.JSON(http.StatusOK, Entries{
@@ -666,6 +671,8 @@ func (s *Server) getUser(c *echo.Context) (models.User, error) {
 
 func (s *Server) registerMiddleware() {
 	for version, group := range s.versionGroups {
+		group.Use(middleware.CORS())
+
 		group.Use(middleware.SecureWithConfig(middleware.SecureConfig{
 			XSSProtection:      "",
 			XFrameOptions:      "",
@@ -680,6 +687,10 @@ func (s *Server) registerMiddleware() {
 
 		group.Use(middleware.JWTWithConfig(middleware.JWTConfig{
 			Skipper: func(c echo.Context) bool {
+				if c.Request().Method == "OPTIONS" {
+					return true
+				}
+
 				if c.Path() == "/"+version+"/login" || c.Path() == "/"+version+"/register" {
 					return true
 				}
@@ -709,6 +720,11 @@ func (s *Server) registerHandlers() {
 	v1.GET("/feeds/:feedID/entries", s.GetEntriesFromFeed)
 	v1.PUT("/feeds/:feedID/mark", s.MarkFeed)
 	v1.GET("/feeds/:feedID/stats", s.GetStatsForFeed)
+	v1.OPTIONS("/feeds", s.OptionsHandler)
+	v1.OPTIONS("/feeds/:feedID", s.OptionsHandler)
+	v1.OPTIONS("/feeds/:feedID/mark", s.OptionsHandler)
+	v1.OPTIONS("/feeds/:feedID/entries", s.OptionsHandler)
+	v1.OPTIONS("/feeds/:feedID/stats", s.OptionsHandler)
 
 	v1.POST("/categories", s.NewCategory)
 	v1.GET("/categories", s.GetCategories)
@@ -720,11 +736,21 @@ func (s *Server) registerHandlers() {
 	v1.GET("/categories/:categoryID/entries", s.GetEntriesFromCategory)
 	v1.PUT("/categories/:categoryID/mark", s.MarkCategory)
 	v1.GET("/categories/:categoryID/stats", s.GetStatsForCategory)
+	v1.OPTIONS("/categories", s.OptionsHandler)
+	v1.OPTIONS("/categories/:categoryID", s.OptionsHandler)
+	v1.OPTIONS("/categories/:categoryID/mark", s.OptionsHandler)
+	v1.OPTIONS("/categories/:categoryID/feeds", s.OptionsHandler)
+	v1.OPTIONS("/categories/:categoryID/entries", s.OptionsHandler)
+	v1.OPTIONS("/categories/:categoryID/stats", s.OptionsHandler)
 
 	v1.GET("/entries", s.GetEntries)
 	v1.GET("/entries/:entryID", s.GetEntry)
 	v1.PUT("/entries/:entryID/mark", s.MarkEntry)
 	v1.GET("/entries/stats", s.GetStatsForEntries)
+	v1.OPTIONS("/entries", s.OptionsHandler)
+	v1.OPTIONS("/entries/stats", s.OptionsHandler)
+	v1.OPTIONS("/entries/:entryID", s.OptionsHandler)
+	v1.OPTIONS("/entries/:entryID/mark", s.OptionsHandler)
 }
 
 func newError(err error, c *echo.Context) error {
