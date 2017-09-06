@@ -69,9 +69,9 @@ func (suite *SyncTestSuite) SetupTest() {
 		Handler: suite,
 	}
 
-	go func() {
-		suite.server.ListenAndServe()
-	}()
+	go suite.server.ListenAndServe()
+
+	time.Sleep(5000)
 
 	suite.sync = NewSync(suite.db)
 }
