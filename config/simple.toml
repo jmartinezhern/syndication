@@ -1,0 +1,29 @@
+Enable = false
+Connection = "/tmp/syndication.db"
+
+[database]
+  [database.sqlite]
+    Enable = true
+    Connection = "/tmp/syndication.db"
+
+[Server]
+  auth_secret = "secret_cat"
+  auth_secret_file_path = ""
+  enable_tls = false
+  enable_http_requests_log = false
+  enable_panic_print_stack = false
+  domain = ""
+  cert_cache_dir = ""
+  max_shutdown_time = 0
+  http_port = 0
+  shutdown_timeout = 0
+  api_key_expiration = 0
+  tls_port = 0
+
+[Sync]
+  time = 0001-01-01T00:00:00Z
+  interval = 0
+
+[Admin]
+  socket_path = ""
+  max_connections = 0

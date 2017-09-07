@@ -26,11 +26,17 @@ import (
 )
 
 const (
-	SystemConfigPath       = "/etc/syndication/config.toml"
+	// SystemConfigPath is Syndication's default path for system wide configuration.
+	SystemConfigPath = "/etc/syndication/config.toml"
+
+	// UserConfigRelativePath is the relative path to a user configuration.
+	// This should be added to a full path to make a complete path to a configuration.
+	// Internally when concatenate this with the full path $HOME/.config.
 	UserConfigRelativePath = "syndication/config.toml"
 )
 
 type (
+	// Server represents the complete configuration for Syndication's REST server component.
 	Server struct {
 		AuthSecret            string        `toml:"auth_secret"`
 		AuthSecreteFilePath   string        `toml:"auth_secret_file_path"`
@@ -46,22 +52,26 @@ type (
 		TLSPort               int           `toml:"tls_port"`
 	}
 
+	// Database represents the complete configuration for the database used by Syndication.
 	Database struct {
 		Type       string `toml:"-"`
 		Enable     bool
 		Connection string
 	}
 
+	// Sync represents configurations applicable to Syndication's sync component.
 	Sync struct {
 		SyncTime     time.Time     `toml:"time"`
 		SyncInterval time.Duration `toml:"interval"`
 	}
 
+	// Admin represents configurations applicable to Syndication's admin component.
 	Admin struct {
 		SocketPath     string `toml:"socket_path"`
 		MaxConnections int    `toml:"max_connections"`
 	}
 
+	// Config collects all configuration types
 	Config struct {
 		Database  `toml:"-"`
 		Databases map[string]Database `toml:"database"`
@@ -73,11 +83,13 @@ type (
 )
 
 var (
+	// DefaultDatabaseConfig represents the minimum configuration necessary for the database
 	DefaultDatabaseConfig = Database{
 		Type:       "sqlite3",
 		Connection: "/var/syndication/syndication.db",
 	}
 
+	// DefaultServerConfig represents the minimum configuration necessary for the server component.
 	DefaultServerConfig = Server{
 		EnableRequestLogs:     false,
 		EnablePanicPrintStack: true,
@@ -86,15 +98,18 @@ var (
 		HTTPPort:              80,
 	}
 
+	// DefaultAdminConfig represents the minimum configuration necessary for the admin component.
 	DefaultAdminConfig = Admin{
 		SocketPath:     "/var/syndication/syndication.admin",
 		MaxConnections: 5,
 	}
 
+	// DefaultSyncConfig represents the minimum configuration necessary for the sync component.
 	DefaultSyncConfig = Sync{
 		SyncInterval: time.Minute * 15,
 	}
 
+	// DefaultConfig collects all minimum default configurations.
 	DefaultConfig = Config{
 		Databases: map[string]Database{
 			"sqlite": DefaultDatabaseConfig,
@@ -102,6 +117,23 @@ var (
 		Admin:  DefaultAdminConfig,
 		Server: DefaultServerConfig,
 		Sync:   DefaultSyncConfig,
+	}
+)
+
+type (
+	// InvalidFieldValue represents an error caused by a query for an invalid field value.
+	InvalidFieldValue struct {
+		msg string
+	}
+
+	// FileSystemError signals that an file system error occurred during an operation.
+	FileSystemError struct {
+		msg string
+	}
+
+	// ParsingError signals that an error was encountered while parsing a configuration file.
+	ParsingError struct {
+		msg string
 	}
 )
 
@@ -191,6 +223,7 @@ func (c *Config) checkSQLiteConfig() error {
 	return nil
 }
 
+// Save the configuration
 func (c *Config) Save() error {
 	file, err := os.Create(c.path)
 	if err != nil {
@@ -205,12 +238,7 @@ func (c *Config) Save() error {
 	return nil
 }
 
-func NewEmptyConfig(path string) Config {
-	return Config{
-		path: path,
-	}
-}
-
+// NewConfig creates new configuration from a file located at path.
 func NewConfig(path string) (config Config, err error) {
 	config.path = path
 
@@ -230,4 +258,16 @@ func NewConfig(path string) (config Config, err error) {
 	}
 
 	return
+}
+
+func (e InvalidFieldValue) Error() string {
+	return e.msg
+}
+
+func (e FileSystemError) Error() string {
+	return e.msg
+}
+
+func (e ParsingError) Error() string {
+	return e.msg
 }

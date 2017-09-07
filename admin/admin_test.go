@@ -73,6 +73,27 @@ func (suite *AdminTestSuite) TearDownTest() {
 	suite.Nil(err)
 }
 
+func (suite *AdminTestSuite) TestBadCommandArgument() {
+	message := `
+	{
+		"command": "bogus"
+	}
+	`
+	size, err := suite.conn.Write([]byte(message))
+	suite.Require().Nil(err)
+	suite.Equal(len(message), size)
+
+	buff := make([]byte, 256)
+	size, err = suite.conn.Read(buff)
+	suite.Require().Nil(err)
+
+	result := &Response{}
+	err = json.Unmarshal(buff[:size], &result)
+	suite.Require().Nil(err)
+	suite.Equal(NotImplemented, result.Status)
+	suite.Equal("bogus is not implemented.", result.Error)
+}
+
 func (suite *AdminTestSuite) TestNewUser() {
 	message := `
 	{
@@ -95,6 +116,68 @@ func (suite *AdminTestSuite) TestNewUser() {
 	suite.Equal(users[0].Username, "GoTest")
 	suite.NotEmpty(users[0].ID)
 	suite.NotEmpty(users[0].APIID)
+}
+
+func (suite *AdminTestSuite) TestNewUserWithBadFirstArgument() {
+	message := `
+	{
+		"command": "NewUser",
+		"arguments": {"bogus":"GoTest",
+							    "password":"testtesttest"}
+	}
+	`
+	size, err := suite.conn.Write([]byte(message))
+	suite.Require().Nil(err)
+	suite.Equal(len(message), size)
+
+	buff := make([]byte, 256)
+	size, err = suite.conn.Read(buff)
+	suite.Require().Nil(err)
+
+	type UsersResult struct {
+		Status StatusCode    `json:"status"`
+		Error  string        `json:"Error"`
+		Result []models.User `json:"result"`
+	}
+
+	var result UsersResult
+	err = json.Unmarshal(buff[:size], &result)
+	suite.Require().Nil(err)
+	suite.Equal("Bad first argument", result.Error)
+
+	users := suite.db.Users("username")
+	suite.Require().Len(users, 0)
+}
+
+func (suite *AdminTestSuite) TestNewUserWithBadSecondArgument() {
+	message := `
+	{
+		"command": "NewUser",
+		"arguments": {"username":"GoTest",
+							    "bogus":"testtesttest"}
+	}
+	`
+	size, err := suite.conn.Write([]byte(message))
+	suite.Require().Nil(err)
+	suite.Equal(len(message), size)
+
+	buff := make([]byte, 256)
+	size, err = suite.conn.Read(buff)
+	suite.Require().Nil(err)
+
+	type UsersResult struct {
+		Status StatusCode    `json:"status"`
+		Error  string        `json:"Error"`
+		Result []models.User `json:"result"`
+	}
+
+	var result UsersResult
+	err = json.Unmarshal(buff[:size], &result)
+	suite.Require().Nil(err)
+	suite.Equal("Bad second argument", result.Error)
+
+	users := suite.db.Users("username")
+	suite.Require().Len(users, 0)
 }
 
 func (suite *AdminTestSuite) TestGetUsers() {
@@ -168,6 +251,37 @@ func (suite *AdminTestSuite) TestGetUser() {
 	suite.NotEmpty(result.Result.APIID)
 }
 
+func (suite *AdminTestSuite) TestGetUserWithBadArgument() {
+	err := suite.db.NewUser("GoTest", "testtesttest")
+	suite.Require().Nil(err)
+
+	user, err := suite.db.UserWithName("GoTest")
+	suite.Require().Nil(err)
+
+	cmd := Request{
+		Command: "GetUser",
+		Arguments: map[string]interface{}{
+			"bogus": user.APIID,
+		},
+	}
+
+	b, err := json.Marshal(cmd)
+	size, err := suite.conn.Write(b)
+	suite.Require().Nil(err)
+	suite.Equal(len(b), size)
+
+	buff := make([]byte, 512)
+	size, err = suite.conn.Read(buff)
+	suite.Require().Nil(err)
+
+	result := &Response{}
+	err = json.Unmarshal(buff[:size], result)
+	suite.Require().Nil(err)
+
+	suite.Equal(BadArgument, result.Status)
+	suite.Equal("Bad first argument", result.Error)
+}
+
 func (suite *AdminTestSuite) TestDeleteUser() {
 	err := suite.db.NewUser("GoTest", "testtesttest")
 	suite.Require().Nil(err)
@@ -211,6 +325,31 @@ func (suite *AdminTestSuite) TestDeleteUser() {
 	suite.Len(users, 0)
 }
 
+func (suite *AdminTestSuite) TestDeleteUserWithBadArgument() {
+	cmd := Request{
+		Command: "DeleteUser",
+		Arguments: map[string]interface{}{
+			"bogus": "random",
+		},
+	}
+
+	b, err := json.Marshal(cmd)
+	size, err := suite.conn.Write(b)
+	suite.Require().Nil(err)
+	suite.Equal(len(b), size)
+
+	buff := make([]byte, 256)
+	size, err = suite.conn.Read(buff)
+	suite.Require().Nil(err)
+
+	result := &Response{}
+	err = json.Unmarshal(buff[:size], result)
+
+	suite.Require().Nil(err)
+	suite.Equal(BadArgument, result.Status)
+	suite.Equal("Bad first argument", result.Error)
+}
+
 func (suite *AdminTestSuite) TestChangeUserName() {
 	err := suite.db.NewUser("GoTest", "testtesttest")
 	suite.Require().Nil(err)
@@ -244,6 +383,68 @@ func (suite *AdminTestSuite) TestChangeUserName() {
 
 	user, err = suite.db.UserWithAPIID(user.APIID)
 	suite.Equal("gopher", user.Username)
+}
+
+func (suite *AdminTestSuite) TestChangeUserNameWithBadFirstArgument() {
+	err := suite.db.NewUser("GoTest", "testtesttest")
+	suite.Require().Nil(err)
+
+	user, err := suite.db.UserWithName("GoTest")
+	suite.Require().Nil(err)
+
+	req := Request{
+		Command: "ChangeUserName",
+		Arguments: map[string]interface{}{
+			"bogus":   user.APIID,
+			"newName": "gopher",
+		},
+	}
+
+	b, err := json.Marshal(req)
+	size, err := suite.conn.Write(b)
+	suite.Require().Nil(err)
+	suite.Equal(len(b), size)
+
+	buff := make([]byte, 256)
+	size, err = suite.conn.Read(buff)
+	suite.Require().Nil(err)
+
+	resp := &Response{}
+	err = json.Unmarshal(buff[:size], resp)
+	suite.Require().Nil(err)
+	suite.Equal(BadArgument, resp.Status)
+	suite.Equal("Bad first argument", resp.Error)
+}
+
+func (suite *AdminTestSuite) TestChangeUserNameWithBadSecondArgument() {
+	err := suite.db.NewUser("GoTest", "testtesttest")
+	suite.Require().Nil(err)
+
+	user, err := suite.db.UserWithName("GoTest")
+	suite.Require().Nil(err)
+
+	req := Request{
+		Command: "ChangeUserName",
+		Arguments: map[string]interface{}{
+			"userID": user.APIID,
+			"bogus":  "gopher",
+		},
+	}
+
+	b, err := json.Marshal(req)
+	size, err := suite.conn.Write(b)
+	suite.Require().Nil(err)
+	suite.Equal(len(b), size)
+
+	buff := make([]byte, 256)
+	size, err = suite.conn.Read(buff)
+	suite.Require().Nil(err)
+
+	resp := &Response{}
+	err = json.Unmarshal(buff[:size], resp)
+	suite.Require().Nil(err)
+	suite.Equal(BadArgument, resp.Status)
+	suite.Equal("Bad second argument", resp.Error)
 }
 
 func (suite *AdminTestSuite) TestChangeUserPassword() {
@@ -281,6 +482,70 @@ func (suite *AdminTestSuite) TestChangeUserPassword() {
 	user, err = suite.db.Authenticate("GoTest", "gopher")
 	suite.Nil(err)
 	suite.NotEmpty(user.APIID)
+}
+
+func (suite *AdminTestSuite) TestChangeUserPasswordFirstArgument() {
+	err := suite.db.NewUser("GoTest", "testtesttest")
+	suite.Require().Nil(err)
+
+	user, err := suite.db.UserWithName("GoTest")
+	suite.Require().Nil(err)
+	suite.Require().NotEmpty(user.APIID)
+
+	req := Request{
+		Command: "ChangeUserPassword",
+		Arguments: map[string]interface{}{
+			"bogus":       user.APIID,
+			"newPassword": "gopher",
+		},
+	}
+
+	b, err := json.Marshal(req)
+	size, err := suite.conn.Write(b)
+	suite.Require().Nil(err)
+	suite.Equal(len(b), size)
+
+	buff := make([]byte, 512)
+	size, err = suite.conn.Read(buff)
+	suite.Require().Nil(err)
+
+	resp := &Response{}
+	err = json.Unmarshal(buff[:size], resp)
+	suite.Require().Nil(err)
+	suite.Equal(BadArgument, resp.Status)
+	suite.Equal("Bad first argument", resp.Error)
+}
+
+func (suite *AdminTestSuite) TestChangeUserPasswordSecondArgument() {
+	err := suite.db.NewUser("GoTest", "testtesttest")
+	suite.Require().Nil(err)
+
+	user, err := suite.db.UserWithName("GoTest")
+	suite.Require().Nil(err)
+	suite.Require().NotEmpty(user.APIID)
+
+	req := Request{
+		Command: "ChangeUserPassword",
+		Arguments: map[string]interface{}{
+			"userID": user.APIID,
+			"bogus":  "gopher",
+		},
+	}
+
+	b, err := json.Marshal(req)
+	size, err := suite.conn.Write(b)
+	suite.Require().Nil(err)
+	suite.Equal(len(b), size)
+
+	buff := make([]byte, 512)
+	size, err = suite.conn.Read(buff)
+	suite.Require().Nil(err)
+
+	resp := &Response{}
+	err = json.Unmarshal(buff[:size], resp)
+	suite.Require().Nil(err)
+	suite.Equal(BadArgument, resp.Status)
+	suite.Equal("Bad second argument", resp.Error)
 }
 
 func TestAdminTestSuite(t *testing.T) {

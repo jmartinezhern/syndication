@@ -21,15 +21,12 @@ socket_path = "/tmp/syndication.socket"
 
 [server]
 auth_secret = "secret"
+#auth_secret_file_path="$HOME/.config/syndication/secret"
 http_port = 8080
 tls_port = 443
 enable_http_requests_log = true
 enable_panic_print_stack = true
 enable_tls = false
-
-[security]
-auth_secret="secret"
-#auth_secret_file_path="$HOME/.config/syndication/secret"
 
 [database]
 

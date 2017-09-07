@@ -138,7 +138,23 @@ func (suite *SyncTestSuite) TestFeedWithMatchingEtag() {
 	suite.Len(entries, 0)
 }
 
-func (suite *SyncTestSuite) TestFeedWithLastBuildDate() {
+func (suite *SyncTestSuite) TestFeedWithRecentLastUpdateDate() {
+	feed := models.Feed{
+		Title:        "Sync Test",
+		Subscription: "http://localhost:8090/rss.xml",
+		LastUpdated:  time.Now(),
+	}
+
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotEmpty(feed.APIID)
+
+	err = suite.sync.SyncFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
+	suite.Require().Nil(err)
+	suite.Len(entries, 0)
 }
 
 func (suite *SyncTestSuite) TestFeedWithNewEntriesWithGUIDs() {
@@ -179,6 +195,67 @@ func (suite *SyncTestSuite) TestFeedWithNewEntriesWithoutGUIDs() {
 	suite.Require().NotEmpty(feed.APIID)
 
 	err = suite.sync.SyncFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
+	suite.Require().Nil(err)
+	suite.Len(entries, 5)
+}
+
+func (suite *SyncTestSuite) TestSyncUser() {
+	feed := models.Feed{
+		Title:        "Sync Test",
+		Subscription: "http://localhost:8090/rss_minimal.xml",
+	}
+
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotEmpty(feed.APIID)
+
+	err = suite.sync.SyncUser(&suite.user)
+	suite.Require().Nil(err)
+
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
+	suite.Require().Nil(err)
+	suite.Len(entries, 5)
+}
+
+func (suite *SyncTestSuite) TestSyncUsers() {
+	feed := models.Feed{
+		Title:        "Sync Test",
+		Subscription: "http://localhost:8090/rss_minimal.xml",
+	}
+
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotEmpty(feed.APIID)
+
+	suite.sync.SyncUsers()
+
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
+	suite.Require().Nil(err)
+	suite.Len(entries, 5)
+}
+
+func (suite *SyncTestSuite) TestSyncCategory() {
+	ctg := models.Category{
+		Name: "Test Ctg",
+	}
+
+	err := suite.db.NewCategory(&ctg, &suite.user)
+	suite.Require().Nil(err)
+
+	feed := models.Feed{
+		Title:        "Sync Test",
+		Subscription: "http://localhost:8090/rss_minimal.xml",
+		Category:     ctg,
+	}
+
+	err = suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotEmpty(feed.APIID)
+
+	err = suite.sync.SyncCategory(&ctg, &suite.user)
 	suite.Require().Nil(err)
 
 	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
