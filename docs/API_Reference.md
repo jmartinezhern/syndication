@@ -2,22 +2,23 @@
 
 ## Authentication
 
-A Syndication server allows authentication operations over HTTP. However, these can be turned off by an administrator.  If the server does not allow an authentication operation a 403 Forbidden error.
+A Syndication server allows authentication operations over HTTP. However, these can be turned off by an administrator.  If the server does not allow an authentication operation a 403 Forbidden error will be returned.
 
 ### Register a new user
 
 ```
 POST /register
 ```
-#### Request
 
-##### Parameters
-|    Name    |  Type  |                Description              |
-| ---------- | ------ | --------------------------------------- |
-|  username  | string | **Required**. An alpha-numeric username |
-|  password  | string | **Required**. A password                |
+#### Parameters
+
+|    Name    |  Type  |                  Description                |
+| ---------- | ------ | ------------------------------------------- |
+|  username  | string | **Required**. An alpha-numeric username.    |
+|  password  | string | **Required**. A password.                   |
+
 ```bash
-curl -d "username=foo" -d "password=pass"
+curl -d "username=foo" -d "password=pass" http://localhost:8080/v1/login
 ```
 
 #### Response
@@ -28,13 +29,11 @@ Status: 204 No Content
 
 ### Login a user
 
-#### Request
-
 ```
 POST /login
 ```
 
-##### Parameters
+#### Parameters
 
 |    Name    |  Type  |               Description               |
 | ---------- | ------ | --------------------------------------- |
@@ -45,230 +44,17 @@ POST /login
 
 ```
 Status: 200 OK
-
+```
+```javascript
   {
     'token': 'Ad83...'
     'expiration': '2017-08-29'
   }
 ```
 
-## Feeds
-
-### Add a feed
-
-```
-POST /feeds
-```
-
-##### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ------------|
-| title | string | A title to give to a subscribing feed. If this is not provided, the title found in the subscription will be used. |
-| subscription | string | **Required.** A URL to a feed. This must point to a valid atom or rss feed. |
-
-A `category` object can also be provided.
-
-| Name | Type | Description |
-| ---- | ---- | ------------|
-|  id  | string | The id that the category should belong to. |
-
-```
-{
-  'title' : 'Deeplinks',
-  'subscription' : 'https://www.eff.org/rss/updates.xml',
-  'category' :  {
-    'id' : 'df10d51f-eb45-4f05-a20f-c18ae9f09b86'
-  }
-}
-```
-
-#### Response
-
-```
-Status: 201 Created
-```
-```
-{
-  'id' : 'e00aae3f-4c0d-403e-bb72-f3b99e20834a',
-  'title' : 'Deeplinks',
-  'author' ; 'Electronic Frontier Foundation',
-  'description' : 'EFF's Deeplinks Blog: Noteworthy news from around the internet',
-  'subscription' : 'https://www.eff.org/rss/updates.xml',
-  'source' : 'http://eff.org',
-  'status' : 'recheable',
-  'category' :  {
-    'name' : 'News',
-    'id' : 'df10d51f-eb45-4f05-a20f-c18ae9f09b86'
-  }
-}
-```
-
-### Fetch a feed
-
-```
-GET /feeds/:feedID
-```
-
-#### Response
-```
-Status: 201 Created
-```
-```
-{
-  'id' : 'e00aae3f-4c0d-403e-bb72-f3b99e20834a',
-  'title' : 'Deeplinks',
-  'author' ; 'Electronic Frontier Foundation',
-  'description' : 'EFF's Deeplinks Blog: Noteworthy news from around the internet',
-  'subscription' : 'https://www.eff.org/rss/updates.xml',
-  'source' : 'http://eff.org',
-  'status' : 'recheable',
-  'category' :  {
-    'name' : 'News',
-    'id' : 'df10d51f-eb45-4f05-a20f-c18ae9f09b86'
-  }
-}
-```
-
-
-### Get a list of feeds
-
-```
-GET /feeds
-```
-
-#### Response
-
-```
-Status: 200 OK
-```
-```
-{
-  'feeds': [
-    {
-      'id' : 'e00aae3f-4c0d-403e-bb72-f3b99e20834a',
-      'title' : 'Deeplinks',
-      'author' ; 'Electronic Frontier Foundation',
-      'description' : 'EFF's Deeplinks Blog: Noteworthy news from around the internet',
-      'subscription' : 'https://www.eff.org/rss/updates.xml',
-      'source' : 'http://eff.org',
-      'status' : 'recheable',
-      'category' :  {
-        'name' : 'News',
-        'id' : 'df10d51f-eb45-4f05-a20f-c18ae9f09b86'
-      }
-    },
-  ...
-  ]
-}
-```
-
-### Edit a feed
-
-```
-PUT /feeds/:feedID
-```
-
-```
-{
-  'title' : 'Deeplinks'
-}
-```
-
-#### Response
-
-```
-Status: 204 No Content
-```
-
-### Delete a feed
-
-```
-DELETE /feeds/:feedID
-```
-
-#### Response
-```
-Status: 201 No Content
-```
-
-### Get entries from feed
-
-```
-GET /feeds/:feedID/entries
-```
-
-#### Request
-
-##### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| markedAs | string | Return only entries marked as `read` or `unread` |
-| pageSize | integer | Size of the returned page |
-| page | integer | Page number for the returned entry list
-| orderBy | string | Order entries by `newest` or `oldest`
-| newerThan | integer | Return entries newer than a provided time in Unix format |
-
-```
-https://localhost:8081/v1/feeds/e00aae3f-4c0d-403e-bb72-f3b99e20834a/entries?markedAs=unread&pageSize=100&page=2&orderBy=newest&newerThan=1496116444
-```
-
-#### Response
-
-```
-{
-  "entries" : [
-    {
-      'id' : 'cb7fac24-ec4a-4596-af89-19ad21d61e3e',
-      'title' : 'A Bad Broadband Market Begs for Net Neutrality Protections',
-      'description' : 'Anyone who has spent hours on...',
-      'link' : 'https://www.eff.org/deeplinks/2017/05/bad-broadband-market-begs-net-neutrality-protections'
-      'published' : '2017-05-30T03:26:38Z'
-      'author' : 'Kate Tummarello',
-      'isSaved' : 'true',
-      'markedAs' : 'unread'
-    },
-    ...
-  ]
-}
-```
-
-### Mark a feed
-
-```
-PUT /feeds/:feedID/mark
-```
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| as   | string | The marker to apply to the feed. This can be either `read` or `unread`
-
-```
-http://locahost:8080/feeds/e00aae3f-4c0d-403e-bb72-f3b99e20834a/mark?as=read
-```
-
-### Get stats for a feed
-
-```
-GET /feeds/:feedID/stats
-```
-
-#### Response
-```
-{
-  'unread' : 48
-  'read' : 123
-  'saved' : 23
-  'total' : 171
-}
-```
-
 ## Entries
 
-### Get Entry
+### Get an Entry's information
 
 ```
 GET /entries/:entryID
@@ -277,8 +63,12 @@ GET /entries/:entryID
 #### Response
 
 ```
+Status: 200 OK
+```
+
+```javascript
 {
-  'id' : 'cb7fac24-ec4a-4596-af89-19ad21d61e3e',
+  'id' : 'MTUwNDgwNTA3Nw==',
   'title' : 'A Bad Broadband Market Begs for Net Neutrality Protections',
   'description' : 'Anyone who has spent hours on...',
   'link' : 'https://www.eff.org/deeplinks/2017/05/bad-broadband-market-begs-net-neutrality-protections'
@@ -289,25 +79,48 @@ GET /entries/:entryID
 }
 ```
 
-### Get Entries
+### Get a list of all Entries
 
 ```
 GET /entries
 ```
 
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| markedAs | string | Return only entries marked as `read` or `unread` |
-| pageSize | integer | Size of the returned page |
-| page | integer | Page number for the returned entry list
-| orderBy | string | Order entries by `newest` or `oldest`
-| newerThan | integer | Return entries newer than a provided time in Unix format |
+|    Name   |   Type  |                               Description                               |
+| --------- | ------- | ----------------------------------------------------------------------- |
+| markedAs  | string  | Return only entries marked as `read` or `unread`. Default is `unread`.  |
+| pageSize  | integer | Size of the returned page. Default is 100.                              |
+| page      | integer | Page number for the returned entry list. Default is 1.                  |
+| orderBy   | string  | Order entries by `newest` or `oldest`. Default is `newest`.             |
+| newerThan | integer | Return entries newer than a provided time in Unix format.               |
+
+```bash
+curl -H "Authorization: Bearer A32wdj48..." https://localhost:8081/v1/entries?markedAs=unread&pageSize=100&page=2&orderBy=newest&newerThan=1496116444
+```
+#### Response
 
 ```
-https://localhost:8081/v1/entries?markedAs=unread&pageSize=100&page=2&orderBy=newest&newerThan=1496116444
+Status: 200 OK
 ```
 
-### Mark entry
+```javascript
+{
+  "entries" : [
+    {
+      'id' : 'MTUwNDgwNTA3Nw==',
+      'title' : 'A Bad Broadband Market Begs for Net Neutrality Protections',
+      'description' : 'Anyone who has spent hours on...',
+      'link' : 'https://www.eff.org/deeplinks/2017/05/bad-broadband-market-begs-net-neutrality-protections'
+      'published' : '2017-05-30T03:26:38Z'
+      'author' : 'Kate Tummarello',
+      'isSaved' : true,
+      'markedAs' : 'unread'
+    },
+    ...
+  ]
+}
+```
+
+### Apply a Marker to an Entry
 
 ```
 PUT /entries/:entryID/mark
@@ -319,11 +132,15 @@ PUT /entries/:entryID/mark
 | ---- | ---- | ----------- |
 | as   | string | The marker to apply to the feed. This can be either `read` or `unread`
 
+```bash
+curl -X PUT -H "Authorization: Bearer Adk4maY..." http://locahost:8080/entries/MTUwNDgwNTA3Nw==/mark?as=read
 ```
-http://locahost:8080/entries/cb7fac24-ec4a-4596-af89-19ad21d61e3e/mark?as=read
+#### Response
+```
+Status: 204 No Content
 ```
 
-### Get stats for entries
+### Get stats for all Entries
 
 ```
 GET /entries/stats
@@ -332,6 +149,235 @@ GET /entries/stats
 #### Response
 
 ```
+Status: 200 OK
+```
+
+```javascript
+{
+  'unread' : 48
+  'read' : 123
+  'saved' : 23
+  'total' : 171
+}
+```
+
+## Feeds
+
+### Subscribe to a feed
+
+```
+POST /feeds
+```
+
+#### Parameters
+
+| Name  |  Type  | Description |
+| ----  | ------ | ------------|
+| title | string | Title for the subscribed feed. If one is not provided, the title found in the subscription will be used. |
+| subscription | string | **Required.** URL to a feed. This must point to a valid Atom or RSS feed. |
+
+A `category` object can also be provided.
+
+| Name | Type | Description |
+| ---- | ---- | ------------|
+|  id  | string | The id that the category should belong to. |
+
+```javascript
+{
+  'title' : 'Deeplinks',
+  'subscription' : 'https://www.eff.org/rss/updates.xml',
+  'category' :  {
+    'id' : 'MTUwNDgwNDQ4Nw=='
+  }
+}
+```
+
+#### Response
+
+```
+Status: 201 Created
+```
+```javascript
+{
+  'id' : 'MTUwNDgwNDQ4Nw==',
+  'title' : 'Deeplinks',
+  'author' ; 'Electronic Frontier Foundation',
+  'description' : 'EFFs Deeplinks Blog: Noteworthy news from around the internet',
+  'subscription' : 'https://www.eff.org/rss/updates.xml',
+  'source' : 'http://eff.org',
+  'status' : 'reachable',
+  'category' :  {
+    'name' : 'News',
+    'id' : 'MTUwNDgwNDU5Mg=='
+  }
+}
+```
+
+### Get a Feed's metadata
+
+```
+GET /feeds/:feedID
+```
+
+#### Response
+```
+Status: 201 Created
+```
+```javascript
+{
+  'id' : 'MTUwNDgwNDU5Mg==',
+  'title' : 'Deeplinks',
+  'author' ; 'Electronic Frontier Foundation',
+  'description' : 'EFFs Deeplinks Blog: Noteworthy news from around the internet',
+  'subscription' : 'https://www.eff.org/rss/updates.xml',
+  'source' : 'http://eff.org',
+  'status' : 'reachable',
+  'category' :  {
+    'name' : 'News',
+    'id' : 'MTUwNDgwNDQ4Nw=='
+  }
+}
+```
+
+
+### Get a list of subscribed Feeds
+
+```
+GET /feeds
+```
+
+#### Response
+
+```
+Status: 200 OK
+```
+```javascript
+{
+  'feeds': [
+    {
+      'id' : 'MTUwNDgwNDQ4Nw==',
+      'title' : 'Deeplinks',
+      'author' ; 'Electronic Frontier Foundation',
+      'description' : 'EFFs Deeplinks Blog: Noteworthy news from around the internet',
+      'subscription' : 'https://www.eff.org/rss/updates.xml',
+      'source' : 'http://eff.org',
+      'status' : 'recheable',
+      'category' :  {
+        'name' : 'News',
+        'id' : 'MTUwNDgwNDU5Mg=='
+      }
+    }
+    ...
+  ]
+}
+```
+
+### Edit a Feed's information
+
+```
+PUT /feeds/:feedID
+```
+```javascript
+{
+  'title' : 'Deeplinks'
+}
+```
+
+#### Response
+
+```
+Status: 204 No Content
+```
+
+### Unsubscribe from Feed
+
+```
+DELETE /feeds/:feedID
+```
+
+#### Response
+```
+Status: 201 No Content
+```
+
+### Get a list of Entries from a Feed
+
+```
+GET /feeds/:feedID/entries
+```
+
+#### Parameters
+
+|    Name   |   Type  |                               Description                               |
+| --------- | ------- | ----------------------------------------------------------------------- |
+| markedAs  | string  | Return only entries marked as `read` or `unread`. Default is `unread`.  |
+| pageSize  | integer | Size of the returned page. Default is 100.                              |
+| page      | integer | Page number for the returned entry list. Default is 1.                  |
+| orderBy   | string  | Order entries by `newest` or `oldest`. Default is `newest`.             |
+| newerThan | integer | Return entries newer than a provided time in Unix format.               |
+
+```bash
+curl -H "Authorization: Bearer Adae8kd..." https://localhost:8080/v1/feeds/MTUwNDgwNDQ4Nw==/entries?markedAs=unread&pageSize=100&page=2&orderBy=newest&newerThan=1496116444
+```
+
+#### Response
+
+```
+Status: 200 OK
+```
+
+```javascript
+{
+  "entries" : [
+    {
+      'id' : 'MTUwNDgwNTA3Nw==',
+      'title' : 'A Bad Broadband Market Begs for Net Neutrality Protections',
+      'description' : 'Anyone who has spent hours on...',
+      'link' : 'https://www.eff.org/deeplinks/2017/05/bad-broadband-market-begs-net-neutrality-protections'
+      'published' : '2017-05-30T03:26:38Z'
+      'author' : 'Kate Tummarello',
+      'isSaved' : true,
+      'markedAs' : 'unread'
+    },
+    ...
+  ]
+}
+```
+
+### Apply a Marker to a Feed
+
+```
+PUT /feeds/:feedID/mark
+```
+
+#### Parameters
+
+| Name |  Type  | Description |
+| ---- | ----   | ----------- |
+| as   | string | **Required**. The marker to apply to the feed. This can be either `read` or `unread` |
+
+```bash
+curl -X PUT -H "Authorization: Bearer Adj48dkx.." http://locahost:8080/feeds/MTUwNDgwNTA3Nw==/mark?as=read
+```
+
+#### Response
+```
+Status: 204 No Content
+```
+
+### Get stats for a Feed
+
+```
+GET /feeds/:feedID/stats
+```
+
+#### Response
+
+```
+Status: 200 OK
+```
+
+```javascript
 {
   'unread' : 48
   'read' : 123
@@ -348,11 +394,9 @@ GET /entries/stats
 POST /categories
 ```
 
-#### Request
+#### Parameters
 
-##### Parameters
-
-```
+```javascript
 {
   'name': 'News'
 }
@@ -363,14 +407,14 @@ POST /categories
 Status: 201 Created
 ```
 
-```
+```javascript
 {
-  'id': '84a9497e-d165-4fb9-a48e-be85bc9ff559',
+  'id': 'MTUwNDgwNTA3Nw==',
   'name': 'News'
 }
 ```
 
-### Get categories
+### Get a list of Categories
 
 ```
 GET /categories
@@ -379,10 +423,14 @@ GET /categories
 #### Response
 
 ```
+Status: 200 OK
+```
+
+```javascript
 {
   'categories': [
     {
-      'id': '84a9497e-d165-4fb9-a48e-be85bc9ff559',
+      'id': 'MTUwNDgwNTA3Nw==',
       'name': 'News'
     },
     ...
@@ -390,7 +438,7 @@ GET /categories
 }
 ```
 
-### Get a category
+### Get a Category's metadata
 
 ```
 GET /categories/:categoryID
@@ -401,22 +449,20 @@ GET /categories/:categoryID
 Status: 200 OK
 ```
 
-```
+```javascript
 {
-  'id': '84a9497e-d165-4fb9-a48e-be85bc9ff559',
+  'id': 'MTUwNDgwNTA3Nw==',
   'name': 'News'
 }
 ```
 
-### Edit a category
+### Edit a Category's information
 
 ```
 PUT /categories/:categoryID
 ```
 
-#### Request
-
-```
+```javascript
 {
   'name': 'Activism'
 }
@@ -440,7 +486,7 @@ DELETE /categories/:categoryID
 Status: 201 No Content
 ```
 
-### Get feeds
+### Get a list of Feeds from a Category
 
 ```
 GET /categories/:categoryID/feeds
@@ -449,42 +495,44 @@ GET /categories/:categoryID/feeds
 #### Response
 
 ```
+Status: 200 OK
+```
+
+```javascript
 {
   'feeds' : [
     {
-      'id' : 'e00aae3f-4c0d-403e-bb72-f3b99e20834a',
+      'id' : 'MTUwNDgwNTA3Nw==',
       'title' : 'Deeplinks',
       'author' ; 'Electronic Frontier Foundation',
-      'description' : 'EFF's Deeplinks Blog: Noteworthy news from around the internet',
+      'description' : 'EFFs Deeplinks Blog: Noteworthy news from around the internet',
       'subscription' : 'https://www.eff.org/rss/updates.xml',
       'source' : 'http://eff.org',
-      'status' : 'recheable'
+      'status' : 'reachable'
     },
     ...
   ]
 }
 ```
 
-### Add feed to a category
+### Add Feeds to a Category
 
 ```
 PUT /categories/:categoryID/feeds
 ```
 
-#### Request
+#### Parameters
 
-##### Parameters
+| Name  |           Type       | Description |
+| ----- | -------------------- | ----------- |
+| feeds | `array` of `string`s | A list of IDs for Feeds that will be added to the category. |
 
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| feeds | `array` of `string`s | A list of feed IDs that will be added to the category
-
-```
+```javascript
 {
   'feeds' : [
-    '6134d5cc-b595-4263-aea0-53900d9d4ae8',
-    '59652914-fd89-4f1d-9a50-6437fb0aa3c8',
-    'bca982b7-5c26-4da9-b565-d5ab0fcc487c',
+    'MTUwNDgwNDQ4Nw==',
+    'MTUwNDgwNDU5Mg==',
+    'MTUwNDgwNTA3Nw==',
     ...
   ]
 }
@@ -492,26 +540,26 @@ PUT /categories/:categoryID/feeds
 
 #### Response
 ```
-Status: 202 Accepted
+Status: 201 No Content
 ```
 
-### Get entries from a category
+### Get a list of Entries from a Category
 
 ```
 GET /categories/:categoryID/entries
 ```
-##### Parameters
+#### Parameters
 
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| markedAs | string | Return only entries marked as `read` or `unread` |
-| pageSize | integer | Size of the returned page |
-| page | integer | Page number for the returned entry list
-| orderBy | string | Order entries by `newest` or `oldest`
-| newerThan | integer | Return entries newer than a provided time in Unix format |
+|    Name   |   Type  |                               Description                               |
+| --------- | ------- | ----------------------------------------------------------------------- |
+| markedAs  | string  | Return only entries marked as `read` or `unread`. Default is `unread`.  |
+| pageSize  | integer | Size of the returned page. Default is 100.                              |
+| page      | integer | Page number for the returned entry list. Default is 1.                  |
+| orderBy   | string  | Order entries by `newest` or `oldest`. Default is `newest`.             |
+| newerThan | integer | Return entries newer than a provided time in Unix format.               |
 
-```
-https://localhost:8081/v1/categories/84a9497e-d165-4fb9-a48e-be85bc9ff559/entries?markedAs=unread&pageSize=100&page=2&orderBy=newest&newerThan=1496116444
+```bash
+curl -H "Authorization: Bearer Adae8kd..." https://localhost:8080/v1/categories/MTUwNDgwNDQ4Nw==/entries?markedAs=unread&pageSize=100&page=2&orderBy=newest&newerThan=1496116444
 ```
 
 #### Response
@@ -519,11 +567,11 @@ https://localhost:8081/v1/categories/84a9497e-d165-4fb9-a48e-be85bc9ff559/entrie
 Status: 200 OK
 ```
 
-```
+```javascript
 {
   "entries" : [
     {
-      'id' : 'cb7fac24-ec4a-4596-af89-19ad21d61e3e',
+      'id' : 'MTUwNDgwNTA3Nw==',
       'title' : 'A Bad Broadband Market Begs for Net Neutrality Protections',
       'description' : 'Anyone who has spent hours on...',
       'link' : 'https://www.eff.org/deeplinks/2017/05/bad-broadband-market-begs-net-neutrality-protections'
@@ -536,3 +584,44 @@ Status: 200 OK
   ]
 }
 ```
+### Get stats for a Category
+
+```
+GET /categories/:categoryID/stats
+```
+
+#### Response
+```
+Status: 200 OK
+```
+
+```javascript
+{
+  'unread' : 48
+  'read' : 123
+  'saved' : 23
+  'total' : 171
+}
+```
+
+### Apply a Marker to a Category
+
+```
+PUT /categories/:categoryID/mark
+```
+
+#### Parameters
+
+| Name |  Type  | Description |
+| ---- | ----   | ----------- |
+| as   | string | **Required**. The marker to apply to the feed. This can be either `read` or `unread` |
+
+```bash
+curl -X PUT -H "Authorization: Bearer Adj48dkx.." http://locahost:8080/categories/MTUwNDgwNTA3Nw==/mark?as=read
+```
+
+#### Response
+```
+Status: 204 No Content
+```
+
