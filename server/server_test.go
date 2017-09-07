@@ -997,7 +997,47 @@ func (suite *ServerTestSuite) TestGetStatsForCategory() {
 }
 
 func (suite *ServerTestSuite) TestAddFeedsToCategory() {
-	// TODO
+	feed := models.Feed{
+		Title:        "Example Feed",
+		Subscription: "http://example.com/feed",
+	}
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+
+	ctg := models.Category{
+		Name: "Test",
+	}
+	err = suite.db.NewCategory(&ctg, &suite.user)
+	suite.Nil(err)
+
+	type FeedList struct {
+		Feeds []string `json:"feeds"`
+	}
+
+	list := FeedList{
+		Feeds: []string{feed.APIID},
+	}
+
+	b, err := json.Marshal(list)
+	suite.Require().Nil(err)
+
+	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/categories/"+ctg.APIID+"/feeds", bytes.NewBuffer(b))
+	suite.Require().Nil(err)
+
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(http.StatusNoContent, resp.StatusCode)
+
+	feed, err = suite.db.Feed(feed.APIID, &suite.user)
+	suite.Nil(err)
+
+	suite.Equal(ctg.ID, feed.CategoryID)
 }
 
 func TestServerRegister(t *testing.T) {

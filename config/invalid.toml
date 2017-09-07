@@ -1,0 +1,6 @@
+[server]
+auth_secret = ""
+
+[database.sqlite]
+enable = false
+connection = ""

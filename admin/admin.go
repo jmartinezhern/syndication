@@ -242,7 +242,7 @@ func (a *Admin) GetUsers(args args, r *Response) error {
 
 // GetUser returns all information on a user.
 func (a *Admin) GetUser(args args, r *Response) error {
-	r.Status = OK
+	r.Status = BadArgument
 
 	aVal := reflect.ValueOf(args["userID"])
 	if aVal.Kind() != reflect.String {
@@ -406,14 +406,6 @@ func (a *Admin) processRequest(req Request, resp *Response) error {
 		resp.Status = NotImplemented
 		resp.Error = req.Command + " is not implemented."
 		return nil
-	}
-
-	for key, val := range req.Arguments {
-		if !reflect.ValueOf(val).IsValid() {
-			resp.Status = BadArgument
-			resp.Error = "Argument " + key + " is invalid."
-			return nil
-		}
 	}
 
 	args := []reflect.Value{reflect.ValueOf(req.Arguments), reflect.ValueOf(resp)}

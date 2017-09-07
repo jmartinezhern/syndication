@@ -451,6 +451,73 @@ func (suite *DatabaseTestSuite) TestNewEntryWithBadFeed() {
 	suite.Zero(query.FeedID)
 }
 
+func (suite *DatabaseTestSuite) TestNewEntries() {
+	feed := models.Feed{
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+	suite.NotZero(feed.ID)
+	suite.NotEmpty(feed.APIID)
+
+	var entries []models.Entry
+	for i := 0; i < 5; i++ {
+		entry := models.Entry{
+			Title:       "Test Entry",
+			Description: "Testing entry",
+			Author:      "varddum",
+			Link:        "http://example.com",
+			Mark:        models.Unread,
+			Feed:        feed,
+		}
+
+		entries = append(entries, entry)
+	}
+
+	err = suite.db.NewEntries(entries, &feed, &suite.user)
+	suite.Require().Nil(err)
+
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Unread, &suite.user)
+	suite.Nil(err)
+	suite.NotEmpty(entries)
+	suite.Len(entries, 5)
+	for _, entry := range entries {
+		suite.NotZero(entry.ID)
+		suite.NotZero(entry.Title)
+	}
+}
+
+func (suite *DatabaseTestSuite) TestEntries() {
+	feed := models.Feed{
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+	suite.NotEmpty(feed.APIID)
+
+	entry := models.Entry{
+		Title:       "Test Entry",
+		Description: "Testing entry",
+		Author:      "varddum",
+		Link:        "http://example.com",
+		Mark:        models.Unread,
+		Feed:        feed,
+	}
+
+	err = suite.db.NewEntry(&entry, &suite.user)
+	suite.Require().Nil(err)
+
+	entries, err := suite.db.Entries(true, models.Unread, &suite.user)
+	suite.Nil(err)
+	suite.NotEmpty(entries)
+	suite.Equal(entries[0].ID, entry.ID)
+	suite.Equal(entries[0].Title, entry.Title)
+}
+
 func (suite *DatabaseTestSuite) TestEntriesFromFeed() {
 	feed := models.Feed{
 		Title:        "Test site",
@@ -992,6 +1059,28 @@ func (suite *DatabaseTestSuite) TestKeyDoesNotBelongToUser() {
 	suite.False(found)
 }
 
+func (suite *DatabaseTestSuite) TestErrors() {
+	conflictErr := Conflict{"Conflict Error"}
+	suite.Equal(conflictErr.Code(), 409)
+	suite.Equal(conflictErr.Error(), "Conflict Error")
+	suite.Equal(conflictErr.String(), "Conflict")
+
+	notFoundErr := NotFound{"NotFound Error"}
+	suite.Equal(notFoundErr.Code(), 404)
+	suite.Equal(notFoundErr.Error(), "NotFound Error")
+	suite.Equal(notFoundErr.String(), "NotFound")
+
+	badRequestErr := BadRequest{"BadRequest Error"}
+	suite.Equal(badRequestErr.Code(), 400)
+	suite.Equal(badRequestErr.Error(), "BadRequest Error")
+	suite.Equal(badRequestErr.String(), "BadRequest")
+
+	unauthorizedErr := Unauthorized{"Unauthorized Error"}
+	suite.Equal(unauthorizedErr.Code(), 401)
+	suite.Equal(unauthorizedErr.Error(), "Unauthorized Error")
+	suite.Equal(unauthorizedErr.String(), "Unauthorized")
+}
+
 func TestNewDB(t *testing.T) {
 	_, err := NewDB("sqlite3", TestDatabasePath)
 	assert.Nil(t, err)
@@ -1069,6 +1158,77 @@ func TestNewConflictingUsers(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestDeleteUser(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.NewUser("first", "golang")
+	assert.Nil(t, err)
+
+	err = db.NewUser("second", "password")
+	assert.Nil(t, err)
+
+	users := db.Users()
+	assert.Len(t, users, 2)
+
+	err = db.DeleteUser(users[0].APIID)
+	assert.Nil(t, err)
+
+	users = db.Users()
+	assert.Len(t, users, 1)
+
+	err = os.Remove(TestDatabasePath)
+	assert.Nil(t, err)
+}
+
+func TestChangeUserName(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.NewUser("test", "golang")
+	require.Nil(t, err)
+
+	user, err := db.UserWithName("test")
+	require.Nil(t, err)
+
+	err = db.ChangeUserName(user.APIID, "new_name")
+	require.Nil(t, err)
+
+	user, err = db.UserWithName("test")
+	assert.IsType(t, err, NotFound{})
+	assert.Zero(t, user.ID)
+
+	user, err = db.UserWithName("new_name")
+	assert.NotZero(t, user.ID)
+
+	err = os.Remove(TestDatabasePath)
+	assert.Nil(t, err)
+}
+
+func TestChangeUserPassword(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.NewUser("test", "golang")
+	require.Nil(t, err)
+
+	user, err := db.Authenticate("test", "golang")
+	require.Nil(t, err)
+
+	err = db.ChangeUserPassword(user.APIID, "new_password")
+	assert.Nil(t, err)
+
+	_, err = db.Authenticate("test", "golang")
+	assert.IsType(t, err, Unauthorized{})
+
+	user, err = db.Authenticate("test", "new_password")
+	assert.Nil(t, err)
+	assert.NotZero(t, user.ID)
+
+	err = os.Remove(TestDatabasePath)
+	assert.Nil(t, err)
+}
+
 func TestSuccessfulAuthentication(t *testing.T) {
 	db, err := NewDB("sqlite3", TestDatabasePath)
 	require.Nil(t, err)
@@ -1112,6 +1272,107 @@ func TestBadUserAuthentication(t *testing.T) {
 
 	_, err = db.Authenticate("test", "golang")
 	assert.IsType(t, NotFound{}, err)
+
+	err = os.Remove(TestDatabasePath)
+	assert.Nil(t, err)
+}
+
+func TestUserWithAPIID(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.NewUser("test", "golang")
+	require.Nil(t, err)
+
+	user, err := db.UserWithName("test")
+	require.Nil(t, err)
+
+	userWithID, err := db.UserWithAPIID(user.APIID)
+	assert.Nil(t, err)
+	assert.Equal(t, user.APIID, userWithID.APIID)
+	assert.Equal(t, user.ID, userWithID.ID)
+
+	err = os.Remove(TestDatabasePath)
+	assert.Nil(t, err)
+}
+
+func TestUserWithUnknownAPIID(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.NewUser("test", "golang")
+	require.Nil(t, err)
+
+	userWithID, err := db.UserWithAPIID("bogus")
+	assert.IsType(t, err, NotFound{})
+	assert.Zero(t, userWithID.APIID)
+	assert.Zero(t, userWithID.ID)
+
+	err = os.Remove(TestDatabasePath)
+	assert.Nil(t, err)
+}
+
+func TestUserWithName(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.NewUser("test", "golang")
+	require.Nil(t, err)
+
+	user, err := db.UserWithName("test")
+	assert.Nil(t, err)
+	assert.NotZero(t, user.ID)
+	assert.NotZero(t, user.APIID)
+	assert.Equal(t, user.Username, "test")
+
+	err = os.Remove(TestDatabasePath)
+	assert.Nil(t, err)
+}
+
+func TestUserWithUnknownName(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.NewUser("test", "golang")
+	require.Nil(t, err)
+
+	user, err := db.UserWithName("bogus")
+	assert.IsType(t, err, NotFound{})
+	assert.Zero(t, user.ID)
+	assert.Zero(t, user.APIID)
+	assert.NotEqual(t, user.Username, "test")
+
+	err = os.Remove(TestDatabasePath)
+	assert.Nil(t, err)
+}
+
+func TestUserWithPrimaryKey(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.NewUser("test", "golang")
+	require.Nil(t, err)
+
+	user, err := db.UserWithName("test")
+	require.Nil(t, err)
+
+	userID, err := db.UserPrimaryKey(user.APIID)
+	assert.Equal(t, user.ID, userID)
+
+	err = os.Remove(TestDatabasePath)
+	assert.Nil(t, err)
+}
+
+func TestUnknownUserWithPrimaryKey(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.NewUser("test", "golang")
+	require.Nil(t, err)
+
+	userID, err := db.UserPrimaryKey("bogus")
+	assert.IsType(t, err, NotFound{})
+	assert.Zero(t, userID)
 
 	err = os.Remove(TestDatabasePath)
 	assert.Nil(t, err)
