@@ -1,0 +1,10 @@
+[server]
+auth_secret = "secret"
+
+[database.bogus]
+enable = true
+connection ="unknown"
+
+[database.sqlite]
+enable = true
+connection ="/tmp/syndication.db"

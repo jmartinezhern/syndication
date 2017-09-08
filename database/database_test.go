@@ -82,6 +82,15 @@ func (suite *DatabaseTestSuite) TestNewCategory() {
 	suite.NotZero(query.UserID)
 }
 
+func (suite *DatabaseTestSuite) TestNewCategoryWithNoName() {
+	ctg := models.Category{
+		Name: "",
+	}
+
+	err := suite.db.NewCategory(&ctg, &suite.user)
+	suite.NotNil(err)
+}
+
 func (suite *DatabaseTestSuite) TestCategories() {
 	for i := 0; i < 5; i++ {
 		ctg := models.Category{
@@ -284,6 +293,24 @@ func (suite *DatabaseTestSuite) TestChangeFeedCategory() {
 	suite.Require().Len(feeds, 1)
 	suite.Equal(feeds[0].APIID, feed.APIID)
 	suite.Equal(feeds[0].Title, feed.Title)
+}
+
+func (suite *DatabaseTestSuite) TestChangeUnknownFeedCategory() {
+	err := suite.db.ChangeFeedCategory("bogus", "none", &suite.user)
+	suite.NotNil(err)
+}
+
+func (suite *DatabaseTestSuite) TestChangeFeedCategoryToUnknown() {
+	feed := models.Feed{
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+
+	err = suite.db.ChangeFeedCategory(feed.APIID, "bogus", &suite.user)
+	suite.NotNil(err)
 }
 
 func (suite *DatabaseTestSuite) TestFeeds() {
@@ -489,6 +516,21 @@ func (suite *DatabaseTestSuite) TestNewEntries() {
 	}
 }
 
+func (suite *DatabaseTestSuite) TestNewEntriesWithNoFeed() {
+	err := suite.db.NewEntries(nil, &models.Feed{}, &suite.user)
+	suite.NotNil(err)
+}
+
+func (suite *DatabaseTestSuite) TestNewEntriesWithUnknownFeed() {
+	err := suite.db.NewEntries([]models.Entry{models.Entry{}}, &models.Feed{APIID: "bogus"}, &suite.user)
+	suite.NotNil(err)
+}
+
+func (suite *DatabaseTestSuite) TestNewEntriesWithEmptyArray() {
+	err := suite.db.NewEntries([]models.Entry{}, &models.Feed{APIID: "bogus"}, &suite.user)
+	suite.Nil(err)
+}
+
 func (suite *DatabaseTestSuite) TestEntries() {
 	feed := models.Feed{
 		Title:        "Test site",
@@ -516,6 +558,11 @@ func (suite *DatabaseTestSuite) TestEntries() {
 	suite.NotEmpty(entries)
 	suite.Equal(entries[0].ID, entry.ID)
 	suite.Equal(entries[0].Title, entry.Title)
+}
+
+func (suite *DatabaseTestSuite) TestEntriesWithNoneMarker() {
+	_, err := suite.db.Entries(true, models.None, &suite.user)
+	suite.NotNil(err)
 }
 
 func (suite *DatabaseTestSuite) TestEntriesFromFeed() {
@@ -549,6 +596,11 @@ func (suite *DatabaseTestSuite) TestEntriesFromFeed() {
 	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Read, &suite.user)
 	suite.Nil(err)
 	suite.Empty(entries)
+}
+
+func (suite *DatabaseTestSuite) TestEntriesFromFeedWithNoneMarker() {
+	_, err := suite.db.EntriesFromFeed("bogus", true, models.None, &suite.user)
+	suite.NotNil(err)
 }
 
 func (suite *DatabaseTestSuite) TestEntryWithGUIDExists() {
@@ -689,6 +741,11 @@ func (suite *DatabaseTestSuite) TestEntriesFromCategory() {
 	suite.Len(entries, 5)
 	suite.Equal(entries[0].Title, "Third Feed Test Entry 9")
 	suite.Equal(entries[len(entries)-1].Title, "Second Feed Test Entry 5")
+}
+
+func (suite *DatabaseTestSuite) TestEntriesFromCategoryWithtNoneMarker() {
+	_, err := suite.db.EntriesFromCategory("bogus", true, models.None, &suite.user)
+	suite.NotNil(err)
 }
 
 func (suite *DatabaseTestSuite) TestEntriesFromNonExistingCategory() {
@@ -987,6 +1044,11 @@ func (suite *DatabaseTestSuite) TestFeedStats() {
 	suite.Equal(10, stats.Total)
 }
 
+func (suite *DatabaseTestSuite) TestFeedStatsForUnknownFeed() {
+	_, err := suite.db.FeedStats("bogus", &suite.user)
+	suite.NotNil(err)
+}
+
 func (suite *DatabaseTestSuite) TestCategoryStats() {
 	category := models.Category{
 		Name: "World",
@@ -1040,13 +1102,23 @@ func (suite *DatabaseTestSuite) TestCategoryStats() {
 	suite.Equal(10, stats.Total)
 }
 
+func (suite *DatabaseTestSuite) TestCategoryStatsForNonExistentCategory() {
+	_, err := suite.db.CategoryStats("bogus", &suite.user)
+	suite.NotNil(err)
+}
+
 func (suite *DatabaseTestSuite) TestKeyBelongsToUser() {
 	key, err := suite.db.NewAPIKey("secret", &suite.user)
 	suite.Require().Nil(err)
 
 	found, err := suite.db.KeyBelongsToUser(&models.APIKey{Key: key.Key}, &suite.user)
-	suite.Require().Nil(err)
+	suite.Nil(err)
 	suite.True(found)
+}
+
+func (suite *DatabaseTestSuite) TestNoKeyBelongsToUser() {
+	_, err := suite.db.KeyBelongsToUser(&models.APIKey{Key: ""}, &suite.user)
+	suite.NotNil(err)
 }
 
 func (suite *DatabaseTestSuite) TestKeyDoesNotBelongToUser() {
@@ -1181,6 +1253,14 @@ func TestDeleteUser(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestDeleteUnknownUser(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.DeleteUser("bogus")
+	assert.NotNil(t, err)
+}
+
 func TestChangeUserName(t *testing.T) {
 	db, err := NewDB("sqlite3", TestDatabasePath)
 	require.Nil(t, err)
@@ -1205,6 +1285,14 @@ func TestChangeUserName(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestChangeUnknownUserName(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.ChangeUserName("bogus", "none")
+	assert.NotNil(t, err)
+}
+
 func TestChangeUserPassword(t *testing.T) {
 	db, err := NewDB("sqlite3", TestDatabasePath)
 	require.Nil(t, err)
@@ -1227,6 +1315,14 @@ func TestChangeUserPassword(t *testing.T) {
 
 	err = os.Remove(TestDatabasePath)
 	assert.Nil(t, err)
+}
+
+func TestChangeUnknownUserPassword(t *testing.T) {
+	db, err := NewDB("sqlite3", TestDatabasePath)
+	require.Nil(t, err)
+
+	err = db.ChangeUserPassword("bogus", "none")
+	assert.NotNil(t, err)
 }
 
 func TestSuccessfulAuthentication(t *testing.T) {
