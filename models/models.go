@@ -25,7 +25,7 @@ import (
 // Marker type alias
 type Marker int
 
-//Markers
+// Markers identify the visibility status of entities
 const (
 	None = iota
 	Read
@@ -34,10 +34,16 @@ const (
 )
 
 const (
+	// Uncategorized identifies an entity as having no category.
+	// This only applies to Feeds and Entries
 	Uncategorized = "uncategorized"
-	Saved         = "saved"
+
+	// Saved identifies an entity as permenantly saved.
+	// This only applies to Entries.
+	Saved = "saved"
 )
 
+// MarkerFromString converts a string to a Marker type
 func MarkerFromString(marker string) Marker {
 	if len(marker) == 0 {
 		return None
@@ -54,6 +60,7 @@ func MarkerFromString(marker string) Marker {
 }
 
 type (
+	// User represents a user and owner of all other entities.
 	User struct {
 		ID        uint       `json:"-" gorm:"primary_key"`
 		CreatedAt time.Time  `json:"created_at,omitempty"`
@@ -75,6 +82,7 @@ type (
 		SavedCategoryAPIID         string `json:"-"`
 	}
 
+	// Category represents a container for Feed entities.
 	Category struct {
 		ID        uint      `json:"-" gorm:"primary_key"`
 		CreatedAt time.Time `json:"created_at,omitempty"`
@@ -90,6 +98,7 @@ type (
 		Name string `json:"name"`
 	}
 
+	// Feed represents an Atom or RSS feed subscription.
 	Feed struct {
 		ID        uint      `json:"-" gorm:"primary_key"`
 		CreatedAt time.Time `json:"created_at"`
@@ -115,6 +124,7 @@ type (
 		Status       string    `json:"status,omitempty"`
 	}
 
+	// Tag represents an identifier object that can be applied to Entry objects.
 	Tag struct {
 		ID        uint      `json:"-" gorm:"primary_key"`
 		CreatedAt time.Time `json:"created_at"`
@@ -127,6 +137,7 @@ type (
 		Name string
 	}
 
+	// Entry represents subscription items obtained from Feed objects.
 	Entry struct {
 		ID        uint      `json:"-" gorm:"primary_key"`
 		CreatedAt time.Time `json:"created_at"`
@@ -152,6 +163,7 @@ type (
 		Mark        Marker    `json:"markedAs"`
 	}
 
+	// Stats represents statistics related to various attributes of Feed, Entry, and Category objects.
 	Stats struct {
 		Unread int `json:"unread"`
 		Read   int `json:"read"`
@@ -159,6 +171,7 @@ type (
 		Total  int `json:"total"`
 	}
 
+	// APIKey represents an SQL schema for Java Web Tokens created for User objects.
 	APIKey struct {
 		ID        uint      `json:"-" gorm:"primary_key"`
 		CreatedAt time.Time `json:"-"`

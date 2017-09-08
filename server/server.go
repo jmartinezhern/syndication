@@ -125,6 +125,7 @@ func (s *Server) Stop() error {
 	return s.handle.Shutdown(ctx)
 }
 
+// OptionsHandler is a simple default handler for the OPTIONS method.
 func (s *Server) OptionsHandler(c echo.Context) error {
 	return c.NoContent(200)
 }
