@@ -1040,7 +1040,7 @@ func (suite *ServerTestSuite) TestAddFeedsToCategory() {
 	suite.Equal(ctg.ID, feed.CategoryID)
 }
 
-func TestServerRegister(t *testing.T) {
+func TestRegister(t *testing.T) {
 	conf := config.DefaultConfig
 	conf.Server.HTTPPort = 8060
 
@@ -1080,7 +1080,7 @@ func TestServerRegister(t *testing.T) {
 	server.Stop()
 }
 
-func TestServerLogin(t *testing.T) {
+func TestLogin(t *testing.T) {
 	conf := config.DefaultConfig
 	conf.Server.HTTPPort = 8070
 
@@ -1125,6 +1125,86 @@ func TestServerLogin(t *testing.T) {
 
 	_, err = db.UserWithName("GoTest")
 	assert.Nil(t, err)
+
+	err = loginResp.Body.Close()
+	assert.Nil(t, err)
+
+	server.Stop()
+}
+
+func TestLoginWithNonExistentUser(t *testing.T) {
+	conf := config.DefaultConfig
+	conf.Server.HTTPPort = 8070
+
+	db, err := database.NewDB("sqlite3", "/tmp/syndication-test-server-login.db")
+	require.Nil(t, err)
+	defer os.Remove(db.Connection)
+
+	sync := sync.NewSync(db)
+
+	server := NewServer(db, sync, conf.Server)
+	server.handle.HideBanner = true
+
+	go func() {
+		server.Start()
+	}()
+
+	time.Sleep(1000)
+
+	regResp, err := http.PostForm("http://localhost:8070/v1/register",
+		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
+	require.Nil(t, err)
+
+	assert.Equal(t, 204, regResp.StatusCode)
+
+	err = regResp.Body.Close()
+	require.Nil(t, err)
+
+	loginResp, err := http.PostForm("http://localhost:8070/v1/login",
+		url.Values{"username": {"bogus"}, "password": {"testtesttest"}})
+	require.Nil(t, err)
+
+	assert.Equal(t, 401, loginResp.StatusCode)
+
+	err = loginResp.Body.Close()
+	assert.Nil(t, err)
+
+	server.Stop()
+}
+
+func TestLoginWithBadPassword(t *testing.T) {
+	conf := config.DefaultConfig
+	conf.Server.HTTPPort = 8070
+
+	db, err := database.NewDB("sqlite3", "/tmp/syndication-test-server-login.db")
+	require.Nil(t, err)
+	defer os.Remove(db.Connection)
+
+	sync := sync.NewSync(db)
+
+	server := NewServer(db, sync, conf.Server)
+	server.handle.HideBanner = true
+
+	go func() {
+		server.Start()
+	}()
+
+	time.Sleep(1000)
+
+	regResp, err := http.PostForm("http://localhost:8070/v1/register",
+		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
+	require.Nil(t, err)
+
+	assert.Equal(t, 204, regResp.StatusCode)
+
+	err = regResp.Body.Close()
+	require.Nil(t, err)
+
+	loginResp, err := http.PostForm("http://localhost:8070/v1/login",
+		url.Values{"username": {"GoTest"}, "password": {"bogus"}})
+	require.Nil(t, err)
+
+	assert.Equal(t, 401, loginResp.StatusCode)
 
 	err = loginResp.Body.Close()
 	assert.Nil(t, err)
