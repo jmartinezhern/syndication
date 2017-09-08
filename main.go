@@ -83,7 +83,7 @@ func startApp(c *cli.Context) error {
 		conf, err = config.NewConfig(c.String("config"))
 		if err != nil {
 			color.Red(err.Error())
-			return err
+			return nil
 		}
 	}
 
