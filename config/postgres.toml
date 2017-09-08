@@ -1,0 +1,6 @@
+[server]
+auth_secret = "secret"
+
+[database.postgres]
+enable = true
+connection = "user=synd dbname=syndication sslmode=disable"

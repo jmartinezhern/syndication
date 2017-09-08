@@ -1,0 +1,16 @@
+[server]
+auth_secret = "secret cat"
+
+[database]
+  [database.sqlite]
+  enable = false
+  connection ="/tmp/syndication.db"
+
+  [database.postgres]
+  enable = false
+  connection = "user=synd dbname=syndication sslmode=disable"
+
+  [database.mysql]
+  enable = false
+  connection = "synd:test@/syndication?parseTime=True"
+

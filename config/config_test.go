@@ -51,6 +51,15 @@ func (suite *ConfigTestSuite) TestNewConfigWithSecretFile() {
 	suite.Nil(err)
 }
 
+func (suite *ConfigTestSuite) TestNewConfigWithBadSecretFile() {
+	config, err := NewConfig("simple_with_file_secret.toml")
+	suite.Require().Nil(err)
+
+	config.Server.AuthSecreteFilePath = "bogus"
+
+	suite.NotNil(config.verifyConfig())
+}
+
 func (suite *ConfigTestSuite) TestSave() {
 	config, err := NewConfig("simple.toml")
 	suite.Require().Nil(err)
@@ -70,9 +79,54 @@ func (suite *ConfigTestSuite) TestNewInvalidConfig() {
 }
 
 func (suite *ConfigTestSuite) TestSQLiteConfig() {
-	config, err := NewConfig("with_sqlite.toml")
+	config, err := NewConfig("sqlite.toml")
 	suite.Require().Nil(err)
 	suite.Equal("/tmp/syndication.db", config.Database.Connection)
+}
+
+func (suite *ConfigTestSuite) TestBadSQLiteConfig() {
+	config, err := NewConfig("sqlite.toml")
+	suite.Require().Nil(err)
+
+	config.Database = Database{}
+
+	config.Databases["sqlite"] = Database{"sqlite", true, ""}
+	suite.NotNil(config.verifyConfig())
+
+	config.Database = Database{}
+
+	config.Databases["sqlite"] = Database{"sqlite", true, "bogus"}
+	suite.NotNil(config.verifyConfig())
+}
+
+func (suite *ConfigTestSuite) TestMySQLConfig() {
+	_, err := NewConfig("mysql.toml")
+	suite.Require().Nil(err)
+}
+
+func (suite *ConfigTestSuite) TestBadMySQLConfig() {
+	_, err := NewConfig("bad_mysql.toml")
+	suite.Require().NotNil(err)
+}
+
+func (suite *ConfigTestSuite) TestPostgresConfig() {
+	_, err := NewConfig("postgres.toml")
+	suite.Require().Nil(err)
+}
+
+func (suite *ConfigTestSuite) TestUnknownDB() {
+	_, err := NewConfig("with_unknown_db.toml")
+	suite.Require().Nil(err)
+}
+
+func (suite *ConfigTestSuite) TestNoDB() {
+	_, err := NewConfig("no_db.toml")
+	suite.Require().NotNil(err)
+}
+
+func (suite *ConfigTestSuite) TestNoDBEnabled() {
+	_, err := NewConfig("no_db_enabled.toml")
+	suite.Require().NotNil(err)
 }
 
 func (suite *ConfigTestSuite) TestErrors() {

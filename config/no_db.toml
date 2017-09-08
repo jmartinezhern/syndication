@@ -1,0 +1,2 @@
+[server]
+auth_secret = "secret cat"

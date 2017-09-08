@@ -221,7 +221,7 @@ func (c *Config) getSecretFromFile(path string) error {
 	return nil
 }
 
-func (c *Config) checkSQLiteConfig() error {
+func (c Config) checkSQLiteConfig() error {
 	path := c.Databases["sqlite"].Connection
 	if path == "" {
 		return InvalidFieldValue{"DB path cannot be empty"}
