@@ -19,9 +19,11 @@ package config
 import (
 	"bufio"
 	"github.com/BurntSushi/toml"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -147,32 +149,41 @@ func (c *Config) verifyConfig() error {
 		return InvalidFieldValue{"Auth secret should not be empty"}
 	}
 
-	if len(c.Databases) > 1 {
-		return InvalidFieldValue{"Can only have one database definition"}
-	}
-
 	if len(c.Databases) == 0 {
 		return InvalidFieldValue{"Configuration requires a database definition"}
 	}
 
 	for dbType, db := range c.Databases {
-		if dbType == "sqlite" {
-			if !db.Enable {
-				continue
+		if db.Enable {
+			if c.Database != (Database{}) {
+				log.Warn("Multiple database definitions are enabled. Using first found.")
+				break
 			}
 
-			err := c.checkSQLiteConfig()
-			if err != nil {
-				return err
-			}
+			if dbType == "sqlite" {
+				err := c.checkSQLiteConfig()
+				if err != nil {
+					return err
+				}
 
-			c.Database.Connection = c.Databases["sqlite"].Connection
-			c.Database.Type = "sqlite3"
-		} else if dbType == "mysql" {
-		} else if dbType == "postgres" {
-		} else {
-			return InvalidFieldValue{"Database type cannot be empty"}
+				c.Database.Connection = c.Databases["sqlite"].Connection
+				c.Database.Type = "sqlite3"
+			} else if dbType == "mysql" {
+				conn := c.Databases["mysql"].Connection
+				if !strings.Contains(conn, "parseTime=True") {
+					return InvalidFieldValue{"parseTime=True is required for a MySQL connection"}
+				}
+
+				c.Database.Connection = conn
+				c.Database.Type = "mysql"
+			} else if dbType == "postgres" {
+				c.Database.Connection = c.Databases["postgres"].Connection
+				c.Database.Type = "postgres"
+			} else {
+				log.Warn("Found unsupported database definition. Ignoring.")
+			}
 		}
+
 	}
 
 	if c.Database == (Database{}) {

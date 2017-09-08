@@ -29,8 +29,15 @@ enable_panic_print_stack = true
 enable_tls = false
 
 [database]
-
   [database.sqlite]
   enable = true
   connection ="/tmp/syndication.db"
+
+  [database.postgres]
+  enable = false
+  connection = "user=synd dbname=syndication sslmode=disable"
+
+  [database.mysql]
+  enable = false
+  connection = "synd:test@/syndication?parseTime=True"
 
