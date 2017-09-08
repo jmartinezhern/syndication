@@ -136,8 +136,12 @@ func (s *Server) Login(c echo.Context) error {
 	password := c.FormValue("password")
 
 	user, err := s.db.Authenticate(username, password)
-
 	if err != nil {
+		// Do not return NotFound errors on invalid credentials
+		if dbErr, ok := err.(database.DBError); ok && dbErr.Code() == 404 {
+			err = database.Unauthorized{}
+		}
+
 		return newError(err, &c)
 	}
 
