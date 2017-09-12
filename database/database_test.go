@@ -522,7 +522,7 @@ func (suite *DatabaseTestSuite) TestNewEntriesWithNoFeed() {
 }
 
 func (suite *DatabaseTestSuite) TestNewEntriesWithUnknownFeed() {
-	err := suite.db.NewEntries([]models.Entry{models.Entry{}}, &models.Feed{APIID: "bogus"}, &suite.user)
+	err := suite.db.NewEntries([]models.Entry{{}}, &models.Feed{APIID: "bogus"}, &suite.user)
 	suite.NotNil(err)
 }
 
