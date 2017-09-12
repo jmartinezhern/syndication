@@ -344,15 +344,12 @@ func (a *Admin) listen() {
 			if err == nil {
 				go a.handleConnection(conn)
 			}
-
-			break
 		case stopping:
 			for _, conn := range a.connections {
 				conn.Close()
 			}
 
 			shouldStop = true
-			break
 		}
 	}
 
