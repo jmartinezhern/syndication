@@ -241,12 +241,7 @@ func (c *Config) Save() error {
 		return err
 	}
 
-	err = toml.NewEncoder(file).Encode(c)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return toml.NewEncoder(file).Encode(c)
 }
 
 // NewConfig creates new configuration from a file located at path.

@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 
 set -e
+
+test -z "$(gometalinter -j 4 --disable-all \
+  --enable=gofmt \
+  --enable=gosimple \
+  --enable=golint \
+  --enable=vet \
+  --vendor \
+  --deadline=10m ./... 2>&1 | egrep -v 'testdata/' | tee /dev/stderr)"
+
 echo "" > coverage.txt
 
 for d in $(go list ./... | grep -v vendor); do
