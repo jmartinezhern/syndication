@@ -190,12 +190,7 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 		return err
 	}
 
-	err = s.db.EditFeed(feed, user)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.db.EditFeed(feed, user)
 }
 
 // SyncCategory owned by user.
