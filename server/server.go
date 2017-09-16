@@ -315,7 +315,7 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 		withMarker = models.Any
 	}
 
-	entries, err := s.db.EntriesFromFeed(feed.APIID, true, withMarker, &user)
+	entries, err := s.db.EntriesFromFeed(feed.APIID, false, withMarker, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -352,7 +352,7 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 		withMarker = models.Any
 	}
 
-	entries, err := s.db.EntriesFromCategory(ctg.APIID, true, withMarker, &user)
+	entries, err := s.db.EntriesFromCategory(ctg.APIID, false, withMarker, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -584,7 +584,7 @@ func (s *Server) GetEntries(c echo.Context) error {
 		withMarker = models.Any
 	}
 
-	entries, err := s.db.Entries(true, withMarker, &user)
+	entries, err := s.db.Entries(false, withMarker, &user)
 	if err != nil {
 		return newError(err, &c)
 	}

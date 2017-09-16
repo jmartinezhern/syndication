@@ -541,7 +541,13 @@ func (db *DB) Entries(orderByDesc bool, marker models.Marker, user *models.User)
 		return
 	}
 
-	query := db.db.Model(user)
+	var query *gorm.DB
+	if orderByDesc {
+		query = db.db.Model(user).Order("created_at DESC")
+	} else {
+		query = db.db.Model(user).Order("created_at ASC")
+	}
+
 	if marker != models.Any {
 		query = query.Where("mark = ?", marker)
 	}
@@ -563,7 +569,13 @@ func (db *DB) EntriesFromFeed(feedID string, orderByDesc bool, marker models.Mar
 		return
 	}
 
-	query := db.db.Model(feed)
+	var query *gorm.DB
+	if orderByDesc {
+		query = db.db.Model(user).Order("created_at DESC")
+	} else {
+		query = db.db.Model(user).Order("created_at ASC")
+	}
+
 	if marker != models.Any {
 		query = query.Where("mark = ?", marker)
 	}
