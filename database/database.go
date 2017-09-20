@@ -81,6 +81,12 @@ type (
 	Unauthorized struct {
 		msg string
 	}
+
+	// InternalError is a DBError returned when a client has failed to carry out
+	// an operation and any other error type is not appropriate.
+	InternalError struct {
+		msg string
+	}
 )
 
 // NewDB creates a new DB instance
@@ -265,17 +271,19 @@ func (db *DB) UserWithAPIID(apiID string) (user models.User, err error) {
 func (db *DB) Authenticate(username, password string) (user models.User, err error) {
 	user, err = db.UserWithName(username)
 	if err != nil {
+		err = Unauthorized{"Failed to authenticate user"}
 		return
 	}
 
 	hash, err := scrypt.Key([]byte(password), user.PasswordSalt, 1<<14, 8, 1, PWHashBytes)
 	if err != nil {
+		err = InternalError{"Failed to authenticate user due to an internal error"}
 		return
 	}
 
 	for i, hashByte := range hash {
 		if hashByte != user.PasswordHash[i] {
-			err = Unauthorized{"Invalid credentials"}
+			err = Unauthorized{"Failed to authenticate user"}
 		}
 	}
 
@@ -580,7 +588,7 @@ func (db *DB) EntriesFromFeed(feedID string, orderByDesc bool, marker models.Mar
 		query = query.Where("mark = ?", marker)
 	}
 
-	query.Association("Entries").Find(&entries)
+	query.Where("feed_id = ?", feed.ID).Association("Entries").Find(&entries)
 
 	return
 }
@@ -745,7 +753,7 @@ func (e NotFound) Error() string {
 }
 
 func (e NotFound) String() string {
-	return "NotFound"
+	return "Not Found"
 }
 
 // Code returns NotFound's corresponding error code
@@ -758,7 +766,7 @@ func (e BadRequest) Error() string {
 }
 
 func (e BadRequest) String() string {
-	return "BadRequest"
+	return "Bad Request"
 }
 
 // Code returns BadRequest's corresponding error code
@@ -777,4 +785,17 @@ func (e Unauthorized) String() string {
 // Code returns Unauthorized's corresponding error code
 func (e Unauthorized) Code() int {
 	return 401
+}
+
+func (e InternalError) Error() string {
+	return e.msg
+}
+
+// Code returns InternalError's corresponding error code
+func (e InternalError) Code() int {
+	return 500
+}
+
+func (e InternalError) String() string {
+	return "Internal Error"
 }

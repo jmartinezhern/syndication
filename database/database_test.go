@@ -589,7 +589,7 @@ func (suite *DatabaseTestSuite) TestEntriesFromFeed() {
 
 	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Unread, &suite.user)
 	suite.Nil(err)
-	suite.NotEmpty(entries)
+	suite.Require().NotEmpty(entries)
 	suite.Equal(entries[0].ID, entry.ID)
 	suite.Equal(entries[0].Title, entry.Title)
 
@@ -901,7 +901,7 @@ func (suite *DatabaseTestSuite) TestMarkFeed() {
 	err = suite.db.MarkFeed(firstFeed.APIID, models.Read, &suite.user)
 	suite.Nil(err)
 
-	entries, err := suite.db.EntriesFromFeed(firstFeed.APIID, true, models.Any, &suite.user)
+	entries, err := suite.db.EntriesFromFeed(firstFeed.APIID, true, models.Read, &suite.user)
 	suite.Nil(err)
 	suite.Len(entries, 5)
 
@@ -916,7 +916,7 @@ func (suite *DatabaseTestSuite) TestMarkFeed() {
 
 	suite.Equal(suite.db.db.Model(&suite.user).Where("mark = ?", models.Unread).Association("Entries").Count(), 5)
 
-	entries, err = suite.db.EntriesFromFeed(secondFeed.APIID, true, models.Any, &suite.user)
+	entries, err = suite.db.EntriesFromFeed(secondFeed.APIID, true, models.Unread, &suite.user)
 	suite.Nil(err)
 	suite.Len(entries, 5)
 
@@ -1140,12 +1140,12 @@ func (suite *DatabaseTestSuite) TestErrors() {
 	notFoundErr := NotFound{"NotFound Error"}
 	suite.Equal(notFoundErr.Code(), 404)
 	suite.Equal(notFoundErr.Error(), "NotFound Error")
-	suite.Equal(notFoundErr.String(), "NotFound")
+	suite.Equal(notFoundErr.String(), "Not Found")
 
 	badRequestErr := BadRequest{"BadRequest Error"}
 	suite.Equal(badRequestErr.Code(), 400)
 	suite.Equal(badRequestErr.Error(), "BadRequest Error")
-	suite.Equal(badRequestErr.String(), "BadRequest")
+	suite.Equal(badRequestErr.String(), "Bad Request")
 
 	unauthorizedErr := Unauthorized{"Unauthorized Error"}
 	suite.Equal(unauthorizedErr.Code(), 401)
@@ -1367,7 +1367,7 @@ func TestBadUserAuthentication(t *testing.T) {
 	require.Nil(t, err)
 
 	_, err = db.Authenticate("test", "golang")
-	assert.IsType(t, NotFound{}, err)
+	assert.IsType(t, Unauthorized{}, err)
 
 	err = os.Remove(TestDatabasePath)
 	assert.Nil(t, err)
