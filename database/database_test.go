@@ -21,6 +21,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -414,6 +415,7 @@ func (suite *DatabaseTestSuite) TestNewEntry() {
 		Link:        "http://example.com",
 		Mark:        models.Unread,
 		Feed:        feed,
+		Published:   time.Now(),
 	}
 
 	err = suite.db.NewEntry(&entry, &suite.user)
@@ -445,6 +447,7 @@ func (suite *DatabaseTestSuite) TestNewEntryWithEmptyFeed() {
 		Description: "Testing entry",
 		Author:      "varddum",
 		Mark:        models.Unread,
+		Published:   time.Now(),
 	}
 
 	err := suite.db.NewEntry(&entry, &suite.user)
@@ -463,6 +466,7 @@ func (suite *DatabaseTestSuite) TestNewEntryWithBadFeed() {
 		Description: "Testing entry",
 		Author:      "varddum",
 		Mark:        models.Unread,
+		Published:   time.Now(),
 		Feed: models.Feed{
 			APIID: createAPIID(),
 		},
@@ -498,6 +502,7 @@ func (suite *DatabaseTestSuite) TestNewEntries() {
 			Link:        "http://example.com",
 			Mark:        models.Unread,
 			Feed:        feed,
+			Published:   time.Now(),
 		}
 
 		entries = append(entries, entry)
@@ -548,6 +553,7 @@ func (suite *DatabaseTestSuite) TestEntries() {
 		Link:        "http://example.com",
 		Mark:        models.Unread,
 		Feed:        feed,
+		Published:   time.Now(),
 	}
 
 	err = suite.db.NewEntry(&entry, &suite.user)
@@ -582,6 +588,7 @@ func (suite *DatabaseTestSuite) TestEntriesFromFeed() {
 		Link:        "http://example.com",
 		Mark:        models.Unread,
 		Feed:        feed,
+		Published:   time.Now(),
 	}
 
 	err = suite.db.NewEntry(&entry, &suite.user)
@@ -613,9 +620,10 @@ func (suite *DatabaseTestSuite) TestEntryWithGUIDExists() {
 	suite.Require().Nil(err)
 
 	entry := models.Entry{
-		Title: "Test Entry",
-		GUID:  "entry@test",
-		Feed:  feed,
+		Title:     "Test Entry",
+		GUID:      "entry@test",
+		Feed:      feed,
+		Published: time.Now(),
 	}
 
 	err = suite.db.NewEntry(&entry, &suite.user)
@@ -633,8 +641,9 @@ func (suite *DatabaseTestSuite) TestEntryWithGUIDDoesNotExists() {
 	suite.Require().Nil(err)
 
 	entry := models.Entry{
-		Title: "Test Entry",
-		Feed:  feed,
+		Title:     "Test Entry",
+		Feed:      feed,
+		Published: time.Now(),
 	}
 
 	err = suite.db.NewEntry(&entry, &suite.user)
@@ -702,6 +711,7 @@ func (suite *DatabaseTestSuite) TestEntriesFromCategory() {
 				Link:        "http://example.com",
 				Mark:        models.Unread,
 				Feed:        firstFeed,
+				Published:   time.Now(),
 			}
 		} else {
 			if i < 7 {
@@ -712,6 +722,7 @@ func (suite *DatabaseTestSuite) TestEntriesFromCategory() {
 					Link:        "http://example.com",
 					Mark:        models.Unread,
 					Feed:        secondFeed,
+					Published:   time.Now(),
 				}
 			} else {
 				entry = models.Entry{
@@ -721,6 +732,7 @@ func (suite *DatabaseTestSuite) TestEntriesFromCategory() {
 					Link:        "http://example.com",
 					Mark:        models.Unread,
 					Feed:        thirdFeed,
+					Published:   time.Now(),
 				}
 			}
 		}
@@ -802,6 +814,7 @@ func (suite *DatabaseTestSuite) TestMarkCategory() {
 				Link:        "http://example.com",
 				Mark:        models.Unread,
 				Feed:        firstFeed,
+				Published:   time.Now(),
 			}
 		} else {
 			entry = models.Entry{
@@ -811,6 +824,7 @@ func (suite *DatabaseTestSuite) TestMarkCategory() {
 				Link:        "http://example.com",
 				Mark:        models.Read,
 				Feed:        secondFeed,
+				Published:   time.Now(),
 			}
 		}
 
@@ -878,6 +892,7 @@ func (suite *DatabaseTestSuite) TestMarkFeed() {
 				Link:        "http://example.com",
 				Mark:        models.Unread,
 				Feed:        firstFeed,
+				Published:   time.Now(),
 			}
 		} else {
 			entry = models.Entry{
@@ -887,6 +902,7 @@ func (suite *DatabaseTestSuite) TestMarkFeed() {
 				Link:        "http://example.com",
 				Mark:        models.Read,
 				Feed:        secondFeed,
+				Published:   time.Now(),
 			}
 		}
 
@@ -935,9 +951,10 @@ func (suite *DatabaseTestSuite) TestMarkEntry() {
 	suite.Require().Nil(err)
 
 	entry := models.Entry{
-		Title: "Article",
-		Feed:  feed,
-		Mark:  models.Unread,
+		Title:     "Article",
+		Feed:      feed,
+		Mark:      models.Unread,
+		Published: time.Now(),
 	}
 
 	err = suite.db.NewEntry(&entry, &suite.user)
@@ -971,11 +988,12 @@ func (suite *DatabaseTestSuite) TestStats() {
 
 	for i := 0; i < 3; i++ {
 		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Feed:  feed,
-			Mark:  models.Read,
-			Saved: true,
+			Title:     "Item",
+			Link:      "http://example.com",
+			Feed:      feed,
+			Mark:      models.Read,
+			Saved:     true,
+			Published: time.Now(),
 		}
 
 		err = suite.db.NewEntry(&entry, &suite.user)
@@ -984,10 +1002,11 @@ func (suite *DatabaseTestSuite) TestStats() {
 
 	for i := 0; i < 7; i++ {
 		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Feed:  feed,
-			Mark:  models.Unread,
+			Title:     "Item",
+			Link:      "http://example.com",
+			Feed:      feed,
+			Mark:      models.Unread,
+			Published: time.Now(),
 		}
 
 		err = suite.db.NewEntry(&entry, &suite.user)
@@ -1013,11 +1032,12 @@ func (suite *DatabaseTestSuite) TestFeedStats() {
 
 	for i := 0; i < 3; i++ {
 		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Feed:  feed,
-			Mark:  models.Read,
-			Saved: true,
+			Title:     "Item",
+			Link:      "http://example.com",
+			Feed:      feed,
+			Mark:      models.Read,
+			Saved:     true,
+			Published: time.Now(),
 		}
 
 		err = suite.db.NewEntry(&entry, &suite.user)
@@ -1026,10 +1046,11 @@ func (suite *DatabaseTestSuite) TestFeedStats() {
 
 	for i := 0; i < 7; i++ {
 		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Feed:  feed,
-			Mark:  models.Unread,
+			Title:     "Item",
+			Link:      "http://example.com",
+			Feed:      feed,
+			Mark:      models.Unread,
+			Published: time.Now(),
 		}
 
 		err = suite.db.NewEntry(&entry, &suite.user)
@@ -1071,11 +1092,12 @@ func (suite *DatabaseTestSuite) TestCategoryStats() {
 
 	for i := 0; i < 3; i++ {
 		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Feed:  feed,
-			Mark:  models.Read,
-			Saved: true,
+			Title:     "Item",
+			Link:      "http://example.com",
+			Feed:      feed,
+			Mark:      models.Read,
+			Saved:     true,
+			Published: time.Now(),
 		}
 
 		err = suite.db.NewEntry(&entry, &suite.user)
@@ -1084,10 +1106,11 @@ func (suite *DatabaseTestSuite) TestCategoryStats() {
 
 	for i := 0; i < 7; i++ {
 		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Feed:  feed,
-			Mark:  models.Unread,
+			Title:     "Item",
+			Link:      "http://example.com",
+			Feed:      feed,
+			Mark:      models.Unread,
+			Published: time.Now(),
 		}
 
 		err = suite.db.NewEntry(&entry, &suite.user)
