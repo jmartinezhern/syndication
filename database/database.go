@@ -543,21 +543,21 @@ func (db *DB) EntryWithGUIDExists(guid string, user *models.User) bool {
 }
 
 // Entries returns a list of all entries owned by user
-func (db *DB) Entries(orderByDesc bool, marker models.Marker, user *models.User) (entries []models.Entry, err error) {
+func (db *DB) Entries(orderByNewest bool, marker models.Marker, user *models.User) (entries []models.Entry, err error) {
 	if marker == models.None {
 		err = BadRequest{"Request should include a valid marker"}
 		return
 	}
 
-	var query *gorm.DB
-	if orderByDesc {
-		query = db.db.Model(user).Order("published DESC")
-	} else {
-		query = db.db.Model(user).Order("published ASC")
-	}
-
+	query := db.db.Model(user)
 	if marker != models.Any {
 		query = query.Where("mark = ?", marker)
+	}
+
+	if orderByNewest {
+		query = query.Order("published DESC")
+	} else {
+		query = query.Order("published ASC")
 	}
 
 	query.Association("Entries").Find(&entries)
@@ -565,7 +565,7 @@ func (db *DB) Entries(orderByDesc bool, marker models.Marker, user *models.User)
 }
 
 // EntriesFromFeed returns all Entries that belong to a feed with feedID
-func (db *DB) EntriesFromFeed(feedID string, orderByDesc bool, marker models.Marker, user *models.User) (entries []models.Entry, err error) {
+func (db *DB) EntriesFromFeed(feedID string, orderByNewest bool, marker models.Marker, user *models.User) (entries []models.Entry, err error) {
 	if marker == models.None {
 		err = BadRequest{"Request should include a valid marker"}
 		return
@@ -577,15 +577,15 @@ func (db *DB) EntriesFromFeed(feedID string, orderByDesc bool, marker models.Mar
 		return
 	}
 
-	var query *gorm.DB
-	if orderByDesc {
-		query = db.db.Model(user).Order("published DESC")
-	} else {
-		query = db.db.Model(user).Order("published ASC")
-	}
-
+	query := db.db.Model(user)
 	if marker != models.Any {
 		query = query.Where("mark = ?", marker)
+	}
+
+	if orderByNewest {
+		query = query.Order("published DESC")
+	} else {
+		query = query.Order("published ASC")
 	}
 
 	query.Where("feed_id = ?", feed.ID).Association("Entries").Find(&entries)
@@ -594,7 +594,7 @@ func (db *DB) EntriesFromFeed(feedID string, orderByDesc bool, marker models.Mar
 }
 
 // EntriesFromCategory returns all Entries that are related to a Category with categoryID by the entries' owning Feed
-func (db *DB) EntriesFromCategory(categoryID string, orderByDesc bool, marker models.Marker, user *models.User) (entries []models.Entry, err error) {
+func (db *DB) EntriesFromCategory(categoryID string, orderByNewest bool, marker models.Marker, user *models.User) (entries []models.Entry, err error) {
 	if marker == models.None {
 		err = BadRequest{"Request should include a valid marker"}
 		return
@@ -609,15 +609,15 @@ func (db *DB) EntriesFromCategory(categoryID string, orderByDesc bool, marker mo
 	var feeds []models.Feed
 	db.db.Model(category).Related(&feeds)
 
-	var order *gorm.DB
-	if orderByDesc {
-		order = db.db.Model(user).Order("published DESC")
-	} else {
-		order = db.db.Model(user).Order("published ASC")
+	query := db.db.Model(user)
+	if marker != models.Any {
+		query = query.Where("mark = ?", marker)
 	}
 
-	if marker != models.Any {
-		order = order.Where("mark = ?", marker)
+	if orderByNewest {
+		query = query.Order("published DESC")
+	} else {
+		query = query.Order("published ASC")
 	}
 
 	feedIds := make([]uint, len(feeds))
@@ -625,12 +625,12 @@ func (db *DB) EntriesFromCategory(categoryID string, orderByDesc bool, marker mo
 		feedIds[i] = feed.ID
 	}
 
-	order.Where("feed_id in (?)", feedIds).Association("Entries").Find(&entries)
+	query.Where("feed_id in (?)", feedIds).Association("Entries").Find(&entries)
 	return
 }
 
 // EntriesFromTag returns all Entries which are tagged with tagID
-func (db *DB) EntriesFromTag(tagID string, makrer models.Marker, orderByDesc bool, user *models.User) (entries []models.Entry, err error) {
+func (db *DB) EntriesFromTag(tagID string, makrer models.Marker, orderByNewest bool, user *models.User) (entries []models.Entry, err error) {
 	// TODO
 	return
 }
