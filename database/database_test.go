@@ -628,7 +628,7 @@ func (suite *DatabaseTestSuite) TestEntryWithGUIDExists() {
 
 	err = suite.db.NewEntry(&entry, &suite.user)
 
-	suite.True(suite.db.EntryWithGUIDExists(entry.GUID, &suite.user))
+	suite.True(suite.db.EntryWithGUIDExists(entry.GUID, feed.APIID, &suite.user))
 }
 
 func (suite *DatabaseTestSuite) TestEntryWithGUIDDoesNotExists() {
@@ -648,7 +648,7 @@ func (suite *DatabaseTestSuite) TestEntryWithGUIDDoesNotExists() {
 
 	err = suite.db.NewEntry(&entry, &suite.user)
 
-	suite.False(suite.db.EntryWithGUIDExists("item@test", &suite.user))
+	suite.False(suite.db.EntryWithGUIDExists("item@test", feed.APIID, &suite.user))
 }
 
 func (suite *DatabaseTestSuite) TestEntriesFromCategory() {
