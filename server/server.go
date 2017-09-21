@@ -24,6 +24,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/varddum/syndication/config"
@@ -46,8 +47,9 @@ const DefaultTLSPort = "443"
 type (
 	// EntryQueryParams maps query parameters used when GETting entries resources
 	EntryQueryParams struct {
-		Marker string `query:"withMarker"`
-		Saved  bool   `query:"saved"`
+		Marker  string `query:"markedAs"`
+		Saved   bool   `query:"saved"`
+		OrderBy string `query:"orderBy"`
 	}
 
 	// Server represents a echo server instance and holds references to other components
@@ -310,12 +312,12 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 		return newError(err, &c)
 	}
 
-	withMarker := models.MarkerFromString(params.Marker)
-	if withMarker == models.None {
-		withMarker = models.Any
+	markedAs := models.MarkerFromString(params.Marker)
+	if markedAs == models.None {
+		markedAs = models.Any
 	}
 
-	entries, err := s.db.EntriesFromFeed(feed.APIID, false, withMarker, &user)
+	entries, err := s.db.EntriesFromFeed(feed.APIID, convertOrderByParamToValue(params.OrderBy), markedAs, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -347,12 +349,12 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 		return newError(err, &c)
 	}
 
-	withMarker := models.MarkerFromString(params.Marker)
-	if withMarker == models.None {
-		withMarker = models.Any
+	markedAs := models.MarkerFromString(params.Marker)
+	if markedAs == models.None {
+		markedAs = models.Any
 	}
 
-	entries, err := s.db.EntriesFromCategory(ctg.APIID, false, withMarker, &user)
+	entries, err := s.db.EntriesFromCategory(ctg.APIID, convertOrderByParamToValue(params.OrderBy), markedAs, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -579,12 +581,12 @@ func (s *Server) GetEntries(c echo.Context) error {
 		return newError(err, &c)
 	}
 
-	withMarker := models.MarkerFromString(params.Marker)
-	if withMarker == models.None {
-		withMarker = models.Any
+	markedAs := models.MarkerFromString(params.Marker)
+	if markedAs == models.None {
+		markedAs = models.Any
 	}
 
-	entries, err := s.db.Entries(false, withMarker, &user)
+	entries, err := s.db.Entries(convertOrderByParamToValue(params.OrderBy), markedAs, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -745,4 +747,13 @@ func newError(err error, c *echo.Context) error {
 		Reason:  "InternalServerError",
 		Message: "Internal Server Error",
 	})
+}
+
+func convertOrderByParamToValue(param string) bool {
+	if param != "" && strings.ToLower(param) == "oldest" {
+		return false
+	}
+
+	// Default behavior is to return by newest
+	return true
 }
