@@ -538,8 +538,13 @@ func (db *DB) Entry(id string, user *models.User) (entry models.Entry, err error
 }
 
 // EntryWithGUIDExists returns true if an Entry exists with the given guid and is owned by user
-func (db *DB) EntryWithGUIDExists(guid string, user *models.User) bool {
-	return !db.db.Model(user).Where("guid = ?", guid).Related(&models.Entry{}).RecordNotFound()
+func (db *DB) EntryWithGUIDExists(guid string, feedID string, user *models.User) bool {
+	feed := &models.Feed{}
+	if db.db.Model(user).Where("api_id = ?", feedID).Related(feed).RecordNotFound() {
+		return false
+	}
+
+	return !db.db.Model(user).Where("guid = ? AND feed_id = ?", guid, feed.ID).Related(&models.Entry{}).RecordNotFound()
 }
 
 // Entries returns a list of all entries owned by user
