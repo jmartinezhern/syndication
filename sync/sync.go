@@ -123,6 +123,12 @@ func convertItemsToEntries(feed models.Feed, item *gofeed.Item) models.Entry {
 		entry.Author = item.Author.Name
 	}
 
+	if item.PublishedParsed != nil {
+		entry.Published = *item.PublishedParsed
+	} else {
+		entry.Published = time.Now()
+	}
+
 	return entry
 }
 

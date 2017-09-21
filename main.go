@@ -102,12 +102,12 @@ func startApp(c *cli.Context) error {
 
 	defer admin.Stop(true)
 
+	sync.Start()
+
 	server := server.NewServer(db, sync, conf.Server)
 	if err = server.Start(); err != nil {
 		color.Red(err.Error())
 	}
-
-	sync.Start()
 
 	return err
 }

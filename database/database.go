@@ -551,9 +551,9 @@ func (db *DB) Entries(orderByDesc bool, marker models.Marker, user *models.User)
 
 	var query *gorm.DB
 	if orderByDesc {
-		query = db.db.Model(user).Order("created_at DESC")
+		query = db.db.Model(user).Order("published DESC")
 	} else {
-		query = db.db.Model(user).Order("created_at ASC")
+		query = db.db.Model(user).Order("published ASC")
 	}
 
 	if marker != models.Any {
@@ -579,9 +579,9 @@ func (db *DB) EntriesFromFeed(feedID string, orderByDesc bool, marker models.Mar
 
 	var query *gorm.DB
 	if orderByDesc {
-		query = db.db.Model(user).Order("created_at DESC")
+		query = db.db.Model(user).Order("published DESC")
 	} else {
-		query = db.db.Model(user).Order("created_at ASC")
+		query = db.db.Model(user).Order("published ASC")
 	}
 
 	if marker != models.Any {
@@ -611,9 +611,9 @@ func (db *DB) EntriesFromCategory(categoryID string, orderByDesc bool, marker mo
 
 	var order *gorm.DB
 	if orderByDesc {
-		order = db.db.Model(user).Order("created_at DESC")
+		order = db.db.Model(user).Order("published DESC")
 	} else {
-		order = db.db.Model(user).Order("created_at ASC")
+		order = db.db.Model(user).Order("published ASC")
 	}
 
 	if marker != models.Any {
