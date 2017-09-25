@@ -90,7 +90,7 @@ func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.E
 			item.GUID = itemGUID
 		}
 
-		if s.db.EntryWithGUIDExists(itemGUID, feed.APIID, user) {
+		if found, err := s.db.EntryWithGUIDExists(itemGUID, feed.APIID, user); err != nil || found {
 			continue
 		}
 
