@@ -73,6 +73,7 @@ type (
 		Feeds      []Feed     `json:"feeds,omitempty"`
 		Entries    []Entry    `json:"entries,omitempty"`
 		APIKeys    []APIKey   `json:"-"`
+		Tags       []Tag      `json:"tags,omitempty"`
 
 		Username                   string `json:"username,required"`
 		Email                      string `json:"email,optional"`
@@ -130,11 +131,14 @@ type (
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 
+		Name string `json:"name"`
+
+		User   User `json:"-"`
+		UserID uint `json:"-"`
+
 		APIID string `json:"id"`
 
-		EntryID uint `json:"-"`
-
-		Name string
+		Entries []Entry `json:"entries" gorm:"many2many:entry_tags;"`
 	}
 
 	// Entry represents subscription items obtained from Feed objects.
@@ -151,7 +155,7 @@ type (
 		Feed   Feed
 		FeedID uint `json:"-"`
 
-		Tags []Tag `json:"-"`
+		Tags []Tag `json:"tags" gorm:"many2many:entry_tags;"`
 
 		GUID        string    `json:"-"`
 		Title       string    `json:"title"`

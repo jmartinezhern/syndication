@@ -397,6 +397,250 @@ func (suite *DatabaseTestSuite) TestDeleteNonExistingFeed() {
 	suite.IsType(NotFound{}, err)
 }
 
+func (suite *DatabaseTestSuite) TestNewTag() {
+	tag := models.Tag{
+		Name: "tech",
+	}
+
+	err := suite.db.NewTag(&tag, &suite.user)
+	suite.Require().Nil(err)
+
+	query, err := suite.db.Tag(tag.APIID, &suite.user)
+	suite.Nil(err)
+	suite.NotEmpty(query.Name)
+	suite.NotZero(query.ID)
+	suite.NotZero(query.CreatedAt)
+	suite.NotZero(query.UpdatedAt)
+	suite.NotZero(query.UserID)
+}
+
+func (suite *DatabaseTestSuite) TestTagEntries() {
+	feed := models.Feed{
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+
+	var entries []models.Entry
+	for i := 0; i < 5; i++ {
+		entry := models.Entry{
+			Title:       "Test Entry",
+			Description: "Testing entry",
+			Author:      "varddum",
+			Link:        "http://example.com",
+			Mark:        models.Unread,
+			Feed:        feed,
+		}
+
+		entries = append(entries, entry)
+	}
+
+	err = suite.db.NewEntries(entries, &feed, &suite.user)
+	suite.Require().Nil(err)
+
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
+	suite.Require().Nil(err)
+
+	entryAPIIDs := make([]string, len(entries))
+	for i, entry := range entries {
+		entryAPIIDs[i] = entry.APIID
+	}
+
+	tag := models.Tag{
+		Name: "Tech",
+	}
+
+	err = suite.db.NewTag(&tag, &suite.user)
+	suite.Nil(err)
+	suite.NotZero(tag.ID)
+
+	dbTag, err := suite.db.Tag(tag.APIID, &suite.user)
+	suite.Nil(err)
+	suite.Equal(tag.APIID, dbTag.APIID)
+	suite.Equal(tag.Name, dbTag.Name)
+	suite.NotZero(dbTag.ID)
+
+	err = suite.db.TagEntries(tag.APIID, entryAPIIDs, &suite.user)
+	suite.Nil(err)
+
+	taggedEntries, err := suite.db.EntriesFromTag(tag.APIID, models.Any, true, &suite.user)
+	suite.Nil(err)
+	suite.Len(taggedEntries, 5)
+}
+
+func (suite *DatabaseTestSuite) TestTagMultipleEntries() {
+	feed := models.Feed{
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+
+	var entries []models.Entry
+	for i := 0; i < 5; i++ {
+		entry := models.Entry{
+			Title:       "Test Entry " + strconv.Itoa(i),
+			Description: "Testing entry",
+			Author:      "varddum",
+			Link:        "http://example.com",
+			Mark:        models.Unread,
+			Feed:        feed,
+		}
+
+		entries = append(entries, entry)
+	}
+
+	err = suite.db.NewEntries(entries, &feed, &suite.user)
+	suite.Require().Nil(err)
+
+	firstTag := models.Tag{
+		Name: "First tag",
+	}
+
+	secondTag := models.Tag{
+		Name: "Second tag",
+	}
+
+	err = suite.db.NewTag(&firstTag, &suite.user)
+	suite.Nil(err)
+	suite.NotZero(firstTag.ID)
+
+	err = suite.db.NewTag(&secondTag, &suite.user)
+	suite.Nil(err)
+	suite.NotZero(secondTag.ID)
+
+	suite.Require().NotEqual(firstTag.APIID, secondTag.APIID)
+
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
+	suite.Require().Nil(err)
+
+	entryAPIIDs := make([]string, len(entries))
+	for i, entry := range entries {
+		entryAPIIDs[i] = entry.APIID
+	}
+
+	err = suite.db.TagEntries(firstTag.APIID, entryAPIIDs, &suite.user)
+	suite.Nil(err)
+
+	err = suite.db.TagEntries(secondTag.APIID, entryAPIIDs, &suite.user)
+	suite.Nil(err)
+
+	taggedEntries, err := suite.db.EntriesFromTag(firstTag.APIID, models.Any, true, &suite.user)
+	suite.Nil(err)
+	suite.Len(taggedEntries, 5)
+
+	taggedEntries, err = suite.db.EntriesFromTag(secondTag.APIID, models.Any, true, &suite.user)
+	suite.Nil(err)
+	suite.Len(taggedEntries, 5)
+}
+
+func (suite *DatabaseTestSuite) TestEntriesFromMultipleTags() {
+	feed := models.Feed{
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+
+	err := suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+
+	var entries []models.Entry
+	for i := 0; i < 15; i++ {
+		entry := models.Entry{
+			Title:       "Test Entry " + strconv.Itoa(i),
+			Description: "Testing entry",
+			Author:      "varddum",
+			Link:        "http://example.com",
+			Mark:        models.Unread,
+			Feed:        feed,
+		}
+
+		entries = append(entries, entry)
+	}
+
+	err = suite.db.NewEntries(entries, &feed, &suite.user)
+	suite.Require().Nil(err)
+
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
+	suite.Require().Nil(err)
+
+	entryAPIIDs := make([]string, len(entries))
+	for i, entry := range entries {
+		entryAPIIDs[i] = entry.APIID
+	}
+
+	firstTag := models.Tag{
+		Name: "First tag",
+	}
+
+	err = suite.db.NewTag(&firstTag, &suite.user)
+	suite.Nil(err)
+	suite.NotZero(firstTag.ID)
+
+	secondTag := models.Tag{
+		Name: "Second tag",
+	}
+
+	err = suite.db.NewTag(&secondTag, &suite.user)
+	suite.Nil(err)
+	suite.NotZero(secondTag.ID)
+
+	err = suite.db.TagEntries(firstTag.APIID, entryAPIIDs[0:5], &suite.user)
+	suite.Nil(err)
+
+	err = suite.db.TagEntries(secondTag.APIID, entryAPIIDs[5:10], &suite.user)
+	suite.Nil(err)
+
+	suite.Require().NotEqual(firstTag.APIID, secondTag.APIID)
+
+	taggedEntries, err := suite.db.EntriesFromMultipleTags([]string{firstTag.APIID, secondTag.APIID}, true, models.Any, &suite.user)
+	suite.Nil(err)
+	suite.Len(taggedEntries, 10)
+}
+
+func (suite *DatabaseTestSuite) TestDeleteTag() {
+	tag := models.Tag{
+		Name: "News",
+	}
+
+	err := suite.db.NewTag(&tag, &suite.user)
+	suite.Require().Nil(err)
+
+	query, err := suite.db.Tag(tag.APIID, &suite.user)
+	suite.Nil(err)
+	suite.NotEmpty(query.APIID)
+
+	err = suite.db.DeleteTag(tag.APIID, &suite.user)
+	suite.Nil(err)
+
+	_, err = suite.db.Tag(tag.APIID, &suite.user)
+	suite.IsType(NotFound{}, err)
+}
+
+func (suite *DatabaseTestSuite) TestEditTag() {
+	tag := models.Tag{
+		Name: "News",
+	}
+
+	err := suite.db.NewTag(&tag, &suite.user)
+	suite.Require().Nil(err)
+
+	query, err := suite.db.Tag(tag.APIID, &suite.user)
+	suite.Nil(err)
+	suite.Equal(query.Name, "News")
+
+	tag.Name = "World News"
+	err = suite.db.EditTag(&tag, &suite.user)
+	suite.Require().Nil(err)
+
+	query, err = suite.db.Tag(tag.APIID, &suite.user)
+	suite.Nil(err)
+	suite.Equal(tag.ID, query.ID)
+	suite.Equal(query.Name, "World News")
+}
+
 func (suite *DatabaseTestSuite) TestNewEntry() {
 	feed := models.Feed{
 		Title:        "Test site",

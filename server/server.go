@@ -515,6 +515,164 @@ func (s *Server) MarkCategory(c echo.Context) error {
 	return echo.NewHTTPError(http.StatusNoContent)
 }
 
+// NewTag creates a new Tag
+func (s *Server) NewTag(c echo.Context) error {
+	user, err := s.getUser(&c)
+	if err != nil {
+		return echo.ErrUnauthorized
+	}
+
+	tag := models.Tag{}
+	if err = c.Bind(&tag); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest)
+	}
+
+	err = s.db.NewTag(&tag, &user)
+	if err != nil {
+		return newError(err, &c)
+	}
+
+	return c.JSON(http.StatusCreated, tag)
+}
+
+// GetTags returns a list of Tags owned by a user
+func (s *Server) GetTags(c echo.Context) error {
+	user, err := s.getUser(&c)
+	if err != nil {
+		return echo.ErrUnauthorized
+	}
+
+	tags := s.db.Tags(&user)
+
+	type Tags struct {
+		Tags []models.Tag `json:"tags"`
+	}
+
+	return c.JSON(http.StatusOK, Tags{
+		Tags: tags,
+	})
+}
+
+// DeleteTag with id
+func (s *Server) DeleteTag(c echo.Context) error {
+	user, err := s.getUser(&c)
+	if err != nil {
+		return echo.ErrUnauthorized
+	}
+
+	tagID := c.Param("tagID")
+
+	err = s.db.DeleteTag(tagID, &user)
+	if err != nil {
+		return newError(err, &c)
+	}
+
+	return echo.NewHTTPError(http.StatusNoContent)
+}
+
+// EditTag with id
+func (s *Server) EditTag(c echo.Context) error {
+	user, err := s.getUser(&c)
+	if err != nil {
+		return echo.ErrUnauthorized
+	}
+
+	tag := models.Tag{}
+	tag.APIID = c.Param("tagID")
+
+	if err = c.Bind(&tag); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest)
+	}
+
+	err = s.db.EditTag(&tag, &user)
+	if err != nil {
+		return newError(err, &c)
+	}
+
+	return echo.NewHTTPError(http.StatusNoContent)
+}
+
+// GetEntriesFromTag returns a list of Entries
+// that are tagged by a Tag with ID
+func (s *Server) GetEntriesFromTag(c echo.Context) error {
+	user, err := s.getUser(&c)
+	if err != nil {
+		return echo.ErrUnauthorized
+	}
+
+	params := new(EntryQueryParams)
+	if err = c.Bind(params); err != nil {
+		return newError(err, &c)
+	}
+
+	tag, err := s.db.Tag(c.Param("tagID"), &user)
+	if err != nil {
+		return newError(err, &c)
+	}
+
+	withMarker := models.MarkerFromString(params.Marker)
+	if withMarker == models.None {
+		withMarker = models.Any
+	}
+
+	entries, err := s.db.EntriesFromTag(tag.APIID, withMarker, true, &user)
+	if err != nil {
+		return newError(err, &c)
+	}
+
+	type Entries struct {
+		Entries []models.Entry `json:"entries"`
+	}
+
+	return c.JSON(http.StatusOK, Entries{
+		Entries: entries,
+	})
+}
+
+// TagEntries adds a Tag with tagID to a list of entries
+func (s *Server) TagEntries(c echo.Context) error {
+	user, err := s.getUser(&c)
+	if err != nil {
+		return echo.ErrUnauthorized
+	}
+
+	tag, err := s.db.Tag(c.Param("tagID"), &user)
+	if err != nil {
+		return newError(err, &c)
+	}
+
+	type EntryIds struct {
+		Entries []string `json:"entries"`
+	}
+
+	entryIds := new(EntryIds)
+	if err = c.Bind(entryIds); err != nil {
+		return newError(err, &c)
+	}
+
+	err = s.db.TagEntries(tag.APIID, entryIds.Entries, &user)
+	if err != nil {
+		return newError(err, &c)
+	}
+
+	return echo.NewHTTPError(http.StatusNoContent)
+}
+
+// GetTag with id
+func (s *Server) GetTag(c echo.Context) error {
+	user, err := s.getUser(&c)
+	if err != nil {
+		return echo.ErrUnauthorized
+	}
+
+	tag, err := s.db.Tag(c.Param("tagID"), &user)
+	if err != nil {
+		return newError(err, &c)
+	}
+
+	return c.JSON(http.StatusOK, tag)
+}
+
 // MarkFeed applies a Marker to a Feed
 func (s *Server) MarkFeed(c echo.Context) error {
 	user, err := s.getUser(&c)
@@ -707,6 +865,21 @@ func (s *Server) registerHandlers() {
 	v1.OPTIONS("/feeds/:feedID/mark", s.OptionsHandler)
 	v1.OPTIONS("/feeds/:feedID/entries", s.OptionsHandler)
 	v1.OPTIONS("/feeds/:feedID/stats", s.OptionsHandler)
+
+	v1.POST("/tags", s.NewTag)
+	v1.GET("/tags", s.GetTags)
+	v1.GET("/tags/:tagID", s.GetTag)
+	v1.DELETE("/tags/:tagID", s.DeleteTag)
+	v1.PUT("/tags/:tagID", s.EditTag)
+	v1.GET("/tags/:tagID/entries", s.GetEntriesFromTag)
+	v1.PUT("/tags/:tagID/entries", s.TagEntries)
+
+	v1.OPTIONS("/tags", s.OptionsHandler)
+	v1.OPTIONS("/tags", s.OptionsHandler)
+	v1.OPTIONS("/tags/:tagID", s.OptionsHandler)
+	v1.OPTIONS("/tags/:tagID", s.OptionsHandler)
+	v1.OPTIONS("/tags/:tagID", s.OptionsHandler)
+	v1.OPTIONS("/tags/:tagID/entries", s.OptionsHandler)
 
 	v1.POST("/categories", s.NewCategory)
 	v1.GET("/categories", s.GetCategories)

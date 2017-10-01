@@ -419,6 +419,32 @@ func (suite *ServerTestSuite) TestNewCategory() {
 	suite.Equal(dbCtg.Name, respCtg.Name)
 }
 
+func (suite *ServerTestSuite) TestNewTag() {
+	payload := []byte(`{"name": "News"}`)
+	req, err := http.NewRequest("POST", "http://localhost:8080/v1/tags", bytes.NewBuffer(payload))
+	suite.Require().Nil(err)
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(201, resp.StatusCode)
+
+	respTag := new(models.Tag)
+	err = json.NewDecoder(resp.Body).Decode(respTag)
+	suite.Require().Nil(err)
+
+	suite.Require().NotEmpty(respTag.APIID)
+	suite.NotEmpty(respTag.Name)
+
+	dbTag, err := suite.db.Tag(respTag.APIID, &suite.user)
+	suite.Nil(err)
+	suite.Equal(dbTag.Name, respTag.Name)
+}
+
 func (suite *ServerTestSuite) TestGetCategories() {
 	for i := 0; i < 5; i++ {
 		ctg := models.Category{
@@ -454,6 +480,41 @@ func (suite *ServerTestSuite) TestGetCategories() {
 	suite.Len(respCtgs.Categories, 7)
 }
 
+func (suite *ServerTestSuite) TestGetTags() {
+	for i := 0; i < 5; i++ {
+		tag := models.Tag{
+			Name: "Tag " + strconv.Itoa(i+1),
+		}
+		err := suite.db.NewTag(&tag, &suite.user)
+		suite.Require().Nil(err)
+		suite.Require().NotZero(tag.ID)
+		suite.Require().NotEmpty(tag.APIID)
+	}
+
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/tags", nil)
+	suite.Require().Nil(err)
+
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(200, resp.StatusCode)
+
+	type Tags struct {
+		Tags []models.Tag `json:"tags"`
+	}
+
+	respTags := new(Tags)
+	err = json.NewDecoder(resp.Body).Decode(respTags)
+	suite.Require().Nil(err)
+
+	suite.Len(respTags.Tags, 5)
+}
+
 func (suite *ServerTestSuite) TestGetCategory() {
 	ctg := models.Category{Name: "News"}
 	err := suite.db.NewCategory(&ctg, &suite.user)
@@ -482,6 +543,34 @@ func (suite *ServerTestSuite) TestGetCategory() {
 	suite.Equal(respCtg.APIID, ctg.APIID)
 }
 
+func (suite *ServerTestSuite) TestGetTag() {
+	tag := models.Tag{Name: "News"}
+	err := suite.db.NewTag(&tag, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotZero(tag.ID)
+	suite.Require().NotEmpty(tag.APIID)
+
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/tags/"+tag.APIID, nil)
+	suite.Require().Nil(err)
+
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(200, resp.StatusCode)
+
+	respTag := new(models.Tag)
+	err = json.NewDecoder(resp.Body).Decode(respTag)
+	suite.Require().Nil(err)
+
+	suite.Equal(respTag.Name, tag.Name)
+	suite.Equal(respTag.APIID, tag.APIID)
+}
+
 func (suite *ServerTestSuite) TestEditCategory() {
 	ctg := models.Category{Name: "News"}
 	err := suite.db.NewCategory(&ctg, &suite.user)
@@ -508,6 +597,32 @@ func (suite *ServerTestSuite) TestEditCategory() {
 	suite.Equal(editedCtg.Name, "World News")
 }
 
+func (suite *ServerTestSuite) TestEditTag() {
+	tag := models.Tag{Name: "News"}
+	err := suite.db.NewTag(&tag, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotZero(tag.ID)
+	suite.Require().NotEmpty(tag.APIID)
+
+	payload := []byte(`{"name": "World News"}`)
+	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/tags/"+tag.APIID, bytes.NewBuffer(payload))
+	suite.Nil(err)
+
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(204, resp.StatusCode)
+
+	editedTag, err := suite.db.Tag(tag.APIID, &suite.user)
+	suite.Require().Nil(err)
+	suite.Equal(editedTag.Name, "World News")
+}
+
 func (suite *ServerTestSuite) TestDeleteCategory() {
 	ctg := models.Category{Name: "News"}
 	err := suite.db.NewCategory(&ctg, &suite.user)
@@ -529,6 +644,31 @@ func (suite *ServerTestSuite) TestDeleteCategory() {
 	suite.Equal(204, resp.StatusCode)
 
 	_, err = suite.db.Category(ctg.APIID, &suite.user)
+	suite.NotNil(err)
+	suite.IsType(database.NotFound{}, err)
+}
+
+func (suite *ServerTestSuite) TestDeleteTag() {
+	tag := models.Tag{Name: "News"}
+	err := suite.db.NewTag(&tag, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotZero(tag.ID)
+	suite.Require().NotEmpty(tag.APIID)
+
+	req, err := http.NewRequest("DELETE", "http://localhost:8080/v1/tags/"+tag.APIID, nil)
+	suite.Require().Nil(err)
+
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(204, resp.StatusCode)
+
+	_, err = suite.db.Category(tag.APIID, &suite.user)
 	suite.NotNil(err)
 	suite.IsType(database.NotFound{}, err)
 }
@@ -621,6 +761,134 @@ func (suite *ServerTestSuite) TestGetEntriesFromCategory() {
 	err = json.NewDecoder(resp.Body).Decode(respEntries)
 	suite.Require().Nil(err)
 	suite.Len(respEntries.Entries, 5)
+}
+
+func (suite *ServerTestSuite) TestGetEntriesFromTag() {
+	tag := models.Tag{
+		Name:   "News",
+		User:   suite.user,
+		UserID: suite.user.ID,
+	}
+
+	err := suite.db.NewTag(&tag, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotEmpty(tag.APIID)
+	suite.Require().NotZero(tag.ID)
+
+	feed := models.Feed{
+		Subscription: suite.ts.URL,
+	}
+
+	err = suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotZero(feed.ID)
+	suite.Require().NotEmpty(feed.APIID)
+
+	err = suite.server.sync.SyncFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+
+	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
+	suite.Require().Nil(err)
+	suite.Require().NotEmpty(entries)
+
+	entryAPIIDs := make([]string, len(entries))
+	for i, entry := range entries {
+		entryAPIIDs[i] = entry.APIID
+	}
+
+	err = suite.db.TagEntries(tag.APIID, entryAPIIDs, &suite.user)
+	suite.Require().Nil(err)
+
+	req, err := http.NewRequest("GET", "http://localhost:8080/v1/tags/"+tag.APIID+"/entries", nil)
+	suite.Nil(err)
+
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(200, resp.StatusCode)
+
+	type Entries struct {
+		Entries []models.Entry `json:"entries"`
+	}
+
+	respEntries := new(Entries)
+	err = json.NewDecoder(resp.Body).Decode(respEntries)
+	suite.Require().Nil(err)
+	suite.Len(respEntries.Entries, 5)
+}
+
+func (suite *ServerTestSuite) TestTagEntries() {
+	tag := models.Tag{
+		Name: "News",
+	}
+	err := suite.db.NewTag(&tag, &suite.user)
+	suite.Require().Nil(err)
+
+	feed := models.Feed{
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+
+	err = suite.db.NewFeed(&feed, &suite.user)
+	suite.Require().Nil(err)
+
+	type EntryIds struct {
+		Entries []string `json:"entries"`
+	}
+
+	var entries []models.Entry
+	for i := 0; i < 5; i++ {
+		entry := models.Entry{
+			Title:       "Test Entry",
+			Description: "Testing entry",
+			Author:      "varddum",
+			Link:        "http://example.com",
+			Mark:        models.Unread,
+			Feed:        feed,
+		}
+
+		entries = append(entries, entry)
+	}
+
+	err = suite.db.NewEntries(entries, &feed, &suite.user)
+	suite.Require().Nil(err)
+
+	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
+	suite.Require().Nil(err)
+
+	entryAPIIDs := make([]string, len(entries))
+	for i, entry := range entries {
+		entryAPIIDs[i] = entry.APIID
+	}
+
+	list := EntryIds{
+		Entries: entryAPIIDs,
+	}
+
+	b, err := json.Marshal(list)
+	suite.Require().Nil(err)
+
+	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/tags/"+tag.APIID+"/entries", bytes.NewBuffer(b))
+	suite.Require().Nil(err)
+
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(http.StatusNoContent, resp.StatusCode)
+
+	taggedEntries, err := suite.db.EntriesFromTag(tag.APIID, models.Any, true, &suite.user)
+	suite.Nil(err)
+	suite.Len(taggedEntries, 5)
 }
 
 func (suite *ServerTestSuite) TestMarkCategory() {

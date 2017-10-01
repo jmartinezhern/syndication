@@ -267,6 +267,14 @@ func (db *DB) UserWithAPIID(apiID string) (user models.User, err error) {
 	return
 }
 
+// EntryWithAPIID returns an Entry with id that belongs to user
+func (db *DB) EntryWithAPIID(apiID string, user *models.User) (entry models.Entry, err error) {
+	if db.db.Model(user).First(&entry, "api_id = ?", apiID).RecordNotFound() {
+		err = NotFound{"Entry does not exist"}
+	}
+	return
+}
+
 // Authenticate a user and return its respective User model if successful
 func (db *DB) Authenticate(username, password string) (user models.User, err error) {
 	user, err = db.UserWithName(username)
@@ -634,10 +642,160 @@ func (db *DB) EntriesFromCategory(categoryID string, orderByNewest bool, marker 
 	return
 }
 
-// EntriesFromTag returns all Entries which are tagged with tagID
-func (db *DB) EntriesFromTag(tagID string, makrer models.Marker, orderByNewest bool, user *models.User) (entries []models.Entry, err error) {
-	// TODO
+// NewTag creates a new Tag object owned by user
+func (db *DB) NewTag(tag *models.Tag, user *models.User) error {
+	if tag.Name == "" {
+		return BadRequest{"Tag name should not be empty"}
+	}
+
+	tmpTag := &models.Tag{}
+	if db.db.Model(user).Where("name = ?", tag.Name).Related(tmpTag).RecordNotFound() {
+		tag.APIID = createAPIID()
+		db.db.Model(user).Association("Tags").Append(tag)
+		return nil
+	}
+
+	return Conflict{"Tag already exists"}
+}
+
+// Tag returns a Tag with id and owned by user
+func (db *DB) Tag(id string, user *models.User) (tag models.Tag, err error) {
+	if db.db.Model(user).Where("api_id = ?", id).Related(&tag).RecordNotFound() {
+		err = NotFound{"Tag does not exist"}
+	}
+
 	return
+}
+
+// Tags returns a list of all Tags owned by user
+func (db *DB) Tags(user *models.User) (tags []models.Tag) {
+	db.db.Model(user).Association("Tags").Find(&tags)
+	return
+}
+
+// TagEntries with the given tag for user
+func (db *DB) TagEntries(tagID string, entries []string, user *models.User) error {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	tag := &models.Tag{}
+	if db.db.Model(user).Where("api_id = ?", tagID).Related(tag).RecordNotFound() {
+		return NotFound{"Tag does not exist"}
+	}
+
+	dbEntries := make([]models.Entry, len(entries))
+	for i, entry := range entries {
+		dbEntry, err := db.EntryWithAPIID(entry, user)
+		if err != nil {
+			return err
+		}
+
+		dbEntries[i] = dbEntry
+	}
+
+	for _, entry := range dbEntries {
+		db.db.Model(tag).Association("Entries").Append(&entry)
+	}
+
+	return nil
+}
+
+// EntriesFromTag returns all Entries which are tagged with tagID
+func (db *DB) EntriesFromTag(tagID string, marker models.Marker, orderByNewest bool, user *models.User) (entries []models.Entry, err error) {
+	if marker == models.None {
+		err = BadRequest{"Request should include a valid marker"}
+		return
+	}
+
+	tag := &models.Tag{}
+	if db.db.Model(user).Where("api_id = ?", tagID).Related(tag).RecordNotFound() {
+		err = NotFound{"Tag not found"}
+		return
+	}
+
+	query := db.db.Model(tag)
+	if marker != models.Any {
+		query = query.Where("mark = ?", marker)
+	}
+
+	if orderByNewest {
+		query = query.Order("published DESC")
+	} else {
+		query = query.Order("published ASC")
+	}
+
+	query.Association("Entries").Find(&entries)
+
+	return
+}
+
+// EntriesFromMultipleTags returns all Entries that are related to a Category with categoryID by the entries' owning Feed
+func (db *DB) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marker models.Marker, user *models.User) (entries []models.Entry, err error) {
+	var order *gorm.DB
+	if orderByNewest {
+		order = db.db.Table("entries").Select("entries.title").Order("created_at DESC")
+	} else {
+		order = db.db.Table("entries").Select("entries.title").Order("created_at ASC")
+	}
+
+	if marker != models.Any {
+		order = order.Where("mark = ?", marker)
+	}
+
+	var tagPrimaryKeys []uint
+	for _, tag := range tagIDs {
+		key, keyErr := db.TagPrimaryKey(tag)
+		if keyErr != nil {
+			err = keyErr
+			return
+		}
+
+		tagPrimaryKeys = append(tagPrimaryKeys, key)
+	}
+
+	order.Joins("inner join entry_tags ON entry_tags.entry_id = entries.id").Where("entry_tags.tag_id in (?)", tagPrimaryKeys).Scan(&entries)
+	return
+}
+
+// TagPrimaryKey returns the SQL primary key of a Tag with an api_id
+func (db *DB) TagPrimaryKey(apiID string) (uint, error) {
+	tag := &models.Tag{}
+	if db.db.First(tag, "api_id = ?", apiID).RecordNotFound() {
+		return 0, NotFound{"Tag does not exist"}
+	}
+	return tag.ID, nil
+}
+
+// EntryPrimaryKey returns the SQL primary key of an Entry with api_id
+func (db *DB) EntryPrimaryKey(apiID string) (uint, error) {
+	entry := &models.Entry{}
+	if db.db.First(entry, "api_id = ?", apiID).RecordNotFound() {
+		return 0, NotFound{"Entry does not exist"}
+	}
+	return entry.ID, nil
+}
+
+// EditTag owned by user
+func (db *DB) EditTag(tag *models.Tag, user *models.User) error {
+	foundTag := &models.Tag{}
+	if !db.db.Model(user).Where("api_id = ?", tag.APIID).Related(foundTag).RecordNotFound() {
+		foundTag.Name = tag.Name
+		db.db.Model(tag).Save(foundTag)
+		return nil
+	}
+	return NotFound{"Tag does not exist"}
+}
+
+// DeleteTag with id and owned by user
+func (db *DB) DeleteTag(id string, user *models.User) error {
+	tag := &models.Tag{}
+	if db.db.Model(user).Where("api_id = ?", id).Related(tag).RecordNotFound() {
+		return NotFound{"Tag does not exist"}
+	}
+
+	db.db.Delete(tag)
+	return nil
 }
 
 // CategoryStats returns all Stats for a Category with the given id and that is owned by user
