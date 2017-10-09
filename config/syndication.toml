@@ -33,11 +33,11 @@ enable_tls = false
   enable = true
   connection ="/tmp/syndication.db"
 
-  [database.postgres]
-  enable = false
-  connection = "user=synd dbname=syndication sslmode=disable"
+  #[database.postgres]
+  #enable = false
+  #connection = "user=synd dbname=syndication sslmode=disable"
 
-  [database.mysql]
-  enable = false
-  connection = "synd:test@/syndication?parseTime=True"
+  #[database.mysql]
+  #enable = false
+  #connection = "synd:test@/syndication?parseTime=True"
 
