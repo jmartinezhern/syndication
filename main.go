@@ -92,7 +92,7 @@ func startApp(c *cli.Context) error {
 		return err
 	}
 
-	sync := sync.NewSync(db)
+	sync := sync.NewSync(db, conf.Sync)
 
 	admin, err := admin.NewAdmin(db, conf.Admin.SocketPath)
 	if err != nil {

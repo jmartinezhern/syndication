@@ -62,7 +62,7 @@ func (suite *ServerTestSuite) SetupTest() {
 	suite.db, err = database.NewDB("sqlite3", TestDBPath)
 	suite.Require().Nil(err)
 
-	suite.sync = sync.NewSync(suite.db)
+	suite.sync = sync.NewSync(suite.db, config.Sync{SyncInterval: time.Second * 5})
 
 	if suite.server == nil {
 		suite.server = NewServer(suite.db, suite.sync, conf.Server)
@@ -737,7 +737,7 @@ func (suite *ServerTestSuite) TestGetEntriesFromCategory() {
 	suite.Require().NotZero(feed.ID)
 	suite.Require().NotEmpty(feed.APIID)
 
-	err = suite.server.sync.SyncCategory(&category, &suite.user)
+	err = suite.server.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
 	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.APIID+"/entries", nil)
@@ -913,7 +913,7 @@ func (suite *ServerTestSuite) TestMarkCategory() {
 	suite.Require().NotZero(feed.ID)
 	suite.Require().NotEmpty(feed.APIID)
 
-	err = suite.server.sync.SyncCategory(&category, &suite.user)
+	err = suite.server.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
 	entries, err := suite.db.EntriesFromCategory(category.APIID, true, models.Unread, &suite.user)
@@ -1317,7 +1317,7 @@ func TestRegister(t *testing.T) {
 	require.NotNil(t, db)
 	require.Nil(t, err)
 
-	sync := sync.NewSync(db)
+	sync := sync.NewSync(db, config.Sync{SyncInterval: time.Second * 5})
 	require.NotNil(t, sync)
 
 	server := NewServer(db, sync, conf.Server)
@@ -1356,7 +1356,7 @@ func TestLogin(t *testing.T) {
 	require.Nil(t, err)
 	defer os.Remove(db.Connection)
 
-	sync := sync.NewSync(db)
+	sync := sync.NewSync(db, config.Sync{SyncInterval: time.Second * 5})
 
 	server := NewServer(db, sync, conf.Server)
 	server.handle.HideBanner = true
@@ -1408,7 +1408,7 @@ func TestLoginWithNonExistentUser(t *testing.T) {
 	require.Nil(t, err)
 	defer os.Remove(db.Connection)
 
-	sync := sync.NewSync(db)
+	sync := sync.NewSync(db, config.Sync{SyncInterval: time.Second * 5})
 
 	server := NewServer(db, sync, conf.Server)
 	server.handle.HideBanner = true
@@ -1448,7 +1448,7 @@ func TestLoginWithBadPassword(t *testing.T) {
 	require.Nil(t, err)
 	defer os.Remove(db.Connection)
 
-	sync := sync.NewSync(db)
+	sync := sync.NewSync(db, config.Sync{SyncInterval: time.Second * 5})
 
 	server := NewServer(db, sync, conf.Server)
 	server.handle.HideBanner = true

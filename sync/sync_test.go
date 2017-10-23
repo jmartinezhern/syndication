@@ -19,15 +19,18 @@ package sync
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/mmcdole/gofeed"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 )
@@ -73,7 +76,7 @@ func (suite *SyncTestSuite) SetupTest() {
 
 	time.Sleep(time.Second * 5)
 
-	suite.sync = NewSync(suite.db)
+	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: time.Minute * 5})
 }
 
 func (suite *SyncTestSuite) TearDownTest() {
@@ -230,37 +233,55 @@ func (suite *SyncTestSuite) TestSyncUsers() {
 	suite.Require().Nil(err)
 	suite.Require().NotEmpty(feed.APIID)
 
-	suite.sync.SyncUsers()
+	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: time.Second * 5})
+
+	suite.sync.Start()
+
+	time.Sleep(time.Second * 6)
+
+	suite.sync.Stop()
 
 	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
 	suite.Require().Nil(err)
 	suite.Len(entries, 5)
 }
 
-func (suite *SyncTestSuite) TestSyncCategory() {
-	ctg := models.Category{
-		Name: "Test Ctg",
+func (suite *SyncTestSuite) TestUserThreadAllocation() {
+	for i := 0; i < 150; i++ {
+		err := suite.db.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
+		suite.Require().Nil(err)
+
+		user, err := suite.db.UserWithName("test" + strconv.Itoa(i))
+		suite.Require().Nil(err)
+
+		feed := models.Feed{
+			Title:        "Sync Test",
+			Subscription: "http://localhost:9090/rss_minimal.xml",
+		}
+
+		err = suite.db.NewFeed(&feed, &user)
+		suite.Require().Nil(err)
 	}
 
-	err := suite.db.NewCategory(&ctg, &suite.user)
-	suite.Require().Nil(err)
+	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: time.Second * 5})
 
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: "http://localhost:9090/rss_minimal.xml",
-		Category:     ctg,
+	suite.sync.Start()
+
+	time.Sleep(time.Second * 6)
+
+	suite.sync.Stop()
+
+	users := suite.db.Users()
+	users = users[1:]
+
+	for _, user := range users {
+		entries, err := suite.db.Entries(true, models.Any, &user)
+		suite.Require().Nil(err)
+		if len(entries) == 0 {
+			fmt.Println(user)
+		}
+		suite.Len(entries, 5)
 	}
-
-	err = suite.db.NewFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.APIID)
-
-	err = suite.sync.SyncCategory(&ctg, &suite.user)
-	suite.Require().Nil(err)
-
-	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
-	suite.Require().Nil(err)
-	suite.Len(entries, 5)
 }
 
 func TestSyncTestSuite(t *testing.T) {
