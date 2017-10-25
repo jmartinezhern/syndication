@@ -625,3 +625,163 @@ curl -X PUT -H "Authorization: Bearer Adj48dkx.." http://locahost:8080/categorie
 Status: 204 No Content
 ```
 
+## Tags
+
+### Create a tag
+
+```
+POST /tags
+```
+
+#### Parameters
+
+```javascript
+{
+  'name': 'News'
+}
+```
+#### Response
+```
+Status: 200 OK
+```
+
+### Get a list of tags
+
+```
+GET /tags
+```
+
+#### Response
+
+```
+Status: 200 OK
+```
+
+```javascript
+{
+  tags: [
+    {
+      'name': 'World News',
+      'id': 'MTUwNDgwNTA3Nw=='
+    },
+    ...
+  ]
+}
+```
+
+### Get a tag's metadata
+
+```
+GET /tags/:tagID
+```
+
+#### Response
+
+```
+Status: 200 OK
+```
+
+```javascript
+{
+  'name': 'World News',
+  'id': 'MTUwNDgwNTA3Nw=='
+}
+```
+
+### Edit a tag
+
+```
+PUT /tags/:tagID
+```
+
+#### Parameters
+
+``` javascript
+{
+  'name': 'International News'
+}
+```
+
+#### Response
+
+```
+Status: 204 No Content
+```
+
+### Delete a tag
+
+```
+DELETE /tags/:tagID
+```
+
+#### Response
+
+```
+Status: 204 No Content
+```
+
+
+### Get a list of all Entries with a tag
+
+```
+GET /tags/:tagID/entries
+```
+
+|    Name   |   Type  |                               Description                               |
+| --------- | ------- | ----------------------------------------------------------------------- |
+| markedAs  | string  | Return only entries marked as `read` or `unread`. Default is `unread`.  |
+| pageSize  | integer | Size of the returned page. Default is 100.                              |
+| page      | integer | Page number for the returned entry list. Default is 1.                  |
+| orderBy   | string  | Order entries by `newest` or `oldest`. Default is `newest`.             |
+| newerThan | integer | Return entries newer than a provided time in Unix format.               |
+
+```bash
+curl -H "Authorization: Bearer A32wdj48..." https://localhost:8081/v1/tags/MTUwNDgwNTA3Nw==/entries?markedAs=unread&pageSize=100&page=2&orderBy=newest&newerThan=1496116444
+```
+#### Response
+
+```
+Status: 200 OK
+```
+
+```javascript
+{
+  "entries" : [
+    {
+      'id' : 'MTUwNDgwNTA3Nw==',
+      'title' : 'A Bad Broadband Market Begs for Net Neutrality Protections',
+      'description' : 'Anyone who has spent hours on...',
+      'link' : 'https://www.eff.org/deeplinks/2017/05/bad-broadband-market-begs-net-neutrality-protections'
+      'published' : '2017-05-30T03:26:38Z'
+      'author' : 'Kate Tummarello',
+      'isSaved' : true,
+      'markedAs' : 'unread'
+    },
+    ...
+  ]
+}
+```
+
+### Apply a tag to an entry
+
+```
+PUT /tags/:tagID/entries
+```
+
+#### Parameters
+
+```javascript
+{
+  "entries": [
+    "MTUwNDgwNTA3Nw==",
+    "MTUwNDgwNDQ4Nw==",
+    ...
+  ]
+}
+```
+
+#### Response
+
+```
+Status: 204 No Content
+```

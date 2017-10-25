@@ -20,7 +20,7 @@
 
 ## Planned Features
 - [ ] Plugins
-- [ ] Tags
+- [X] Tags
 
 ## Building
 
