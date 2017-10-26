@@ -169,12 +169,27 @@ func (suite *ServerTestSuite) TearDownTest() {
 	suite.ts.Close()
 }
 
+func (suite *ServerTestSuite) TestRequestWithNonJSONType() {
+	payload := []byte(`{"title":"EFF", "subscription": "https://www.eff.org/rss/updates.xml"}`)
+	req, err := http.NewRequest("POST", "http://localhost:8080/v1/feeds", bytes.NewBuffer(payload))
+
+	suite.Require().Nil(err)
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(400, resp.StatusCode)
+}
+
 func (suite *ServerTestSuite) TestNewFeed() {
 	payload := []byte(`{"title":"EFF", "subscription": "https://www.eff.org/rss/updates.xml"}`)
 	req, err := http.NewRequest("POST", "http://localhost:8080/v1/feeds", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -195,6 +210,20 @@ func (suite *ServerTestSuite) TestNewFeed() {
 	suite.Equal(dbFeed.Title, respFeed.Title)
 }
 
+func (suite *ServerTestSuite) TestNewUnretrivableFeed() {
+	payload := []byte(`{"title":"EFF", "subscription": "https://localhost:17170/rss/updates.xml"}`)
+	req, err := http.NewRequest("POST", "http://localhost:8080/v1/feeds", bytes.NewBuffer(payload))
+	suite.Require().Nil(err)
+	req.Header.Set("Authorization", "Bearer "+suite.token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(400, resp.StatusCode)
+}
+
 func (suite *ServerTestSuite) TestGetFeeds() {
 	for i := 0; i < 5; i++ {
 		feed := models.Feed{
@@ -211,7 +240,6 @@ func (suite *ServerTestSuite) TestGetFeeds() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -245,7 +273,6 @@ func (suite *ServerTestSuite) TestGetFeed() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -274,7 +301,6 @@ func (suite *ServerTestSuite) TestEditFeed() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -299,7 +325,6 @@ func (suite *ServerTestSuite) TestDeleteFeed() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -330,7 +355,6 @@ func (suite *ServerTestSuite) TestGetEntriesFromFeed() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -375,7 +399,6 @@ func (suite *ServerTestSuite) TestMarkFeed() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -398,7 +421,6 @@ func (suite *ServerTestSuite) TestNewCategory() {
 	req, err := http.NewRequest("POST", "http://localhost:8080/v1/categories", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -424,7 +446,6 @@ func (suite *ServerTestSuite) TestNewTag() {
 	req, err := http.NewRequest("POST", "http://localhost:8080/v1/tags", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -460,7 +481,6 @@ func (suite *ServerTestSuite) TestGetCategories() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -495,7 +515,6 @@ func (suite *ServerTestSuite) TestGetTags() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -526,7 +545,6 @@ func (suite *ServerTestSuite) TestGetCategory() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -554,7 +572,6 @@ func (suite *ServerTestSuite) TestGetTag() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -583,7 +600,6 @@ func (suite *ServerTestSuite) TestEditCategory() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -609,7 +625,6 @@ func (suite *ServerTestSuite) TestEditTag() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -634,7 +649,6 @@ func (suite *ServerTestSuite) TestDeleteCategory() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -659,7 +673,6 @@ func (suite *ServerTestSuite) TestDeleteTag() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -695,7 +708,6 @@ func (suite *ServerTestSuite) TestGetFeedsFromCategory() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -744,7 +756,6 @@ func (suite *ServerTestSuite) TestGetEntriesFromCategory() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -803,7 +814,6 @@ func (suite *ServerTestSuite) TestGetEntriesFromTag() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -876,7 +886,6 @@ func (suite *ServerTestSuite) TestTagEntries() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -928,7 +937,6 @@ func (suite *ServerTestSuite) TestMarkCategory() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -963,7 +971,6 @@ func (suite *ServerTestSuite) TestGetEntries() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -1009,7 +1016,6 @@ func (suite *ServerTestSuite) TestGetEntry() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -1052,7 +1058,6 @@ func (suite *ServerTestSuite) TestMarkEntry() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -1112,7 +1117,6 @@ func (suite *ServerTestSuite) TestGetStatsForFeed() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -1173,7 +1177,6 @@ func (suite *ServerTestSuite) TestGetStats() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -1244,7 +1247,6 @@ func (suite *ServerTestSuite) TestGetStatsForCategory() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -1292,7 +1294,6 @@ func (suite *ServerTestSuite) TestAddFeedsToCategory() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

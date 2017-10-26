@@ -22,6 +22,7 @@ package server
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -118,6 +119,23 @@ func (s *Server) Start() error {
 	}
 
 	return err
+}
+
+func (s *Server) assumeJSONContentType(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if !strings.HasSuffix(c.Path(), "/login") && !strings.HasSuffix(c.Path(), "/register") {
+			if c.Request().Header.Get("Content-Type") == "" {
+				c.Request().Header.Set("Content-Type", "application/json")
+			} else if c.Request().Header.Get("Content-Type") != "application/json" {
+				return c.JSON(400, ErrorResp{
+					Reason:  "Bad Request",
+					Message: "Content should be JSON",
+				})
+			}
+		}
+
+		return next(c)
+	}
 }
 
 // Stop the server gracefully
@@ -811,6 +829,8 @@ func (s *Server) getUser(c *echo.Context) (models.User, error) {
 
 func (s *Server) registerMiddleware() {
 	for version, group := range s.versionGroups {
+		group.Use(s.assumeJSONContentType)
+
 		group.Use(middleware.CORS())
 
 		group.Use(middleware.SecureWithConfig(middleware.SecureConfig{
@@ -909,10 +929,18 @@ func (s *Server) registerHandlers() {
 }
 
 func newError(err error, c *echo.Context) error {
+	log.Println(err)
 	if dbErr, ok := err.(database.DBError); ok {
 		return (*c).JSON(dbErr.Code(), ErrorResp{
 			Reason:  dbErr.String(),
 			Message: dbErr.Error(),
+		})
+	}
+
+	if syncErr, ok := err.(sync.Error); ok {
+		return (*c).JSON(syncErr.Code(), ErrorResp{
+			Reason:  syncErr.String(),
+			Message: syncErr.Error(),
 		})
 	}
 

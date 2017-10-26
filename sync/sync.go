@@ -48,6 +48,33 @@ const (
 
 type syncStatus = int
 
+//Error identifies error caused by database queries
+type Error interface {
+	String() string
+	Code() int
+	Error() string
+}
+
+type (
+	// BadRequest is a SyncError returned when a feed could not be fetched.
+	BadRequest struct {
+		msg string
+	}
+)
+
+func (e BadRequest) Error() string {
+	return e.msg
+}
+
+func (e BadRequest) String() string {
+	return "Bad Request"
+}
+
+// Code returns BadRequest's corresponding error code
+func (e BadRequest) Code() int {
+	return 400
+}
+
 // Sync represents a syncing worker.
 type Sync struct {
 	ticker        *time.Ticker
@@ -95,7 +122,7 @@ func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.E
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, BadRequest{err.Error()}
 	}
 
 	fp := gofeed.NewParser()
