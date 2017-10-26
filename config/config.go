@@ -27,6 +27,17 @@ import (
 	"time"
 )
 
+type Duration struct {
+	time.Duration
+}
+
+// UnmarshalText decodes a toml duration string such as "5m1s"
+func (d *Duration) UnmarshalText(text []byte) error {
+	var err error
+	d.Duration, err = time.ParseDuration(string(text))
+	return err
+}
+
 const (
 	// SystemConfigPath is Syndication's default path for system wide configuration.
 	SystemConfigPath = "/etc/syndication/config.toml"
@@ -40,18 +51,18 @@ const (
 type (
 	// Server represents the complete configuration for Syndication's REST server component.
 	Server struct {
-		AuthSecret            string        `toml:"auth_secret"`
-		AuthSecreteFilePath   string        `toml:"auth_secret_file_path"`
-		EnableTLS             bool          `toml:"enable_tls"`
-		EnableRequestLogs     bool          `toml:"enable_http_requests_log"`
-		EnablePanicPrintStack bool          `toml:"enable_panic_print_stack"`
-		Domain                string        `toml:"domain"`
-		CertCacheDir          string        `toml:"cert_cache_dir"`
-		MaxShutdownTime       int           `toml:"max_shutdown_time"`
-		HTTPPort              int           `toml:"http_port"`
-		ShutdownTimeout       time.Duration `toml:"shutdown_timeout"`
-		APIKeyExpiration      time.Duration `toml:"api_key_expiration"`
-		TLSPort               int           `toml:"tls_port"`
+		AuthSecret            string   `toml:"auth_secret"`
+		AuthSecreteFilePath   string   `toml:"auth_secret_file_path"`
+		EnableTLS             bool     `toml:"enable_tls"`
+		EnableRequestLogs     bool     `toml:"enable_http_requests_log"`
+		EnablePanicPrintStack bool     `toml:"enable_panic_print_stack"`
+		Domain                string   `toml:"domain"`
+		CertCacheDir          string   `toml:"cert_cache_dir"`
+		MaxShutdownTime       int      `toml:"max_shutdown_time"`
+		HTTPPort              int      `toml:"http_port"`
+		ShutdownTimeout       Duration `toml:"shutdown_timeout"`
+		APIKeyExpiration      Duration `toml:"api_key_expiration"`
+		TLSPort               int      `toml:"tls_port"`
 	}
 
 	// Database represents the complete configuration for the database used by Syndication.
@@ -63,8 +74,8 @@ type (
 
 	// Sync represents configurations applicable to Syndication's sync component.
 	Sync struct {
-		SyncTime     time.Time     `toml:"time"`
-		SyncInterval time.Duration `toml:"interval"`
+		SyncTime     time.Time `toml:"time"`
+		SyncInterval Duration  `toml:"interval"`
 	}
 
 	// Admin represents configurations applicable to Syndication's admin component.
@@ -98,6 +109,7 @@ var (
 		AuthSecret:            "",
 		AuthSecreteFilePath:   "",
 		HTTPPort:              80,
+		APIKeyExpiration:      Duration{time.Hour * 72},
 	}
 
 	// DefaultAdminConfig represents the minimum configuration necessary for the admin component.
@@ -108,7 +120,7 @@ var (
 
 	// DefaultSyncConfig represents the minimum configuration necessary for the sync component.
 	DefaultSyncConfig = Sync{
-		SyncInterval: time.Minute * 15,
+		SyncInterval: Duration{time.Minute * 15},
 	}
 
 	// DefaultConfig collects all minimum default configurations.
@@ -140,6 +152,12 @@ type (
 )
 
 func (c *Config) verifyConfig() error {
+	if c.Sync.SyncInterval.Duration == 0 {
+		c.Sync.SyncInterval = Duration{time.Minute * 15}
+	} else if c.Sync.SyncInterval.Minutes() < time.Duration(time.Minute*5).Minutes() {
+		return InvalidFieldValue{"Sync interval should be 5 minutes or greater"}
+	}
+
 	if c.Server.AuthSecreteFilePath != "" {
 		err := c.getSecretFromFile(c.Server.AuthSecreteFilePath)
 		if err != nil {
@@ -232,16 +250,6 @@ func (c Config) checkSQLiteConfig() error {
 	}
 
 	return nil
-}
-
-// Save the configuration
-func (c *Config) Save() error {
-	file, err := os.Create(c.path)
-	if err != nil {
-		return err
-	}
-
-	return toml.NewEncoder(file).Encode(c)
 }
 
 // NewConfig creates new configuration from a file located at path.

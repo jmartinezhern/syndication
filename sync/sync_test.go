@@ -76,7 +76,7 @@ func (suite *SyncTestSuite) SetupTest() {
 
 	time.Sleep(time.Second * 5)
 
-	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: time.Minute * 5})
+	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
 }
 
 func (suite *SyncTestSuite) TearDownTest() {
@@ -233,7 +233,7 @@ func (suite *SyncTestSuite) TestSyncUsers() {
 	suite.Require().Nil(err)
 	suite.Require().NotEmpty(feed.APIID)
 
-	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: time.Second * 5})
+	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
 
 	suite.sync.Start()
 
@@ -263,7 +263,7 @@ func (suite *SyncTestSuite) TestUserThreadAllocation() {
 		suite.Require().Nil(err)
 	}
 
-	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: time.Second * 5})
+	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
 
 	suite.sync.Start()
 

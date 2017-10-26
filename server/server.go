@@ -140,7 +140,7 @@ func (s *Server) assumeJSONContentType(next echo.HandlerFunc) echo.HandlerFunc {
 
 // Stop the server gracefully
 func (s *Server) Stop() error {
-	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout.Duration*time.Second)
 	defer cancel()
 	return s.handle.Shutdown(ctx)
 }

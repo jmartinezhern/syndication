@@ -346,6 +346,6 @@ func NewSync(db *database.DB, config config.Sync) *Sync {
 	return &Sync{
 		db:       db,
 		status:   make(chan syncStatus),
-		interval: config.SyncInterval,
+		interval: config.SyncInterval.Duration,
 	}
 }

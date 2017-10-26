@@ -60,19 +60,6 @@ func (suite *ConfigTestSuite) TestNewConfigWithBadSecretFile() {
 	suite.NotNil(config.verifyConfig())
 }
 
-func (suite *ConfigTestSuite) TestSave() {
-	config, err := NewConfig("simple.toml")
-	suite.Require().Nil(err)
-
-	config.Database.Enable = false
-	err = config.Save()
-	suite.Nil(err)
-
-	changedConfig, err := NewConfig("simple.toml")
-	suite.Require().Nil(err)
-	suite.False(changedConfig.Database.Enable)
-}
-
 func (suite *ConfigTestSuite) TestNewInvalidConfig() {
 	_, err := NewConfig("invalid.toml")
 	suite.IsType(err, InvalidFieldValue{})

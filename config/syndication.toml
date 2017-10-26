@@ -28,6 +28,9 @@ enable_http_requests_log = true
 enable_panic_print_stack = true
 enable_tls = false
 
+[sync]
+interval= "5m"
+
 [database]
   [database.sqlite]
   enable = true
