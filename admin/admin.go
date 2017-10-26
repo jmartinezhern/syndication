@@ -71,9 +71,9 @@ const (
 	// is not implemented by the service.
 	NotImplemented
 
-	// UnkownCommand signals that the requested command
+	// UnknownCommand signals that the requested command
 	// could not be identified.
-	UnkownCommand
+	UnknownCommand
 
 	// BadRequest signals that the request is invalid.
 	BadRequest
