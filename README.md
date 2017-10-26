@@ -4,18 +4,10 @@
 
 # Syndication - An extensible news aggregation server
 
-## Goals
-
-**Simple.** Any web service can be a pain to install and configure. Syndication aims to make setup and maintenance as painless as possible.
-
-**Extensible.** A Unix socket based administration API, a RESTful API and other features allow you to fine tune functionality according to your needs.
-
-**Efficient.** Heavy testing, cyclic refactoring and constant static analysis are the some of the things used to ensure that Syndication is as fast and bug-free as it can be.
-
 ## Features
 * JSON REST API
 * Unix socket based Administration API
-* Let's Encrypt through Echo framework
+* Let's Encrypt through Echo framework (not fully tested)
 * Support for SQLite, MySQL and Postgres
 
 ## Planned Features
@@ -30,3 +22,7 @@ $ git clone https://github.com/varddum/syndication $GOPATH/src/github.com/varddu
 $ cd syndication/src/github.com/varddum/syndication
 $ make
 ```
+
+## Contributing
+
+I built this for my self but I would like to make this useful for everyone. The best way to do this is through feedback. Please feel free to make pull requests and report issues.
