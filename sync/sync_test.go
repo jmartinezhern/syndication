@@ -65,13 +65,13 @@ func (suite *SyncTestSuite) SetupTest() {
 	suite.Require().Nil(err)
 
 	suite.server = &http.Server{
-		Addr:    ":8090",
+		Addr:    ":9090",
 		Handler: suite,
 	}
 
 	go suite.server.ListenAndServe()
 
-	time.Sleep(5000)
+	time.Sleep(time.Second * 5)
 
 	suite.sync = NewSync(suite.db)
 }
@@ -92,7 +92,7 @@ func (suite *SyncTestSuite) TestFetchFeed() {
 	suite.Require().Nil(err)
 
 	feed := &models.Feed{
-		Subscription: "http://localhost:8090/rss.xml",
+		Subscription: "http://localhost:9090/rss.xml",
 	}
 	err = FetchFeed(feed)
 	suite.Require().Nil(err)
@@ -104,7 +104,7 @@ func (suite *SyncTestSuite) TestFetchFeed() {
 func (suite *SyncTestSuite) TestFeedWithNonMatchingEtag() {
 	feed := models.Feed{
 		Title:        "Sync Test",
-		Subscription: "http://localhost:8090/rss.xml",
+		Subscription: "http://localhost:9090/rss.xml",
 	}
 
 	err := suite.db.NewFeed(&feed, &suite.user)
@@ -122,7 +122,7 @@ func (suite *SyncTestSuite) TestFeedWithNonMatchingEtag() {
 func (suite *SyncTestSuite) TestFeedWithMatchingEtag() {
 	feed := models.Feed{
 		Title:        "Sync Test",
-		Subscription: "http://localhost:8090/rss.xml",
+		Subscription: "http://localhost:9090/rss.xml",
 		Etag:         RSSFeedEtag,
 	}
 
@@ -141,7 +141,7 @@ func (suite *SyncTestSuite) TestFeedWithMatchingEtag() {
 func (suite *SyncTestSuite) TestFeedWithRecentLastUpdateDate() {
 	feed := models.Feed{
 		Title:        "Sync Test",
-		Subscription: "http://localhost:8090/rss.xml",
+		Subscription: "http://localhost:9090/rss.xml",
 		LastUpdated:  time.Now(),
 	}
 
@@ -160,7 +160,7 @@ func (suite *SyncTestSuite) TestFeedWithRecentLastUpdateDate() {
 func (suite *SyncTestSuite) TestFeedWithNewEntriesWithGUIDs() {
 	feed := models.Feed{
 		Title:        "Sync Test",
-		Subscription: "http://localhost:8090/rss.xml",
+		Subscription: "http://localhost:9090/rss.xml",
 	}
 
 	err := suite.db.NewFeed(&feed, &suite.user)
@@ -187,7 +187,7 @@ func (suite *SyncTestSuite) TestFeedWithNewEntriesWithGUIDs() {
 func (suite *SyncTestSuite) TestFeedWithNewEntriesWithoutGUIDs() {
 	feed := models.Feed{
 		Title:        "Sync Test",
-		Subscription: "http://localhost:8090/rss_minimal.xml",
+		Subscription: "http://localhost:9090/rss_minimal.xml",
 	}
 
 	err := suite.db.NewFeed(&feed, &suite.user)
@@ -205,7 +205,7 @@ func (suite *SyncTestSuite) TestFeedWithNewEntriesWithoutGUIDs() {
 func (suite *SyncTestSuite) TestSyncUser() {
 	feed := models.Feed{
 		Title:        "Sync Test",
-		Subscription: "http://localhost:8090/rss_minimal.xml",
+		Subscription: "http://localhost:9090/rss_minimal.xml",
 	}
 
 	err := suite.db.NewFeed(&feed, &suite.user)
@@ -223,7 +223,7 @@ func (suite *SyncTestSuite) TestSyncUser() {
 func (suite *SyncTestSuite) TestSyncUsers() {
 	feed := models.Feed{
 		Title:        "Sync Test",
-		Subscription: "http://localhost:8090/rss_minimal.xml",
+		Subscription: "http://localhost:9090/rss_minimal.xml",
 	}
 
 	err := suite.db.NewFeed(&feed, &suite.user)
@@ -247,7 +247,7 @@ func (suite *SyncTestSuite) TestSyncCategory() {
 
 	feed := models.Feed{
 		Title:        "Sync Test",
-		Subscription: "http://localhost:8090/rss_minimal.xml",
+		Subscription: "http://localhost:9090/rss_minimal.xml",
 		Category:     ctg,
 	}
 

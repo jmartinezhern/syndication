@@ -1327,7 +1327,7 @@ func TestRegister(t *testing.T) {
 		server.Start()
 	}()
 
-	time.Sleep(1000)
+	time.Sleep(time.Second * 2)
 
 	regResp, err := http.PostForm("http://localhost:8060/v1/register",
 		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
@@ -1417,7 +1417,7 @@ func TestLoginWithNonExistentUser(t *testing.T) {
 		server.Start()
 	}()
 
-	time.Sleep(1000)
+	time.Sleep(time.Second)
 
 	regResp, err := http.PostForm("http://localhost:8070/v1/register",
 		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
