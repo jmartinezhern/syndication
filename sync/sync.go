@@ -20,8 +20,10 @@ package sync
 import (
 	"crypto/md5"
 	"net/http"
+	"sync"
 	"time"
 
+	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 
@@ -29,10 +31,52 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const maxThreads = 100
+
+type userPool struct {
+	users []models.User
+	lock  sync.Mutex
+}
+
+const (
+	idle = iota
+	started
+	running
+	stopping
+	stopped
+)
+
+type syncStatus = int
+
 // Sync represents a syncing worker.
 type Sync struct {
-	ticker *time.Ticker
-	db     *database.DB
+	ticker        *time.Ticker
+	db            *database.DB
+	userPool      userPool
+	userWaitGroup sync.WaitGroup
+	status        chan syncStatus
+	interval      time.Duration
+	dbLock        sync.Mutex
+}
+
+func (p *userPool) get() models.User {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if len(p.users) == 0 {
+		return models.User{}
+	}
+
+	user := p.users[0]
+	p.users = p.users[1:]
+	return user
+}
+
+func (p *userPool) put(user models.User) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.users = append(p.users, user)
 }
 
 func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.Entry, error) {
@@ -58,6 +102,9 @@ func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.E
 	fetchedFeed, err := fp.Parse(resp.Body)
 
 	if err != nil {
+		// If there was an error by the feed parser and the
+		// content length is zero or less, it implies that
+		// we got an empty request so we swallow the error.
 		if req.ContentLength <= 0 {
 			return nil, nil
 		}
@@ -90,9 +137,12 @@ func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.E
 			item.GUID = itemGUID
 		}
 
+		s.dbLock.Lock()
 		if found, err := s.db.EntryWithGUIDExists(itemGUID, feed.APIID, user); err != nil || found {
+			s.dbLock.Unlock()
 			continue
 		}
+		s.dbLock.Unlock()
 
 		entries = append(entries, convertItemsToEntries(*feed, item))
 	}
@@ -173,10 +223,31 @@ func FetchFeed(feed *models.Feed) error {
 // SyncUsers sync's all user's feeds.
 func (s *Sync) SyncUsers() {
 	users := s.db.Users()
+
 	for _, user := range users {
-		if err := s.SyncUser(&user); err != nil {
-			log.Error(err)
-		}
+		s.userPool.put(user)
+	}
+
+	var numThreads int
+	if len(users) > maxThreads {
+		numThreads = maxThreads
+	} else {
+		numThreads = len(users)
+	}
+
+	for i := 0; i < numThreads; i++ {
+		s.userWaitGroup.Add(1)
+		go func() {
+			user := s.userPool.get()
+			for user.ID != 0 {
+				if err := s.SyncUser(&user); err != nil {
+					log.Error(err)
+				}
+				user = s.userPool.get()
+			}
+
+			s.userWaitGroup.Done()
+		}()
 	}
 }
 
@@ -191,6 +262,8 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 		return err
 	}
 
+	s.dbLock.Lock()
+	defer s.dbLock.Unlock()
 	err = s.db.NewEntries(entries, feed, user)
 	if err != nil {
 		return err
@@ -199,28 +272,11 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 	return s.db.EditFeed(feed, user)
 }
 
-// SyncCategory owned by user.
-func (s *Sync) SyncCategory(category *models.Category, user *models.User) error {
-	feeds, err := s.db.FeedsFromCategory(category.APIID, user)
-	if err != nil {
-		return err
-	}
-
-	for _, feed := range feeds {
-		feed.Category = *category
-		feed.CategoryID = category.ID
-		err = s.SyncFeed(&feed, user)
-		if err != nil {
-			log.Error(err)
-		}
-	}
-
-	return nil
-}
-
 // SyncUser sync's all feeds owned by user
 func (s *Sync) SyncUser(user *models.User) error {
+	s.dbLock.Lock()
 	feeds := s.db.Feeds(user)
+	s.dbLock.Unlock()
 	for _, feed := range feeds {
 		if err := s.SyncFeed(&feed, user); err != nil {
 			log.Error(err)
@@ -233,26 +289,37 @@ func (s *Sync) SyncUser(user *models.User) error {
 func (s *Sync) scheduleTask() {
 	go func() {
 		for {
-			s.SyncUsers()
-			<-s.ticker.C
+			select {
+			case <-s.ticker.C:
+				s.SyncUsers()
+			case <-s.status:
+				s.ticker.Stop()
+				s.status <- stopped
+				return
+			}
 		}
 	}()
 }
 
 // Start a syncer
 func (s *Sync) Start() {
-	s.ticker = time.NewTicker(time.Minute * 5)
+	s.ticker = time.NewTicker(s.interval)
 	s.scheduleTask()
 }
 
 // Stop a syncer
 func (s *Sync) Stop() {
 	s.ticker.Stop()
+	s.status <- stopping
+	<-s.status
+	s.userWaitGroup.Wait()
 }
 
 // NewSync creates a new Sync object
-func NewSync(db *database.DB) *Sync {
+func NewSync(db *database.DB, config config.Sync) *Sync {
 	return &Sync{
-		db: db,
+		db:       db,
+		status:   make(chan syncStatus),
+		interval: config.SyncInterval,
 	}
 }
