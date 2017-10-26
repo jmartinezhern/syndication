@@ -844,12 +844,11 @@ func (suite *ServerTestSuite) TestTagEntries() {
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
-			Title:       "Test Entry",
-			Description: "Testing entry",
-			Author:      "varddum",
-			Link:        "http://example.com",
-			Mark:        models.Unread,
-			Feed:        feed,
+			Title:  "Test Entry",
+			Author: "varddum",
+			Link:   "http://example.com",
+			Mark:   models.Unread,
+			Feed:   feed,
 		}
 
 		entries = append(entries, entry)

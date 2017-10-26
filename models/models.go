@@ -157,14 +157,13 @@ type (
 
 		Tags []Tag `json:"tags" gorm:"many2many:entry_tags;"`
 
-		GUID        string    `json:"-"`
-		Title       string    `json:"title"`
-		Link        string    `json:"link"`
-		Description string    `json:"description"`
-		Author      string    `json:"author"`
-		Published   time.Time `json:"published"`
-		Saved       bool      `json:"isSaved"`
-		Mark        Marker    `json:"markedAs"`
+		GUID      string    `json:"-"`
+		Title     string    `json:"title"`
+		Link      string    `json:"link"`
+		Author    string    `json:"author"`
+		Published time.Time `json:"published"`
+		Saved     bool      `json:"isSaved"`
+		Mark      Marker    `json:"markedAs"`
 	}
 
 	// Stats represents statistics related to various attributes of Feed, Entry, and Category objects.

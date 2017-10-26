@@ -162,11 +162,10 @@ func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.E
 
 func convertItemsToEntries(feed models.Feed, item *gofeed.Item) models.Entry {
 	entry := models.Entry{
-		Title:       item.Title,
-		Description: item.Description,
-		Link:        item.Link,
-		GUID:        item.GUID,
-		Mark:        models.Unread,
+		Title: item.Title,
+		Link:  item.Link,
+		GUID:  item.GUID,
+		Mark:  models.Unread,
 	}
 
 	if item.Author != nil {

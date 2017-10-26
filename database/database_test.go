@@ -426,12 +426,11 @@ func (suite *DatabaseTestSuite) TestTagEntries() {
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
-			Title:       "Test Entry",
-			Description: "Testing entry",
-			Author:      "varddum",
-			Link:        "http://example.com",
-			Mark:        models.Unread,
-			Feed:        feed,
+			Title:  "Test Entry",
+			Author: "varddum",
+			Link:   "http://example.com",
+			Mark:   models.Unread,
+			Feed:   feed,
 		}
 
 		entries = append(entries, entry)
@@ -482,12 +481,11 @@ func (suite *DatabaseTestSuite) TestTagMultipleEntries() {
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
-			Title:       "Test Entry " + strconv.Itoa(i),
-			Description: "Testing entry",
-			Author:      "varddum",
-			Link:        "http://example.com",
-			Mark:        models.Unread,
-			Feed:        feed,
+			Title:  "Test Entry " + strconv.Itoa(i),
+			Author: "varddum",
+			Link:   "http://example.com",
+			Mark:   models.Unread,
+			Feed:   feed,
 		}
 
 		entries = append(entries, entry)
@@ -549,12 +547,11 @@ func (suite *DatabaseTestSuite) TestEntriesFromMultipleTags() {
 	var entries []models.Entry
 	for i := 0; i < 15; i++ {
 		entry := models.Entry{
-			Title:       "Test Entry " + strconv.Itoa(i),
-			Description: "Testing entry",
-			Author:      "varddum",
-			Link:        "http://example.com",
-			Mark:        models.Unread,
-			Feed:        feed,
+			Title:  "Test Entry " + strconv.Itoa(i),
+			Author: "varddum",
+			Link:   "http://example.com",
+			Mark:   models.Unread,
+			Feed:   feed,
 		}
 
 		entries = append(entries, entry)
@@ -653,13 +650,12 @@ func (suite *DatabaseTestSuite) TestNewEntry() {
 	suite.NotEmpty(feed.APIID)
 
 	entry := models.Entry{
-		Title:       "Test Entry",
-		Description: "Testing entry",
-		Author:      "varddum",
-		Link:        "http://example.com",
-		Mark:        models.Unread,
-		Feed:        feed,
-		Published:   time.Now(),
+		Title:     "Test Entry",
+		Author:    "varddum",
+		Link:      "http://example.com",
+		Mark:      models.Unread,
+		Feed:      feed,
+		Published: time.Now(),
 	}
 
 	err = suite.db.NewEntry(&entry, &suite.user)
@@ -686,12 +682,11 @@ func (suite *DatabaseTestSuite) TestEntriesFromFeedWithNonExistenFeed() {
 
 func (suite *DatabaseTestSuite) TestNewEntryWithEmptyFeed() {
 	entry := models.Entry{
-		Title:       "Test Entry",
-		Link:        "http://example.com",
-		Description: "Testing entry",
-		Author:      "varddum",
-		Mark:        models.Unread,
-		Published:   time.Now(),
+		Title:     "Test Entry",
+		Link:      "http://example.com",
+		Author:    "varddum",
+		Mark:      models.Unread,
+		Published: time.Now(),
 	}
 
 	err := suite.db.NewEntry(&entry, &suite.user)
@@ -706,11 +701,10 @@ func (suite *DatabaseTestSuite) TestNewEntryWithEmptyFeed() {
 
 func (suite *DatabaseTestSuite) TestNewEntryWithBadFeed() {
 	entry := models.Entry{
-		Title:       "Test Entry",
-		Description: "Testing entry",
-		Author:      "varddum",
-		Mark:        models.Unread,
-		Published:   time.Now(),
+		Title:     "Test Entry",
+		Author:    "varddum",
+		Mark:      models.Unread,
+		Published: time.Now(),
 		Feed: models.Feed{
 			APIID: createAPIID(),
 		},
@@ -740,13 +734,12 @@ func (suite *DatabaseTestSuite) TestNewEntries() {
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
-			Title:       "Test Entry",
-			Description: "Testing entry",
-			Author:      "varddum",
-			Link:        "http://example.com",
-			Mark:        models.Unread,
-			Feed:        feed,
-			Published:   time.Now(),
+			Title:     "Test Entry",
+			Author:    "varddum",
+			Link:      "http://example.com",
+			Mark:      models.Unread,
+			Feed:      feed,
+			Published: time.Now(),
 		}
 
 		entries = append(entries, entry)
@@ -791,13 +784,12 @@ func (suite *DatabaseTestSuite) TestEntries() {
 	suite.NotEmpty(feed.APIID)
 
 	entry := models.Entry{
-		Title:       "Test Entry",
-		Description: "Testing entry",
-		Author:      "varddum",
-		Link:        "http://example.com",
-		Mark:        models.Unread,
-		Feed:        feed,
-		Published:   time.Now(),
+		Title:     "Test Entry",
+		Author:    "varddum",
+		Link:      "http://example.com",
+		Mark:      models.Unread,
+		Feed:      feed,
+		Published: time.Now(),
 	}
 
 	err = suite.db.NewEntry(&entry, &suite.user)
@@ -826,13 +818,12 @@ func (suite *DatabaseTestSuite) TestEntriesFromFeed() {
 	suite.NotEmpty(feed.APIID)
 
 	entry := models.Entry{
-		Title:       "Test Entry",
-		Description: "Testing entry",
-		Author:      "varddum",
-		Link:        "http://example.com",
-		Mark:        models.Unread,
-		Feed:        feed,
-		Published:   time.Now(),
+		Title:     "Test Entry",
+		Author:    "varddum",
+		Link:      "http://example.com",
+		Mark:      models.Unread,
+		Feed:      feed,
+		Published: time.Now(),
 	}
 
 	err = suite.db.NewEntry(&entry, &suite.user)
@@ -949,34 +940,31 @@ func (suite *DatabaseTestSuite) TestEntriesFromCategory() {
 		var entry models.Entry
 		if i <= 4 {
 			entry = models.Entry{
-				Title:       "First Feed Test Entry " + strconv.Itoa(i),
-				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "varddum",
-				Link:        "http://example.com",
-				Mark:        models.Unread,
-				Feed:        firstFeed,
-				Published:   time.Now(),
+				Title:     "First Feed Test Entry " + strconv.Itoa(i),
+				Author:    "varddum",
+				Link:      "http://example.com",
+				Mark:      models.Unread,
+				Feed:      firstFeed,
+				Published: time.Now(),
 			}
 		} else {
 			if i < 7 {
 				entry = models.Entry{
-					Title:       "Second Feed Test Entry " + strconv.Itoa(i),
-					Description: "Testing entry " + strconv.Itoa(i),
-					Author:      "varddum",
-					Link:        "http://example.com",
-					Mark:        models.Unread,
-					Feed:        secondFeed,
-					Published:   time.Now(),
+					Title:     "Second Feed Test Entry " + strconv.Itoa(i),
+					Author:    "varddum",
+					Link:      "http://example.com",
+					Mark:      models.Unread,
+					Feed:      secondFeed,
+					Published: time.Now(),
 				}
 			} else {
 				entry = models.Entry{
-					Title:       "Third Feed Test Entry " + strconv.Itoa(i),
-					Description: "Testing entry " + strconv.Itoa(i),
-					Author:      "varddum",
-					Link:        "http://example.com",
-					Mark:        models.Unread,
-					Feed:        thirdFeed,
-					Published:   time.Now(),
+					Title:     "Third Feed Test Entry " + strconv.Itoa(i),
+					Author:    "varddum",
+					Link:      "http://example.com",
+					Mark:      models.Unread,
+					Feed:      thirdFeed,
+					Published: time.Now(),
 				}
 			}
 		}
@@ -1052,23 +1040,21 @@ func (suite *DatabaseTestSuite) TestMarkCategory() {
 		var entry models.Entry
 		if i <= 4 {
 			entry = models.Entry{
-				Title:       "First Feed Test Entry " + strconv.Itoa(i),
-				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "varddum",
-				Link:        "http://example.com",
-				Mark:        models.Unread,
-				Feed:        firstFeed,
-				Published:   time.Now(),
+				Title:     "First Feed Test Entry " + strconv.Itoa(i),
+				Author:    "varddum",
+				Link:      "http://example.com",
+				Mark:      models.Unread,
+				Feed:      firstFeed,
+				Published: time.Now(),
 			}
 		} else {
 			entry = models.Entry{
-				Title:       "Second Feed Test Entry " + strconv.Itoa(i),
-				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "varddum",
-				Link:        "http://example.com",
-				Mark:        models.Read,
-				Feed:        secondFeed,
-				Published:   time.Now(),
+				Title:     "Second Feed Test Entry " + strconv.Itoa(i),
+				Author:    "varddum",
+				Link:      "http://example.com",
+				Mark:      models.Read,
+				Feed:      secondFeed,
+				Published: time.Now(),
 			}
 		}
 
@@ -1130,23 +1116,21 @@ func (suite *DatabaseTestSuite) TestMarkFeed() {
 		var entry models.Entry
 		if i <= 4 {
 			entry = models.Entry{
-				Title:       "First Feed Test Entry " + strconv.Itoa(i),
-				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "varddum",
-				Link:        "http://example.com",
-				Mark:        models.Unread,
-				Feed:        firstFeed,
-				Published:   time.Now(),
+				Title:     "First Feed Test Entry " + strconv.Itoa(i),
+				Author:    "varddum",
+				Link:      "http://example.com",
+				Mark:      models.Unread,
+				Feed:      firstFeed,
+				Published: time.Now(),
 			}
 		} else {
 			entry = models.Entry{
-				Title:       "Second Feed Test Entry " + strconv.Itoa(i),
-				Description: "Testing entry " + strconv.Itoa(i),
-				Author:      "varddum",
-				Link:        "http://example.com",
-				Mark:        models.Read,
-				Feed:        secondFeed,
-				Published:   time.Now(),
+				Title:     "Second Feed Test Entry " + strconv.Itoa(i),
+				Author:    "varddum",
+				Link:      "http://example.com",
+				Mark:      models.Read,
+				Feed:      secondFeed,
+				Published: time.Now(),
 			}
 		}
 
