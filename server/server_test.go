@@ -59,10 +59,18 @@ func (suite *ServerTestSuite) SetupTest() {
 	conf.Server.AuthSecret = "secret"
 
 	var err error
-	suite.db, err = database.NewDB("sqlite3", TestDBPath)
+	suite.db, err = database.NewDB(config.Database{
+		Type:       "sqlite3",
+		Connection: TestDBPath,
+		APIKeyExpiration: config.Duration{
+			Duration: time.Hour * 72,
+		},
+	})
 	suite.Require().Nil(err)
 
-	suite.sync = sync.NewSync(suite.db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
+	suite.sync = sync.NewSync(suite.db, config.Sync{
+		SyncInterval: config.Duration{Duration: time.Second * 5},
+	})
 
 	if suite.server == nil {
 		suite.server = NewServer(suite.db, suite.sync, conf.Server)
@@ -1312,12 +1320,18 @@ func TestRegister(t *testing.T) {
 	conf := config.DefaultConfig
 	conf.Server.HTTPPort = 8060
 
-	db, err := database.NewDB("sqlite3", "/tmp/syndication-test-server-register.db")
-	defer os.Remove(db.Connection)
+	db, err := database.NewDB(config.Database{
+		Type:       "sqlite3",
+		Connection: "/tmp/syndication-test-server-register.db",
+		APIKeyExpiration: config.Duration{
+			Duration: time.Hour * 72,
+		},
+	})
+	defer os.Remove("/tmp/syndication-test-server-register.db")
 	require.NotNil(t, db)
 	require.Nil(t, err)
 
-	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
+	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 	require.NotNil(t, sync)
 
 	server := NewServer(db, sync, conf.Server)
@@ -1352,11 +1366,15 @@ func TestLogin(t *testing.T) {
 	conf := config.DefaultConfig
 	conf.Server.HTTPPort = 8070
 
-	db, err := database.NewDB("sqlite3", "/tmp/syndication-test-server-login.db")
+	db, err := database.NewDB(config.Database{
+		Type:             "sqlite3",
+		Connection:       "/tmp/syndication-test-server-login.db",
+		APIKeyExpiration: config.Duration{Duration: time.Hour * 72},
+	})
 	require.Nil(t, err)
-	defer os.Remove(db.Connection)
+	defer os.Remove("/tmp/syndication-test-server-login.db")
 
-	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
+	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 
 	server := NewServer(db, sync, conf.Server)
 	server.handle.HideBanner = true
@@ -1404,11 +1422,15 @@ func TestLoginWithNonExistentUser(t *testing.T) {
 	conf := config.DefaultConfig
 	conf.Server.HTTPPort = 8070
 
-	db, err := database.NewDB("sqlite3", "/tmp/syndication-test-server-login.db")
+	db, err := database.NewDB(config.Database{
+		Type:             "sqlite3",
+		Connection:       "/tmp/syndication-test-server-login.db",
+		APIKeyExpiration: config.Duration{Duration: time.Hour * 72},
+	})
 	require.Nil(t, err)
-	defer os.Remove(db.Connection)
+	defer os.Remove("/tmp/syndication-test-server-login.db")
 
-	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
+	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 
 	server := NewServer(db, sync, conf.Server)
 	server.handle.HideBanner = true
@@ -1444,11 +1466,15 @@ func TestLoginWithBadPassword(t *testing.T) {
 	conf := config.DefaultConfig
 	conf.Server.HTTPPort = 8070
 
-	db, err := database.NewDB("sqlite3", "/tmp/syndication-test-server-login.db")
+	db, err := database.NewDB(config.Database{
+		Type:             "sqlite3",
+		Connection:       "/tmp/syndication-test-server-login.db",
+		APIKeyExpiration: config.Duration{Duration: time.Hour * 72},
+	})
 	require.Nil(t, err)
-	defer os.Remove(db.Connection)
+	defer os.Remove("/tmp/syndication-test-server-login.db")
 
-	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
+	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 
 	server := NewServer(db, sync, conf.Server)
 	server.handle.HideBanner = true

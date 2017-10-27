@@ -6,3 +6,6 @@
 
 [server]
   auth_secret = "secret_cat"
+
+[sync]
+  interval = "5m"

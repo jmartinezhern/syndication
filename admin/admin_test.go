@@ -23,8 +23,10 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 )
@@ -44,7 +46,11 @@ const TestDBPath = "/tmp/syndication-test-admin.db"
 
 func (suite *AdminTestSuite) SetupTest() {
 	var err error
-	suite.db, err = database.NewDB("sqlite3", TestDBPath)
+	suite.db, err = database.NewDB(config.Database{
+		Type:             "sqlite3",
+		Connection:       TestDBPath,
+		APIKeyExpiration: config.Duration{Duration: time.Hour * 72},
+	})
 	suite.Nil(err)
 
 	suite.socketPath = "/tmp/syndication.socket"
@@ -66,7 +72,7 @@ func (suite *AdminTestSuite) TearDownTest() {
 	err := suite.db.Close()
 	suite.Nil(err)
 
-	err = os.Remove(suite.db.Connection)
+	err = os.Remove(TestDBPath)
 	suite.Nil(err)
 
 	err = suite.conn.Close()

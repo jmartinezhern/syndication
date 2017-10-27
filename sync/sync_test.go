@@ -58,7 +58,10 @@ func (suite *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (suite *SyncTestSuite) SetupTest() {
 	var err error
-	suite.db, err = database.NewDB("sqlite3", TestDatabasePath)
+	suite.db, err = database.NewDB(config.Database{
+		Type:       "sqlite3",
+		Connection: TestDatabasePath,
+	})
 	suite.Require().Nil(err)
 
 	err = suite.db.NewUser("test", "golang")
@@ -76,12 +79,12 @@ func (suite *SyncTestSuite) SetupTest() {
 
 	time.Sleep(time.Second * 5)
 
-	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
+	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 }
 
 func (suite *SyncTestSuite) TearDownTest() {
 	suite.db.Close()
-	os.Remove(suite.db.Connection)
+	os.Remove(TestDatabasePath)
 	suite.server.Close()
 }
 
@@ -233,7 +236,7 @@ func (suite *SyncTestSuite) TestSyncUsers() {
 	suite.Require().Nil(err)
 	suite.Require().NotEmpty(feed.APIID)
 
-	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
+	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 
 	suite.sync.Start()
 
@@ -263,7 +266,7 @@ func (suite *SyncTestSuite) TestUserThreadAllocation() {
 		suite.Require().Nil(err)
 	}
 
-	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{time.Second * 5}})
+	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 
 	suite.sync.Start()
 

@@ -6,3 +6,6 @@
 
 [server]
   auth_secret = "secret_cat"
+
+[admin]
+socket_path = "./.."

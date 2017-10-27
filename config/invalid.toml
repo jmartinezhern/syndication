@@ -1,6 +1,10 @@
 [server]
 auth_secret = ""
 
+[database.redis]
+enable = false
+connection = ""
+
 [database.sqlite]
 enable = false
 connection = ""

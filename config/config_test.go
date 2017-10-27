@@ -18,6 +18,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -47,17 +48,40 @@ func (suite *ConfigTestSuite) TestNewConfigOnInvalidPath() {
 }
 
 func (suite *ConfigTestSuite) TestNewConfigWithSecretFile() {
-	_, err := NewConfig("simple_with_file_secret.toml")
+	dir, err := os.Getwd()
+	suite.Require().Nil(err)
+
+	err = os.Symlink(dir+"/sample_secret", "/tmp/sample_secret")
+	suite.Require().Nil(err)
+	defer os.Remove("/tmp/sample_secret")
+
+	_, err = NewConfig("simple_with_file_secret.toml")
 	suite.Nil(err)
 }
 
 func (suite *ConfigTestSuite) TestNewConfigWithBadSecretFile() {
+	dir, err := os.Getwd()
+	suite.Require().Nil(err)
+
+	err = os.Symlink(dir+"/sample_secret", "/tmp/sample_secret")
+	suite.Require().Nil(err)
+	defer os.Remove("/tmp/sample_secret")
+
 	config, err := NewConfig("simple_with_file_secret.toml")
 	suite.Require().Nil(err)
 
 	config.Server.AuthSecreteFilePath = "bogus"
 
 	suite.NotNil(config.verifyConfig())
+
+}
+
+func (suite *ConfigTestSuite) TestMinimalConfig() {
+	config, err := NewConfig("simple.toml")
+	suite.Require().Nil(err)
+
+	suite.Equal(DefaultSyncConfig, config.Sync)
+	suite.Equal(DefaultAdminConfig, config.Admin)
 }
 
 func (suite *ConfigTestSuite) TestNewInvalidConfig() {
@@ -77,12 +101,12 @@ func (suite *ConfigTestSuite) TestBadSQLiteConfig() {
 
 	config.Database = Database{}
 
-	config.Databases["sqlite"] = Database{"sqlite", true, ""}
+	config.Databases["sqlite"] = Database{"sqlite", true, "", Duration{0}}
 	suite.NotNil(config.verifyConfig())
 
 	config.Database = Database{}
 
-	config.Databases["sqlite"] = Database{"sqlite", true, "bogus"}
+	config.Databases["sqlite"] = Database{"sqlite", true, "bogus", Duration{0}}
 	suite.NotNil(config.verifyConfig())
 }
 
@@ -113,6 +137,21 @@ func (suite *ConfigTestSuite) TestNoDB() {
 
 func (suite *ConfigTestSuite) TestNoDBEnabled() {
 	_, err := NewConfig("no_db_enabled.toml")
+	suite.Require().NotNil(err)
+}
+
+func (suite *ConfigTestSuite) TestSyncConfig() {
+	_, err := NewConfig("simple_sync.toml")
+	suite.Require().Nil(err)
+}
+
+func (suite *ConfigTestSuite) TestShortSyncInterval() {
+	_, err := NewConfig("invalid_sync.toml")
+	suite.Require().NotNil(err)
+}
+
+func (suite *ConfigTestSuite) TestInvalidAdmin() {
+	_, err := NewConfig("invalid_admin.toml")
 	suite.Require().NotNil(err)
 }
 

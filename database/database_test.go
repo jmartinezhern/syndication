@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/models"
 )
 
@@ -42,7 +44,10 @@ const TestDatabasePath = "/tmp/syndication-test-db.db"
 
 func (suite *DatabaseTestSuite) SetupTest() {
 	var err error
-	suite.db, err = NewDB("sqlite3", TestDatabasePath)
+	suite.db, err = NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	suite.Require().NotNil(suite.db)
 	suite.Require().Nil(err)
 
@@ -56,7 +61,7 @@ func (suite *DatabaseTestSuite) SetupTest() {
 func (suite *DatabaseTestSuite) TearDownTest() {
 	err := suite.db.Close()
 	suite.Nil(err)
-	err = os.Remove(suite.db.Connection)
+	err = os.Remove(suite.db.config.Connection)
 	suite.Nil(err)
 }
 
@@ -1405,19 +1410,28 @@ func (suite *DatabaseTestSuite) TestErrors() {
 }
 
 func TestNewDB(t *testing.T) {
-	_, err := NewDB("sqlite3", TestDatabasePath)
+	_, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	assert.Nil(t, err)
 	err = os.Remove(TestDatabasePath)
 	assert.Nil(t, err)
 }
 
 func TestNewDBWithBadOptions(t *testing.T) {
-	_, err := NewDB("bogus", TestDatabasePath)
+	_, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "bogus",
+	})
 	assert.NotNil(t, err)
 }
 
 func TestNewUser(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1432,7 +1446,10 @@ func TestNewUser(t *testing.T) {
 }
 
 func TestUsers(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test_one", "golang")
@@ -1449,7 +1466,10 @@ func TestUsers(t *testing.T) {
 }
 
 func TestUsersWithFields(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test_one", "golang")
@@ -1468,7 +1488,10 @@ func TestUsersWithFields(t *testing.T) {
 }
 
 func TestNewConflictingUsers(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1482,7 +1505,10 @@ func TestNewConflictingUsers(t *testing.T) {
 }
 
 func TestDeleteUser(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("first", "golang")
@@ -1505,7 +1531,10 @@ func TestDeleteUser(t *testing.T) {
 }
 
 func TestDeleteUnknownUser(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.DeleteUser("bogus")
@@ -1513,7 +1542,10 @@ func TestDeleteUnknownUser(t *testing.T) {
 }
 
 func TestChangeUserName(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1537,7 +1569,10 @@ func TestChangeUserName(t *testing.T) {
 }
 
 func TestChangeUnknownUserName(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.ChangeUserName("bogus", "none")
@@ -1545,7 +1580,10 @@ func TestChangeUnknownUserName(t *testing.T) {
 }
 
 func TestChangeUserPassword(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1569,7 +1607,10 @@ func TestChangeUserPassword(t *testing.T) {
 }
 
 func TestChangeUnknownUserPassword(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.ChangeUserPassword("bogus", "none")
@@ -1577,7 +1618,10 @@ func TestChangeUnknownUserPassword(t *testing.T) {
 }
 
 func TestSuccessfulAuthentication(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1596,7 +1640,10 @@ func TestSuccessfulAuthentication(t *testing.T) {
 }
 
 func TestBadPasswordAuthentication(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1614,7 +1661,10 @@ func TestBadPasswordAuthentication(t *testing.T) {
 }
 
 func TestBadUserAuthentication(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	_, err = db.Authenticate("test", "golang")
@@ -1625,7 +1675,10 @@ func TestBadUserAuthentication(t *testing.T) {
 }
 
 func TestUserWithAPIID(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1644,7 +1697,10 @@ func TestUserWithAPIID(t *testing.T) {
 }
 
 func TestUserWithUnknownAPIID(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1660,7 +1716,10 @@ func TestUserWithUnknownAPIID(t *testing.T) {
 }
 
 func TestUserWithName(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1677,7 +1736,10 @@ func TestUserWithName(t *testing.T) {
 }
 
 func TestUserWithUnknownName(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1694,7 +1756,10 @@ func TestUserWithUnknownName(t *testing.T) {
 }
 
 func TestUserWithPrimaryKey(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")
@@ -1711,7 +1776,10 @@ func TestUserWithPrimaryKey(t *testing.T) {
 }
 
 func TestUnknownUserWithPrimaryKey(t *testing.T) {
-	db, err := NewDB("sqlite3", TestDatabasePath)
+	db, err := NewDB(config.Database{
+		Connection: TestDatabasePath,
+		Type:       "sqlite3",
+	})
 	require.Nil(t, err)
 
 	err = db.NewUser("test", "golang")

@@ -35,6 +35,7 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"golang.org/x/crypto/scrypt"
 
+	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/models"
 )
 
@@ -46,9 +47,8 @@ const (
 
 // DB represents a connectin to a SQL database
 type DB struct {
-	db         *gorm.DB
-	Connection string
-	Type       string
+	db     *gorm.DB
+	config config.Database
 }
 
 // DBError identifies error caused by database queries
@@ -90,15 +90,14 @@ type (
 )
 
 // NewDB creates a new DB instance
-func NewDB(dbType, conn string) (db *DB, err error) {
-	gormDB, err := gorm.Open(dbType, conn)
+func NewDB(conf config.Database) (db *DB, err error) {
+	gormDB, err := gorm.Open(conf.Type, conf.Connection)
 	if err != nil {
 		return
 	}
 
 	db = &DB{
-		Connection: conn,
-		Type:       dbType,
+		config: conf,
 	}
 
 	gormDB.AutoMigrate(&models.Feed{})
@@ -305,7 +304,7 @@ func (db *DB) NewAPIKey(secret string, user *models.User) (models.APIKey, error)
 	claims := token.Claims.(jwt.MapClaims)
 	claims["id"] = user.APIID
 	claims["admin"] = false
-	claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	claims["exp"] = time.Now().Add(db.config.APIKeyExpiration.Duration).Unix()
 
 	t, err := token.SignedString([]byte(secret))
 	if err != nil {
