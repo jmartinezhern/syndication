@@ -27,6 +27,7 @@ import (
 	"time"
 )
 
+// Duration represents a duration string such as "3m4s" as a time.Duration
 type Duration struct {
 	time.Duration
 }
@@ -61,15 +62,15 @@ type (
 		MaxShutdownTime       int      `toml:"max_shutdown_time"`
 		HTTPPort              int      `toml:"http_port"`
 		ShutdownTimeout       Duration `toml:"shutdown_timeout"`
-		APIKeyExpiration      Duration `toml:"api_key_expiration"`
 		TLSPort               int      `toml:"tls_port"`
 	}
 
 	// Database represents the complete configuration for the database used by Syndication.
 	Database struct {
-		Type       string `toml:"-"`
-		Enable     bool
-		Connection string
+		Type             string `toml:"-"`
+		Enable           bool
+		Connection       string
+		APIKeyExpiration Duration `toml:"api_key_expiration"`
 	}
 
 	// Sync represents configurations applicable to Syndication's sync component.
@@ -98,8 +99,9 @@ type (
 var (
 	// DefaultDatabaseConfig represents the minimum configuration necessary for the database
 	DefaultDatabaseConfig = Database{
-		Type:       "sqlite3",
-		Connection: "/var/syndication/syndication.db",
+		Type:             "sqlite3",
+		Connection:       "/var/syndication/syndication.db",
+		APIKeyExpiration: Duration{time.Hour * 72},
 	}
 
 	// DefaultServerConfig represents the minimum configuration necessary for the server component.
@@ -109,7 +111,7 @@ var (
 		AuthSecret:            "",
 		AuthSecreteFilePath:   "",
 		HTTPPort:              80,
-		APIKeyExpiration:      Duration{time.Hour * 72},
+		TLSPort:               443,
 	}
 
 	// DefaultAdminConfig represents the minimum configuration necessary for the admin component.
@@ -152,12 +154,48 @@ type (
 )
 
 func (c *Config) verifyConfig() error {
-	if c.Sync.SyncInterval.Duration == 0 {
-		c.Sync.SyncInterval = Duration{time.Minute * 15}
-	} else if c.Sync.SyncInterval.Minutes() < time.Duration(time.Minute*5).Minutes() {
-		return InvalidFieldValue{"Sync interval should be 5 minutes or greater"}
+	err := c.parseDatabase()
+	if err != nil {
+		return err
 	}
 
+	err = c.parseAdmin()
+	if err != nil {
+		return err
+	}
+
+	err = c.parseSync()
+	if err != nil {
+		return err
+	}
+
+	return c.parseServer()
+}
+
+func (c *Config) getSecretFromFile(path string) error {
+	if !filepath.IsAbs(path) {
+		return InvalidFieldValue{"Invalid secrete file path"}
+	}
+
+	c.Server.AuthSecreteFilePath = path
+
+	fi, err := os.Open(c.Server.AuthSecreteFilePath)
+	if err != nil {
+		return err
+	}
+
+	r := bufio.NewReader(fi)
+	buf := make([]byte, 512)
+	if _, err := r.Read(buf); err != nil && err != io.EOF {
+		return err
+	}
+
+	c.Server.AuthSecret = string(buf)
+
+	return fi.Close()
+}
+
+func (c *Config) parseServer() error {
 	if c.Server.AuthSecreteFilePath != "" {
 		err := c.getSecretFromFile(c.Server.AuthSecreteFilePath)
 		if err != nil {
@@ -167,79 +205,83 @@ func (c *Config) verifyConfig() error {
 		return InvalidFieldValue{"Auth secret should not be empty"}
 	}
 
-	if len(c.Databases) == 0 {
-		return InvalidFieldValue{"Configuration requires a database definition"}
+	if c.Server.HTTPPort == 0 {
+		c.Server.HTTPPort = DefaultServerConfig.HTTPPort
 	}
 
+	if c.Server.TLSPort == 0 {
+		c.Server.TLSPort = DefaultServerConfig.TLSPort
+	}
+
+	return nil
+}
+
+func (c *Config) parseAdmin() error {
+	if c.Admin.SocketPath != "" {
+		if !filepath.IsAbs(c.Admin.SocketPath) {
+			return InvalidFieldValue{"Admin socket path must be absolute"}
+		}
+	} else {
+		c.Admin.SocketPath = DefaultAdminConfig.SocketPath
+	}
+
+	if c.Admin.MaxConnections == 0 {
+		c.Admin.MaxConnections = DefaultAdminConfig.MaxConnections
+	}
+
+	return nil
+}
+
+func (c *Config) parseSync() error {
+	if c.Sync.SyncInterval.Duration == 0 {
+		c.Sync.SyncInterval = DefaultSyncConfig.SyncInterval
+	} else if c.Sync.SyncInterval.Minutes() < time.Duration(time.Minute*5).Minutes() {
+		return InvalidFieldValue{"Sync interval should be 5 minutes or greater"}
+	}
+
+	return nil
+}
+
+func (c *Config) parseDatabase() error {
+	c.Database = Database{}
+
 	for dbType, db := range c.Databases {
-		if db.Enable {
-			if c.Database != (Database{}) {
-				log.Warn("Multiple database definitions are enabled. Using first found.")
-				break
-			}
-
-			if dbType == "sqlite" {
-				err := c.checkSQLiteConfig()
-				if err != nil {
-					return err
-				}
-
-				c.Database.Connection = c.Databases["sqlite"].Connection
-				c.Database.Type = "sqlite3"
-			} else if dbType == "mysql" {
-				conn := c.Databases["mysql"].Connection
-				if !strings.Contains(conn, "parseTime=True") {
-					return InvalidFieldValue{"parseTime=True is required for a MySQL connection"}
-				}
-
-				c.Database.Connection = conn
-				c.Database.Type = "mysql"
-			} else if dbType == "postgres" {
-				c.Database.Connection = c.Databases["postgres"].Connection
-				c.Database.Type = "postgres"
-			} else {
-				log.Warn("Found unsupported database definition. Ignoring.")
-			}
+		if !db.Enable {
+			continue
+		} else if c.Database != (Database{}) {
+			log.Warn("Multiple database definitions are enabled. Using first found.")
+			break
 		}
 
+		var err error
+		switch dbType {
+		case "sqlite":
+			err = c.parseSQLiteDB()
+		case "mysql":
+			err = c.parseMySQLDB()
+		case "postgres":
+			err = c.parsePostgresDB()
+		default:
+			log.Warn("Found unsupported database definition. Ignoring.")
+		}
+
+		if err != nil {
+			log.Error(err)
+		}
 	}
 
 	if c.Database == (Database{}) {
 		return InvalidFieldValue{"Database not defined or not enabled"}
 	}
 
-	return nil
-}
-
-func (c *Config) getSecretFromFile(path string) error {
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return InvalidFieldValue{"Invalid secrete file path"}
-	}
-
-	c.Server.AuthSecreteFilePath = absPath
-
-	fi, err := os.Open(c.Server.AuthSecreteFilePath)
-	if err != nil {
-		return FileSystemError{"Could not read secrete file"}
-	}
-
-	r := bufio.NewReader(fi)
-	buf := make([]byte, 512)
-	if _, err := r.Read(buf); err != nil && err != io.EOF {
-		return FileSystemError{"Could not read secrete file"}
-	}
-
-	c.Server.AuthSecret = string(buf)
-
-	if err := fi.Close(); err != nil {
-		return FileSystemError{"Could not close secrete file"}
+	if c.Database.APIKeyExpiration.Duration == 0 {
+		c.Database.APIKeyExpiration = DefaultDatabaseConfig.APIKeyExpiration
 	}
 
 	return nil
 }
 
-func (c Config) checkSQLiteConfig() error {
+func (c *Config) parseSQLiteDB() error {
 	path := c.Databases["sqlite"].Connection
 	if path == "" {
 		return InvalidFieldValue{"DB path cannot be empty"}
@@ -248,6 +290,28 @@ func (c Config) checkSQLiteConfig() error {
 	if !filepath.IsAbs(path) {
 		return InvalidFieldValue{"DB path must be absolute"}
 	}
+
+	c.Database.Connection = c.Databases["sqlite"].Connection
+	c.Database.Type = "sqlite3"
+
+	return nil
+}
+
+func (c *Config) parseMySQLDB() error {
+	conn := c.Databases["mysql"].Connection
+	if !strings.Contains(conn, "parseTime=True") {
+		return InvalidFieldValue{"parseTime=True is required for a MySQL connection"}
+	}
+
+	c.Database.Connection = conn
+	c.Database.Type = "mysql"
+
+	return nil
+}
+
+func (c *Config) parsePostgresDB() error {
+	c.Database.Connection = c.Databases["postgres"].Connection
+	c.Database.Type = "postgres"
 
 	return nil
 }
@@ -268,6 +332,7 @@ func NewConfig(path string) (config Config, err error) {
 
 	err = config.verifyConfig()
 	if err != nil {
+		log.Error(err)
 		config = Config{}
 	}
 

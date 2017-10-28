@@ -87,7 +87,7 @@ func startApp(c *cli.Context) error {
 		}
 	}
 
-	db, err := database.NewDB(conf.Database.Type, conf.Database.Connection)
+	db, err := database.NewDB(conf.Database)
 	if err != nil {
 		return err
 	}
