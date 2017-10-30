@@ -20,7 +20,9 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -29,8 +31,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	//"github.com/stretchr/testify/suite"
+	//"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
@@ -53,44 +55,35 @@ type (
 	}
 )
 
-func (suite *ServerTestSuite) SetupTest() {
-	conf := config.DefaultConfig
-	conf.Server.HTTPPort = 8080
-	conf.Server.AuthSecret = "secret"
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
-	var err error
-	suite.db, err = database.NewDB(config.Database{
-		Type:       "sqlite3",
-		Connection: TestDBPath,
-		APIKeyExpiration: config.Duration{
-			Duration: time.Hour * 72,
-		},
-	})
-	suite.Require().Nil(err)
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-	suite.sync = sync.NewSync(suite.db, config.Sync{
-		SyncInterval: config.Duration{Duration: time.Second * 5},
-	})
-
-	if suite.server == nil {
-		suite.server = NewServer(suite.db, suite.sync, conf.Server)
-		suite.server.handle.HideBanner = true
-		go suite.server.Start()
+func RandStringRunes(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
+	return string(b)
+}
 
-	time.Sleep(10000)
+func (suite *ServerTestSuite) SetupTest() {
+	randUserName := RandStringRunes(8)
+	fmt.Println(randUserName)
 
-	resp, err := http.PostForm("http://localhost:8080/v1/register",
-		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
+	resp, err := http.PostForm("http://localhost:9876/v1/register",
+		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
 	suite.Require().Nil(err)
 
-	suite.Equal(204, resp.StatusCode)
+	suite.Require().Equal(204, resp.StatusCode)
 
 	err = resp.Body.Close()
 	suite.Nil(err)
 
-	resp, err = http.PostForm("http://localhost:8080/v1/login",
-		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
+	resp, err = http.PostForm("http://localhost:9876/v1/login",
+		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
 	suite.Require().Nil(err)
 
 	suite.Equal(resp.StatusCode, 200)
@@ -106,80 +99,20 @@ func (suite *ServerTestSuite) SetupTest() {
 
 	suite.token = t.Token
 
-	suite.user, err = suite.db.UserWithName("GoTest")
+	suite.user, err = suite.db.UserWithName(randUserName)
 	suite.Require().Nil(err)
 
 	err = resp.Body.Close()
 	suite.Nil(err)
-
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `<rss>
-		<channel>
-    <title>RSS Test</title>
-    <link>http://localhost:8080</link>
-    <description>Testing rss feeds</description>
-    <language>en</language>
-    <lastBuildDate></lastBuildDate>
-    <item>
-      <title>Item 1</title>
-      <link>http://localhost:8080/item_1</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item1@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:8080/rss.xml</source>
-    </item>
-    <item>
-      <title>Item 2</title>
-      <link>http://localhost:8080/item_2</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item2@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:8080/rss.xml</source>
-    </item>
-    <item>
-      <title>Item 3</title>
-      <link>http://localhost:8080/item_3</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item3@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:8080/rss.xml</source>
-    </item>
-    <item>
-      <title>Item 4</title>
-      <link>http://localhost:8080/item_4</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item4@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:8080/rss.xml</source>
-    </item>
-    <item>
-      <title>Item 5</title>
-      <link>http://localhost:8080/item_5</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item5@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:8080/rss.xml</source>
-    </item>
-		</channel>
-		</rss>`)
-	}
-
-	suite.ts = httptest.NewServer(http.HandlerFunc(handler))
 }
 
 func (suite *ServerTestSuite) TearDownTest() {
-	suite.db.DeleteAll()
-	suite.ts.Close()
+	suite.db.DeleteUser(suite.user.APIID)
 }
 
 func (suite *ServerTestSuite) TestRequestWithNonJSONType() {
-	payload := []byte(`{"title":"EFF", "subscription": "https://www.eff.org/rss/updates.xml"}`)
-	req, err := http.NewRequest("POST", "http://localhost:8080/v1/feeds", bytes.NewBuffer(payload))
+	payload := []byte(`{"title":"RSS Test", "subscription": "https://www.eff.org/rss/updates.xml"}`)
+	req, err := http.NewRequest("POST", "http://localhost:9876/v1/feeds", bytes.NewBuffer(payload))
 
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -194,8 +127,8 @@ func (suite *ServerTestSuite) TestRequestWithNonJSONType() {
 }
 
 func (suite *ServerTestSuite) TestNewFeed() {
-	payload := []byte(`{"title":"EFF", "subscription": "https://www.eff.org/rss/updates.xml"}`)
-	req, err := http.NewRequest("POST", "http://localhost:8080/v1/feeds", bytes.NewBuffer(payload))
+	payload := []byte(`{"title":"RSS Test", "subscription": "` + suite.ts.URL + `"}`)
+	req, err := http.NewRequest("POST", "http://localhost:9876/v1/feeds", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
 
@@ -220,7 +153,7 @@ func (suite *ServerTestSuite) TestNewFeed() {
 
 func (suite *ServerTestSuite) TestNewUnretrivableFeed() {
 	payload := []byte(`{"title":"EFF", "subscription": "https://localhost:17170/rss/updates.xml"}`)
-	req, err := http.NewRequest("POST", "http://localhost:8080/v1/feeds", bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", "http://localhost:9876/v1/feeds", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
 
@@ -244,7 +177,7 @@ func (suite *ServerTestSuite) TestGetFeeds() {
 		suite.Require().NotEmpty(feed.APIID)
 	}
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/feeds", nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -268,8 +201,7 @@ func (suite *ServerTestSuite) TestGetFeeds() {
 
 func (suite *ServerTestSuite) TestGetFeed() {
 	feed := models.Feed{
-		Title:        "EFF",
-		Subscription: "https://www.eff.org/rss/updates.xml",
+		Subscription: suite.ts.URL,
 	}
 
 	err := suite.db.NewFeed(&feed, &suite.user)
@@ -277,7 +209,7 @@ func (suite *ServerTestSuite) TestGetFeed() {
 	suite.Require().NotZero(feed.ID)
 	suite.Require().NotEmpty(feed.APIID)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds/"+feed.APIID, nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/feeds/"+feed.APIID, nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -298,14 +230,14 @@ func (suite *ServerTestSuite) TestGetFeed() {
 }
 
 func (suite *ServerTestSuite) TestEditFeed() {
-	feed := models.Feed{Title: "EFF", Subscription: "https://www.eff.org/rss/updates.xml"}
+	feed := models.Feed{Subscription: suite.ts.URL}
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
 	suite.Require().NotEmpty(feed.APIID)
 
 	payload := []byte(`{"title": "EFF Updates"}`)
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/feeds/"+feed.APIID, bytes.NewBuffer(payload))
+	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/feeds/"+feed.APIID, bytes.NewBuffer(payload))
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -323,13 +255,13 @@ func (suite *ServerTestSuite) TestEditFeed() {
 }
 
 func (suite *ServerTestSuite) TestDeleteFeed() {
-	feed := models.Feed{Title: "EFF", Subscription: "https://www.eff.org/rss/updates.xml"}
+	feed := models.Feed{Subscription: suite.ts.URL}
 	err := suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 	suite.Require().NotZero(feed.ID)
 	suite.Require().NotEmpty(feed.APIID)
 
-	req, err := http.NewRequest("DELETE", "http://localhost:8080/v1/feeds/"+feed.APIID, nil)
+	req, err := http.NewRequest("DELETE", "http://localhost:9876/v1/feeds/"+feed.APIID, nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -359,7 +291,7 @@ func (suite *ServerTestSuite) TestGetEntriesFromFeed() {
 	err = suite.server.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds/"+feed.APIID+"/entries", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/feeds/"+feed.APIID+"/entries", nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -402,7 +334,7 @@ func (suite *ServerTestSuite) TestMarkFeed() {
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 0)
 
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/feeds/"+feed.APIID+"/mark?as=read", nil)
+	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/feeds/"+feed.APIID+"/mark?as=read", nil)
 
 	suite.Nil(err)
 
@@ -426,7 +358,7 @@ func (suite *ServerTestSuite) TestMarkFeed() {
 
 func (suite *ServerTestSuite) TestNewCategory() {
 	payload := []byte(`{"name": "News"}`)
-	req, err := http.NewRequest("POST", "http://localhost:8080/v1/categories", bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", "http://localhost:9876/v1/categories", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
 
@@ -451,7 +383,7 @@ func (suite *ServerTestSuite) TestNewCategory() {
 
 func (suite *ServerTestSuite) TestNewTag() {
 	payload := []byte(`{"name": "News"}`)
-	req, err := http.NewRequest("POST", "http://localhost:8080/v1/tags", bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", "http://localhost:9876/v1/tags", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
 
@@ -485,7 +417,7 @@ func (suite *ServerTestSuite) TestGetCategories() {
 		suite.Require().NotEmpty(ctg.APIID)
 	}
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/categories", nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -519,7 +451,7 @@ func (suite *ServerTestSuite) TestGetTags() {
 		suite.Require().NotEmpty(tag.APIID)
 	}
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/tags", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags", nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -549,7 +481,7 @@ func (suite *ServerTestSuite) TestGetCategory() {
 	suite.Require().NotZero(ctg.ID)
 	suite.Require().NotEmpty(ctg.APIID)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+ctg.APIID, nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/categories/"+ctg.APIID, nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -576,7 +508,7 @@ func (suite *ServerTestSuite) TestGetTag() {
 	suite.Require().NotZero(tag.ID)
 	suite.Require().NotEmpty(tag.APIID)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/tags/"+tag.APIID, nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags/"+tag.APIID, nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -604,7 +536,7 @@ func (suite *ServerTestSuite) TestEditCategory() {
 	suite.Require().NotEmpty(ctg.APIID)
 
 	payload := []byte(`{"name": "World News"}`)
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/categories/"+ctg.APIID, bytes.NewBuffer(payload))
+	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/categories/"+ctg.APIID, bytes.NewBuffer(payload))
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -629,7 +561,7 @@ func (suite *ServerTestSuite) TestEditTag() {
 	suite.Require().NotEmpty(tag.APIID)
 
 	payload := []byte(`{"name": "World News"}`)
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/tags/"+tag.APIID, bytes.NewBuffer(payload))
+	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/tags/"+tag.APIID, bytes.NewBuffer(payload))
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -653,7 +585,7 @@ func (suite *ServerTestSuite) TestDeleteCategory() {
 	suite.Require().NotZero(ctg.ID)
 	suite.Require().NotEmpty(ctg.APIID)
 
-	req, err := http.NewRequest("DELETE", "http://localhost:8080/v1/categories/"+ctg.APIID, nil)
+	req, err := http.NewRequest("DELETE", "http://localhost:9876/v1/categories/"+ctg.APIID, nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -677,7 +609,7 @@ func (suite *ServerTestSuite) TestDeleteTag() {
 	suite.Require().NotZero(tag.ID)
 	suite.Require().NotEmpty(tag.APIID)
 
-	req, err := http.NewRequest("DELETE", "http://localhost:8080/v1/tags/"+tag.APIID, nil)
+	req, err := http.NewRequest("DELETE", "http://localhost:9876/v1/tags/"+tag.APIID, nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -705,14 +637,14 @@ func (suite *ServerTestSuite) TestGetFeedsFromCategory() {
 
 	feed := models.Feed{
 		Title:        "Test feed",
-		Subscription: "http://localhost:8080",
+		Subscription: "http://localhost:9876",
 		Category:     category,
 	}
 
 	err = suite.db.NewFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.APIID+"/feeds", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/categories/"+category.APIID+"/feeds", nil)
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -760,7 +692,7 @@ func (suite *ServerTestSuite) TestGetEntriesFromCategory() {
 	err = suite.server.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.APIID+"/entries", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/categories/"+category.APIID+"/entries", nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -818,7 +750,7 @@ func (suite *ServerTestSuite) TestGetEntriesFromTag() {
 	err = suite.db.TagEntries(tag.APIID, entryAPIIDs, &suite.user)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/tags/"+tag.APIID+"/entries", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags/"+tag.APIID+"/entries", nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -890,7 +822,7 @@ func (suite *ServerTestSuite) TestTagEntries() {
 	b, err := json.Marshal(list)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/tags/"+tag.APIID+"/entries", bytes.NewBuffer(b))
+	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/tags/"+tag.APIID+"/entries", bytes.NewBuffer(b))
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -940,7 +872,7 @@ func (suite *ServerTestSuite) TestMarkCategory() {
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 0)
 
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/categories/"+category.APIID+"/mark?as=read", nil)
+	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/categories/"+category.APIID+"/mark?as=read", nil)
 
 	suite.Nil(err)
 
@@ -975,7 +907,7 @@ func (suite *ServerTestSuite) TestGetEntries() {
 	err = suite.server.sync.SyncFeed(&feed, &suite.user)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/entries", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/entries", nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -999,8 +931,7 @@ func (suite *ServerTestSuite) TestGetEntries() {
 
 func (suite *ServerTestSuite) TestGetEntry() {
 	feed := models.Feed{
-		Title:        "EFF",
-		Subscription: "https://www.eff.org/rss/updates.xml",
+		Subscription: suite.ts.URL,
 	}
 
 	err := suite.db.NewFeed(&feed, &suite.user)
@@ -1009,8 +940,8 @@ func (suite *ServerTestSuite) TestGetEntry() {
 	suite.Require().NotEmpty(feed.APIID)
 
 	entry := models.Entry{
-		Title:  "The Espionage Acts Troubling Origins",
-		Link:   "https://www.eff.org/deeplinks/2017/06/one-hundred-years-espionage-act",
+		Title:  "Item 1",
+		Link:   "http://localhost:9876/item_1",
 		Feed:   feed,
 		FeedID: feed.ID,
 	}
@@ -1020,7 +951,7 @@ func (suite *ServerTestSuite) TestGetEntry() {
 	suite.Require().NotZero(entry.ID)
 	suite.Require().NotEmpty(entry.APIID)
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/entries/"+entry.APIID, nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/entries/"+entry.APIID, nil)
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -1061,7 +992,7 @@ func (suite *ServerTestSuite) TestMarkEntry() {
 	suite.Require().Nil(err)
 	suite.Require().Len(entries, 5)
 
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/entries/"+entries[0].APIID+"/mark?as=read", nil)
+	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/entries/"+entries[0].APIID+"/mark?as=read", nil)
 
 	suite.Nil(err)
 
@@ -1120,7 +1051,7 @@ func (suite *ServerTestSuite) TestGetStatsForFeed() {
 		suite.Require().Nil(err)
 	}
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/feeds/"+feed.APIID+"/stats", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/feeds/"+feed.APIID+"/stats", nil)
 
 	suite.Nil(err)
 
@@ -1180,7 +1111,7 @@ func (suite *ServerTestSuite) TestGetStats() {
 		suite.Require().Nil(err)
 	}
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/entries/stats", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/entries/stats", nil)
 
 	suite.Nil(err)
 
@@ -1250,7 +1181,7 @@ func (suite *ServerTestSuite) TestGetStatsForCategory() {
 		suite.Require().Nil(err)
 	}
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/v1/categories/"+category.APIID+"/stats", nil)
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/categories/"+category.APIID+"/stats", nil)
 
 	suite.Nil(err)
 
@@ -1298,7 +1229,7 @@ func (suite *ServerTestSuite) TestAddFeedsToCategory() {
 	b, err := json.Marshal(list)
 	suite.Require().Nil(err)
 
-	req, err := http.NewRequest("PUT", "http://localhost:8080/v1/categories/"+ctg.APIID+"/feeds", bytes.NewBuffer(b))
+	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/categories/"+ctg.APIID+"/feeds", bytes.NewBuffer(b))
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
@@ -1316,89 +1247,45 @@ func (suite *ServerTestSuite) TestAddFeedsToCategory() {
 	suite.Equal(ctg.ID, feed.CategoryID)
 }
 
-func TestRegister(t *testing.T) {
-	conf := config.DefaultConfig
-	conf.Server.HTTPPort = 8060
+func (suite *ServerTestSuite) TestRegister() {
+	suite.db.DeleteUser(suite.user.APIID)
 
-	db, err := database.NewDB(config.Database{
-		Type:       "sqlite3",
-		Connection: "/tmp/syndication-test-server-register.db",
-		APIKeyExpiration: config.Duration{
-			Duration: time.Hour * 72,
-		},
-	})
-	defer os.Remove("/tmp/syndication-test-server-register.db")
-	require.NotNil(t, db)
-	require.Nil(t, err)
+	randUserName := RandStringRunes(8)
+	regResp, err := http.PostForm("http://localhost:9876/v1/register",
+		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
+	suite.Require().Nil(err)
 
-	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
-	require.NotNil(t, sync)
+	suite.Equal(204, regResp.StatusCode)
 
-	server := NewServer(db, sync, conf.Server)
-	server.handle.HideBanner = true
+	users := suite.db.Users("username")
+	suite.Len(users, 1)
 
-	go func() {
-		server.Start()
-	}()
-
-	time.Sleep(time.Second * 2)
-
-	regResp, err := http.PostForm("http://localhost:8060/v1/register",
-		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
-	require.Nil(t, err)
-
-	assert.Equal(t, 204, regResp.StatusCode)
-
-	users := db.Users("username")
-	assert.Len(t, users, 1)
-
-	assert.Equal(t, "GoTest", users[0].Username)
-	assert.NotEmpty(t, users[0].ID)
-	assert.NotEmpty(t, users[0].APIID)
+	suite.Equal(randUserName, users[0].Username)
+	suite.NotEmpty(users[0].ID)
+	suite.NotEmpty(users[0].APIID)
 
 	err = regResp.Body.Close()
-	require.Nil(t, err)
+	suite.Nil(err)
 
-	server.Stop()
+	suite.db.DeleteUser(users[0].APIID)
 }
 
-func TestLogin(t *testing.T) {
-	conf := config.DefaultConfig
-	conf.Server.HTTPPort = 8070
+func (suite *ServerTestSuite) TestLogin() {
+	randUserName := RandStringRunes(8)
+	regResp, err := http.PostForm("http://localhost:9876/v1/register",
+		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
+	suite.Require().Nil(err)
 
-	db, err := database.NewDB(config.Database{
-		Type:             "sqlite3",
-		Connection:       "/tmp/syndication-test-server-login.db",
-		APIKeyExpiration: config.Duration{Duration: time.Hour * 72},
-	})
-	require.Nil(t, err)
-	defer os.Remove("/tmp/syndication-test-server-login.db")
-
-	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
-
-	server := NewServer(db, sync, conf.Server)
-	server.handle.HideBanner = true
-
-	go func() {
-		server.Start()
-	}()
-
-	time.Sleep(1000)
-
-	regResp, err := http.PostForm("http://localhost:8070/v1/register",
-		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
-	require.Nil(t, err)
-
-	assert.Equal(t, 204, regResp.StatusCode)
+	suite.Equal(204, regResp.StatusCode)
 
 	err = regResp.Body.Close()
-	require.Nil(t, err)
+	suite.Require().Nil(err)
 
-	loginResp, err := http.PostForm("http://localhost:8070/v1/login",
-		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
-	require.Nil(t, err)
+	loginResp, err := http.PostForm("http://localhost:9876/v1/login",
+		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
+	suite.Require().Nil(err)
 
-	assert.Equal(t, 200, loginResp.StatusCode)
+	suite.Equal(200, loginResp.StatusCode)
 
 	type Token struct {
 		Token string `json:"token"`
@@ -1406,109 +1293,146 @@ func TestLogin(t *testing.T) {
 
 	var token Token
 	err = json.NewDecoder(loginResp.Body).Decode(&token)
-	require.Nil(t, err)
-	assert.NotEmpty(t, token.Token)
+	suite.Require().Nil(err)
+	suite.NotEmpty(token.Token)
 
-	_, err = db.UserWithName("GoTest")
-	assert.Nil(t, err)
+	user, err := suite.db.UserWithName(randUserName)
+	suite.Nil(err)
 
 	err = loginResp.Body.Close()
-	assert.Nil(t, err)
+	suite.Nil(err)
 
-	server.Stop()
+	suite.db.DeleteUser(user.APIID)
 }
 
-func TestLoginWithNonExistentUser(t *testing.T) {
+func (suite *ServerTestSuite) TestLoginWithNonExistentUser() {
+	loginResp, err := http.PostForm("http://localhost:9876/v1/login",
+		url.Values{"username": {"bogus"}, "password": {"testtesttest"}})
+	suite.Require().Nil(err)
+
+	suite.Equal(401, loginResp.StatusCode)
+
+	err = loginResp.Body.Close()
+	suite.Nil(err)
+}
+
+func (suite *ServerTestSuite) TestLoginWithBadPassword() {
+	randUserName := RandStringRunes(8)
+	regResp, err := http.PostForm("http://localhost:9876/v1/register",
+		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
+	suite.Require().Nil(err)
+
+	user, err := suite.db.UserWithName(randUserName)
+	suite.Require().Nil(err)
+	defer suite.db.DeleteUser(user.APIID)
+
+	suite.Equal(204, regResp.StatusCode)
+
+	err = regResp.Body.Close()
+	suite.Require().Nil(err)
+
+	loginResp, err := http.PostForm("http://localhost:9876/v1/login",
+		url.Values{"username": {randUserName}, "password": {"bogus"}})
+	suite.Require().Nil(err)
+
+	suite.Equal(401, loginResp.StatusCode)
+
+	err = loginResp.Body.Close()
+	suite.Nil(err)
+}
+
+func (suite *ServerTestSuite) startServer() {
 	conf := config.DefaultConfig
-	conf.Server.HTTPPort = 8070
+	conf.Server.HTTPPort = 9876
+	conf.Server.AuthSecret = "secret"
 
-	db, err := database.NewDB(config.Database{
-		Type:             "sqlite3",
-		Connection:       "/tmp/syndication-test-server-login.db",
-		APIKeyExpiration: config.Duration{Duration: time.Hour * 72},
+	var err error
+	suite.db, err = database.NewDB(config.Database{
+		Type:       "sqlite3",
+		Connection: TestDBPath,
+		APIKeyExpiration: config.Duration{
+			Duration: time.Hour * 72,
+		},
 	})
-	require.Nil(t, err)
-	defer os.Remove("/tmp/syndication-test-server-login.db")
+	suite.Require().Nil(err)
 
-	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
+	suite.sync = sync.NewSync(suite.db, config.Sync{
+		SyncInterval: config.Duration{Duration: time.Second * 5},
+	})
 
-	server := NewServer(db, sync, conf.Server)
-	server.handle.HideBanner = true
-
-	go func() {
-		server.Start()
-	}()
+	if suite.server == nil {
+		suite.server = NewServer(suite.db, suite.sync, conf.Server)
+		suite.server.handle.HideBanner = true
+		go suite.server.Start()
+	}
 
 	time.Sleep(time.Second)
 
-	regResp, err := http.PostForm("http://localhost:8070/v1/register",
-		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
-	require.Nil(t, err)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `<rss>
+		<channel>
+    <title>RSS Test</title>
+    <link>http://localhost:9876</link>
+    <description>Testing rss feeds</description>
+    <language>en</language>
+    <lastBuildDate></lastBuildDate>
+    <item>
+      <title>Item 1</title>
+      <link>http://localhost:9876/item_1</link>
+      <description>Single test item</description>
+      <author>varddum</author>
+      <guid>item1@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:9876/rss.xml</source>
+    </item>
+    <item>
+      <title>Item 2</title>
+      <link>http://localhost:9876/item_2</link>
+      <description>Single test item</description>
+      <author>varddum</author>
+      <guid>item2@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:9876/rss.xml</source>
+    </item>
+    <item>
+      <title>Item 3</title>
+      <link>http://localhost:9876/item_3</link>
+      <description>Single test item</description>
+      <author>varddum</author>
+      <guid>item3@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:9876/rss.xml</source>
+    </item>
+    <item>
+      <title>Item 4</title>
+      <link>http://localhost:9876/item_4</link>
+      <description>Single test item</description>
+      <author>varddum</author>
+      <guid>item4@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:9876/rss.xml</source>
+    </item>
+    <item>
+      <title>Item 5</title>
+      <link>http://localhost:9876/item_5</link>
+      <description>Single test item</description>
+      <author>varddum</author>
+      <guid>item5@test</guid>
+      <pubDate></pubDate>
+      <source>http://localhost:9876/rss.xml</source>
+    </item>
+		</channel>
+		</rss>`)
+	}
 
-	assert.Equal(t, 204, regResp.StatusCode)
-
-	err = regResp.Body.Close()
-	require.Nil(t, err)
-
-	loginResp, err := http.PostForm("http://localhost:8070/v1/login",
-		url.Values{"username": {"bogus"}, "password": {"testtesttest"}})
-	require.Nil(t, err)
-
-	assert.Equal(t, 401, loginResp.StatusCode)
-
-	err = loginResp.Body.Close()
-	assert.Nil(t, err)
-
-	server.Stop()
-}
-
-func TestLoginWithBadPassword(t *testing.T) {
-	conf := config.DefaultConfig
-	conf.Server.HTTPPort = 8070
-
-	db, err := database.NewDB(config.Database{
-		Type:             "sqlite3",
-		Connection:       "/tmp/syndication-test-server-login.db",
-		APIKeyExpiration: config.Duration{Duration: time.Hour * 72},
-	})
-	require.Nil(t, err)
-	defer os.Remove("/tmp/syndication-test-server-login.db")
-
-	sync := sync.NewSync(db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
-
-	server := NewServer(db, sync, conf.Server)
-	server.handle.HideBanner = true
-
-	go func() {
-		server.Start()
-	}()
-
-	time.Sleep(1000)
-
-	regResp, err := http.PostForm("http://localhost:8070/v1/register",
-		url.Values{"username": {"GoTest"}, "password": {"testtesttest"}})
-	require.Nil(t, err)
-
-	assert.Equal(t, 204, regResp.StatusCode)
-
-	err = regResp.Body.Close()
-	require.Nil(t, err)
-
-	loginResp, err := http.PostForm("http://localhost:8070/v1/login",
-		url.Values{"username": {"GoTest"}, "password": {"bogus"}})
-	require.Nil(t, err)
-
-	assert.Equal(t, 401, loginResp.StatusCode)
-
-	err = loginResp.Body.Close()
-	assert.Nil(t, err)
-
-	server.Stop()
+	suite.ts = httptest.NewServer(http.HandlerFunc(handler))
 }
 
 func TestServerTestSuite(t *testing.T) {
 	serverSuite := new(ServerTestSuite)
+	serverSuite.startServer()
 	suite.Run(t, serverSuite)
 	serverSuite.server.Stop()
 	os.Remove(TestDBPath)
+	serverSuite.ts.Close()
 }
