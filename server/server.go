@@ -22,7 +22,6 @@ package server
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -929,7 +928,6 @@ func (s *Server) registerHandlers() {
 }
 
 func newError(err error, c *echo.Context) error {
-	log.Println(err)
 	if dbErr, ok := err.(database.DBError); ok {
 		return (*c).JSON(dbErr.Code(), ErrorResp{
 			Reason:  dbErr.String(),

@@ -20,7 +20,6 @@ package server
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -71,7 +70,6 @@ func RandStringRunes(n int) string {
 
 func (suite *ServerTestSuite) SetupTest() {
 	randUserName := RandStringRunes(8)
-	fmt.Println(randUserName)
 
 	resp, err := http.PostForm("http://localhost:9876/v1/register",
 		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
@@ -437,7 +435,7 @@ func (suite *ServerTestSuite) TestGetCategories() {
 	err = json.NewDecoder(resp.Body).Decode(respCtgs)
 	suite.Require().Nil(err)
 
-	suite.Len(respCtgs.Categories, 7)
+	suite.Len(respCtgs.Categories, 6)
 }
 
 func (suite *ServerTestSuite) TestGetTags() {
@@ -1345,6 +1343,7 @@ func (suite *ServerTestSuite) startServer() {
 	conf := config.DefaultConfig
 	conf.Server.HTTPPort = 9876
 	conf.Server.AuthSecret = "secret"
+	conf.Server.EnableRequestLogs = false
 
 	var err error
 	suite.db, err = database.NewDB(config.Database{
