@@ -170,13 +170,6 @@ func (db *DB) NewUser(username, password string) error {
 	})
 	user.UncategorizedCategoryAPIID = unctgAPIID
 
-	savedAPIID := createAPIID()
-	user.Categories = append(user.Categories, models.Category{
-		APIID: savedAPIID,
-		Name:  "Saved",
-	})
-	user.SavedCategoryAPIID = savedAPIID
-
 	user.APIID = createAPIID()
 	user.PasswordHash = hash
 	user.PasswordSalt = salt
@@ -435,7 +428,7 @@ func (db *DB) EditCategory(ctg *models.Category, user *models.User) error {
 
 // DeleteCategory with id and owned by user
 func (db *DB) DeleteCategory(id string, user *models.User) error {
-	if id == user.UncategorizedCategoryAPIID || id == user.SavedCategoryAPIID {
+	if id == user.UncategorizedCategoryAPIID {
 		return BadRequest{"Cannot delete system categories"}
 	}
 

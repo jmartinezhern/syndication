@@ -108,7 +108,7 @@ func (suite *DatabaseTestSuite) TestCategories() {
 	}
 
 	ctgs := suite.db.Categories(&suite.user)
-	suite.Len(ctgs, 7)
+	suite.Len(ctgs, 6)
 }
 
 func (suite *DatabaseTestSuite) TestEditCategory() {
@@ -163,7 +163,7 @@ func (suite *DatabaseTestSuite) TestDeleteNonExistingCategory() {
 }
 
 func (suite *DatabaseTestSuite) TestDeleteSystemCategory() {
-	err := suite.db.DeleteCategory(suite.user.SavedCategoryAPIID, &suite.user)
+	err := suite.db.DeleteCategory(suite.user.UncategorizedCategoryAPIID, &suite.user)
 	suite.IsType(BadRequest{}, err)
 }
 
@@ -1478,9 +1478,8 @@ func TestUsersWithFields(t *testing.T) {
 	err = db.NewUser("test_two", "password")
 	assert.Nil(t, err)
 
-	users := db.Users("uncategorized_category_api_id", "saved_category_api_id")
+	users := db.Users("uncategorized_category_api_id")
 	assert.Len(t, users, 2)
-	assert.NotEmpty(t, users[0].SavedCategoryAPIID)
 	assert.NotEmpty(t, users[0].UncategorizedCategoryAPIID)
 
 	err = os.Remove(TestDatabasePath)

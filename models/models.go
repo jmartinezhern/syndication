@@ -80,7 +80,6 @@ type (
 		PasswordHash               []byte `json:"-"`
 		PasswordSalt               []byte `json:"-"`
 		UncategorizedCategoryAPIID string `json:"-"`
-		SavedCategoryAPIID         string `json:"-"`
 	}
 
 	// Category represents a container for Feed entities.
