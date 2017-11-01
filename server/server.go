@@ -38,11 +38,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// DefaultPort server binds to
-const DefaultPort = "80"
-
-// DefaultTLSPort server binds to if TLS is enabled
-const DefaultTLSPort = "443"
+const echoSyndUserKey = "syndUser"
 
 type (
 	// EntryQueryParams maps query parameters used when GETting entries resources
@@ -96,18 +92,9 @@ func NewServer(db *database.DB, sync *sync.Sync, config config.Server) *Server {
 func (s *Server) Start() error {
 	var port string
 	if s.config.EnableTLS {
-		if s.config.TLSPort == 0 {
-			port = DefaultTLSPort
-		} else {
-			port = strconv.Itoa(s.config.TLSPort)
-		}
+		port = strconv.Itoa(s.config.TLSPort)
 	} else {
-		if s.config.HTTPPort == 0 {
-			port = DefaultPort
-		} else {
-			port = strconv.Itoa(s.config.HTTPPort)
-		}
-
+		port = strconv.Itoa(s.config.HTTPPort)
 	}
 
 	var err error
@@ -126,12 +113,49 @@ func (s *Server) assumeJSONContentType(next echo.HandlerFunc) echo.HandlerFunc {
 			if c.Request().Header.Get("Content-Type") == "" {
 				c.Request().Header.Set("Content-Type", "application/json")
 			} else if c.Request().Header.Get("Content-Type") != "application/json" {
-				return c.JSON(400, ErrorResp{
+				return c.JSON(http.StatusBadRequest, ErrorResp{
 					Reason:  "Bad Request",
 					Message: "Content should be JSON",
 				})
 			}
 		}
+
+		return next(c)
+	}
+}
+
+func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if c.Request().Method == "OPTIONS" {
+			return next(c)
+		}
+
+		if strings.HasSuffix(c.Path(), "/login") || strings.HasSuffix(c.Path(), "/register") {
+			return next(c)
+		}
+
+		userClaim := c.Get("user").(*jwt.Token)
+		claims := userClaim.Claims.(jwt.MapClaims)
+		user, err := s.db.UserWithAPIID(claims["id"].(string))
+		if err != nil {
+			return c.JSON(http.StatusUnauthorized, ErrorResp{
+				Reason:  "Unauthorized",
+				Message: "Credentials are invalid",
+			})
+		}
+
+		key := &models.APIKey{
+			Key: userClaim.Raw,
+		}
+		found, err := s.db.KeyBelongsToUser(key, &user)
+		if err != nil || !found {
+			return c.JSON(http.StatusUnauthorized, ErrorResp{
+				Reason:  "Unauthorized",
+				Message: "Credentials are invalid",
+			})
+		}
+
+		c.Set(echoSyndUserKey, user)
 
 		return next(c)
 	}
@@ -184,17 +208,14 @@ func (s *Server) Register(c echo.Context) error {
 
 // NewFeed creates a new feed
 func (s *Server) NewFeed(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	feed := models.Feed{}
-	if err = c.Bind(&feed); err != nil {
+	if err := c.Bind(&feed); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err = s.db.NewFeed(&feed, &user)
+	err := s.db.NewFeed(&feed, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -209,10 +230,7 @@ func (s *Server) NewFeed(c echo.Context) error {
 
 // GetFeeds returns a list of subscribed feeds
 func (s *Server) GetFeeds(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	feeds := s.db.Feeds(&user)
 
@@ -227,10 +245,7 @@ func (s *Server) GetFeeds(c echo.Context) error {
 
 // GetFeed with id
 func (s *Server) GetFeed(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	feed, err := s.db.Feed(c.Param("feedID"), &user)
 	if err != nil {
@@ -242,20 +257,17 @@ func (s *Server) GetFeed(c echo.Context) error {
 
 // EditFeed with id
 func (s *Server) EditFeed(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	feed := models.Feed{}
 
-	if err = c.Bind(&feed); err != nil {
+	if err := c.Bind(&feed); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
 	feed.APIID = c.Param("feedID")
 
-	err = s.db.EditFeed(&feed, &user)
+	err := s.db.EditFeed(&feed, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -265,13 +277,10 @@ func (s *Server) EditFeed(c echo.Context) error {
 
 // DeleteFeed with id
 func (s *Server) DeleteFeed(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	feedID := c.Param("feedID")
-	err = s.db.DeleteFeed(feedID, &user)
+	err := s.db.DeleteFeed(feedID, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -281,10 +290,7 @@ func (s *Server) DeleteFeed(c echo.Context) error {
 
 // GetCategories returns a list of Categories owned by a user
 func (s *Server) GetCategories(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	ctgs := s.db.Categories(&user)
 
@@ -299,10 +305,7 @@ func (s *Server) GetCategories(c echo.Context) error {
 
 // GetCategory with id
 func (s *Server) GetCategory(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	ctg, err := s.db.Category(c.Param("categoryID"), &user)
 	if err != nil {
@@ -314,13 +317,10 @@ func (s *Server) GetCategory(c echo.Context) error {
 
 // GetEntriesFromFeed returns a list of entries provided from a feed
 func (s *Server) GetEntriesFromFeed(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	params := new(EntryQueryParams)
-	if err = c.Bind(params); err != nil {
+	if err := c.Bind(params); err != nil {
 		return newError(err, &c)
 	}
 
@@ -351,13 +351,10 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 // GetEntriesFromCategory returns a list of Entries
 // that belong to a Feed that belongs to a Category
 func (s *Server) GetEntriesFromCategory(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	params := new(EntryQueryParams)
-	if err = c.Bind(params); err != nil {
+	if err := c.Bind(params); err != nil {
 		return newError(err, &c)
 	}
 
@@ -387,10 +384,7 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 
 // GetFeedsFromCategory returns a list of Feeds that belong to a Category
 func (s *Server) GetFeedsFromCategory(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	feeds, err := s.db.FeedsFromCategory(c.Param("categoryID"), &user)
 	if err != nil {
@@ -408,17 +402,14 @@ func (s *Server) GetFeedsFromCategory(c echo.Context) error {
 
 // NewCategory creates a new Category
 func (s *Server) NewCategory(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	ctg := models.Category{}
-	if err = c.Bind(&ctg); err != nil {
+	if err := c.Bind(&ctg); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err = s.db.NewCategory(&ctg, &user)
+	err := s.db.NewCategory(&ctg, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -428,19 +419,16 @@ func (s *Server) NewCategory(c echo.Context) error {
 
 // EditCategory with id
 func (s *Server) EditCategory(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	ctg := models.Category{}
 	ctg.APIID = c.Param("categoryID")
 
-	if err = c.Bind(&ctg); err != nil {
+	if err := c.Bind(&ctg); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err = s.db.EditCategory(&ctg, &user)
+	err := s.db.EditCategory(&ctg, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -450,10 +438,7 @@ func (s *Server) EditCategory(c echo.Context) error {
 
 // AddFeedsToCategory adds a Feed to a Category with id
 func (s *Server) AddFeedsToCategory(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	ctgID := c.Param("categoryID")
 
@@ -462,12 +447,12 @@ func (s *Server) AddFeedsToCategory(c echo.Context) error {
 	}
 
 	feedIds := new(FeedIds)
-	if err = c.Bind(feedIds); err != nil {
+	if err := c.Bind(feedIds); err != nil {
 		return newError(err, &c)
 	}
 
 	for _, id := range feedIds.Feeds {
-		err = s.db.ChangeFeedCategory(id, ctgID, &user)
+		err := s.db.ChangeFeedCategory(id, ctgID, &user)
 		if err != nil {
 			return newError(err, &c)
 		}
@@ -478,14 +463,11 @@ func (s *Server) AddFeedsToCategory(c echo.Context) error {
 
 // DeleteCategory with id
 func (s *Server) DeleteCategory(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	ctgID := c.Param("categoryID")
 
-	err = s.db.DeleteCategory(ctgID, &user)
+	err := s.db.DeleteCategory(ctgID, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -495,10 +477,7 @@ func (s *Server) DeleteCategory(c echo.Context) error {
 
 // GetStatsForCategory returns statistics related to a Category
 func (s *Server) GetStatsForCategory(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	ctgID := c.Param("categoryID")
 
@@ -512,10 +491,7 @@ func (s *Server) GetStatsForCategory(c echo.Context) error {
 
 // MarkCategory applies a Marker to a Category
 func (s *Server) MarkCategory(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	ctgID := c.Param("categoryID")
 
@@ -524,7 +500,7 @@ func (s *Server) MarkCategory(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
-	err = s.db.MarkCategory(ctgID, marker, &user)
+	err := s.db.MarkCategory(ctgID, marker, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -534,17 +510,14 @@ func (s *Server) MarkCategory(c echo.Context) error {
 
 // NewTag creates a new Tag
 func (s *Server) NewTag(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	tag := models.Tag{}
-	if err = c.Bind(&tag); err != nil {
+	if err := c.Bind(&tag); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err = s.db.NewTag(&tag, &user)
+	err := s.db.NewTag(&tag, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -554,10 +527,7 @@ func (s *Server) NewTag(c echo.Context) error {
 
 // GetTags returns a list of Tags owned by a user
 func (s *Server) GetTags(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	tags := s.db.Tags(&user)
 
@@ -572,14 +542,11 @@ func (s *Server) GetTags(c echo.Context) error {
 
 // DeleteTag with id
 func (s *Server) DeleteTag(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	tagID := c.Param("tagID")
 
-	err = s.db.DeleteTag(tagID, &user)
+	err := s.db.DeleteTag(tagID, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -589,19 +556,16 @@ func (s *Server) DeleteTag(c echo.Context) error {
 
 // EditTag with id
 func (s *Server) EditTag(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	tag := models.Tag{}
 	tag.APIID = c.Param("tagID")
 
-	if err = c.Bind(&tag); err != nil {
+	if err := c.Bind(&tag); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err = s.db.EditTag(&tag, &user)
+	err := s.db.EditTag(&tag, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -612,13 +576,10 @@ func (s *Server) EditTag(c echo.Context) error {
 // GetEntriesFromTag returns a list of Entries
 // that are tagged by a Tag with ID
 func (s *Server) GetEntriesFromTag(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	params := new(EntryQueryParams)
-	if err = c.Bind(params); err != nil {
+	if err := c.Bind(params); err != nil {
 		return newError(err, &c)
 	}
 
@@ -648,10 +609,7 @@ func (s *Server) GetEntriesFromTag(c echo.Context) error {
 
 // TagEntries adds a Tag with tagID to a list of entries
 func (s *Server) TagEntries(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	tag, err := s.db.Tag(c.Param("tagID"), &user)
 	if err != nil {
@@ -677,10 +635,7 @@ func (s *Server) TagEntries(c echo.Context) error {
 
 // GetTag with id
 func (s *Server) GetTag(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	tag, err := s.db.Tag(c.Param("tagID"), &user)
 	if err != nil {
@@ -692,10 +647,7 @@ func (s *Server) GetTag(c echo.Context) error {
 
 // MarkFeed applies a Marker to a Feed
 func (s *Server) MarkFeed(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	feedID := c.Param("feedID")
 
@@ -704,7 +656,7 @@ func (s *Server) MarkFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
-	err = s.db.MarkFeed(feedID, marker, &user)
+	err := s.db.MarkFeed(feedID, marker, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -714,10 +666,7 @@ func (s *Server) MarkFeed(c echo.Context) error {
 
 // GetStatsForFeed provides statistics related to a Feed
 func (s *Server) GetStatsForFeed(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	feedID := c.Param("feedID")
 
@@ -731,10 +680,7 @@ func (s *Server) GetStatsForFeed(c echo.Context) error {
 
 // GetEntry with id
 func (s *Server) GetEntry(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	entry, err := s.db.Entry(c.Param("entryID"), &user)
 	if err != nil {
@@ -746,13 +692,10 @@ func (s *Server) GetEntry(c echo.Context) error {
 
 // GetEntries returns a list of entries that belong to a user
 func (s *Server) GetEntries(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	params := new(EntryQueryParams)
-	if err = c.Bind(params); err != nil {
+	if err := c.Bind(params); err != nil {
 		return newError(err, &c)
 	}
 
@@ -777,10 +720,7 @@ func (s *Server) GetEntries(c echo.Context) error {
 
 // MarkEntry applies a Marker to an Entry
 func (s *Server) MarkEntry(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	entryID := c.Param("entryID")
 
@@ -789,7 +729,7 @@ func (s *Server) MarkEntry(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
-	err = s.db.MarkEntry(entryID, marker, &user)
+	err := s.db.MarkEntry(entryID, marker, &user)
 	if err != nil {
 		return newError(err, &c)
 	}
@@ -799,31 +739,9 @@ func (s *Server) MarkEntry(c echo.Context) error {
 
 // GetStatsForEntries provides statistics related to Entries
 func (s *Server) GetStatsForEntries(c echo.Context) error {
-	user, err := s.getUser(&c)
-	if err != nil {
-		return echo.ErrUnauthorized
-	}
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	return c.JSON(http.StatusOK, s.db.Stats(&user))
-}
-
-func (s *Server) getUser(c *echo.Context) (models.User, error) {
-	userClaim := (*c).Get("user").(*jwt.Token)
-	claims := userClaim.Claims.(jwt.MapClaims)
-	user, err := s.db.UserWithAPIID(claims["id"].(string))
-	if err != nil {
-		return models.User{}, err
-	}
-
-	key := &models.APIKey{
-		Key: userClaim.Raw,
-	}
-	found, err := s.db.KeyBelongsToUser(key, &user)
-	if err != nil || !found {
-		return models.User{}, err
-	}
-
-	return user, nil
 }
 
 func (s *Server) registerMiddleware() {
@@ -858,6 +776,8 @@ func (s *Server) registerMiddleware() {
 			SigningKey:    []byte(s.config.AuthSecret),
 			SigningMethod: "HS256",
 		}))
+
+		group.Use(s.checkAuth)
 
 		if s.config.EnableRequestLogs {
 			group.Use(middleware.Logger())
