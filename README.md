@@ -2,7 +2,7 @@
 [![codecov](https://codecov.io/gh/varddum/syndication/branch/master/graph/badge.svg)](https://codecov.io/gh/varddum/syndication)
 [![Waffle.io - Columns and their card count](https://badge.waffle.io/varddum/syndication.svg?columns=all)](http://waffle.io/varddum/syndication)
 
-# Syndication - An extensible news aggregation server
+# Syndication - An extendable news aggregation server
 
 ## Features
 * JSON REST API
@@ -25,4 +25,4 @@ $ make
 
 ## Contributing
 
-I built this for my self but I would like to make this useful for everyone. The best way to do this is through feedback. Please feel free to make pull requests and report issues.
+Testing, submitting issues, and pull requests are the best ways to contribute.
