@@ -19,16 +19,26 @@ package main
 
 import (
 	"os"
+	"os/signal"
 	"os/user"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli"
+
 	"github.com/varddum/syndication/admin"
 	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/plugins"
 	"github.com/varddum/syndication/server"
 	"github.com/varddum/syndication/sync"
 )
+
+var intSignal chan os.Signal
+
+func listenForInterrupt() {
+	intSignal = make(chan os.Signal, 1)
+	signal.Notify(intSignal, os.Interrupt)
+}
 
 func findSystemConfig() (config.Config, error) {
 	if _, err := os.Stat(config.SystemConfigPath); err != nil {
@@ -104,12 +114,27 @@ func startApp(c *cli.Context) error {
 
 	sync.Start()
 
-	server := server.NewServer(db, sync, conf.Server)
-	if err = server.Start(); err != nil {
+	plugins := plugins.NewPlugins(conf.Plugins)
+
+	listenForInterrupt()
+
+	server := server.NewServer(db, sync, &plugins, conf.Server)
+	go func() {
+		for sig := range intSignal {
+			if sig == os.Interrupt || sig == os.Kill {
+				err := server.Stop()
+				if err != nil {
+					color.Red(err.Error())
+				}
+			}
+		}
+	}()
+
+	if err := server.Start(); err != nil {
 		color.Red(err.Error())
 	}
 
-	return err
+	return nil
 }
 
 func main() {

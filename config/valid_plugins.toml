@@ -1,0 +1,10 @@
+plugins = ['/tmp/libtest.so']
+
+[database]
+
+  [database.sqlite]
+    enable = true
+    connection = "/tmp/syndication.db"
+
+[server]
+  auth_secret = "secret_cat"

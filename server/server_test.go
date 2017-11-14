@@ -30,12 +30,11 @@ import (
 	"testing"
 	"time"
 
-	//"github.com/stretchr/testify/suite"
-	//"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
+	"github.com/varddum/syndication/plugins"
 	"github.com/varddum/syndication/sync"
 )
 
@@ -108,6 +107,18 @@ func (suite *ServerTestSuite) TearDownTest() {
 	suite.db.DeleteUser(suite.user.APIID)
 }
 
+func (suite *ServerTestSuite) TestPlugins() {
+	req, err := http.NewRequest("GET", "http://localhost:9876/api_test/hello_world", nil)
+	suite.Require().Nil(err)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	suite.Require().Nil(err)
+	defer resp.Body.Close()
+
+	suite.Equal(200, resp.StatusCode)
+}
+
 func (suite *ServerTestSuite) TestRequestWithNonJSONType() {
 	payload := []byte(`{"title":"RSS Test", "subscription": "https://www.eff.org/rss/updates.xml"}`)
 	req, err := http.NewRequest("POST", "http://localhost:9876/v1/feeds", bytes.NewBuffer(payload))
@@ -129,6 +140,7 @@ func (suite *ServerTestSuite) TestNewFeed() {
 	req, err := http.NewRequest("POST", "http://localhost:9876/v1/feeds", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -239,6 +251,7 @@ func (suite *ServerTestSuite) TestEditFeed() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -359,6 +372,7 @@ func (suite *ServerTestSuite) TestNewCategory() {
 	req, err := http.NewRequest("POST", "http://localhost:9876/v1/categories", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -384,6 +398,7 @@ func (suite *ServerTestSuite) TestNewTag() {
 	req, err := http.NewRequest("POST", "http://localhost:9876/v1/tags", bytes.NewBuffer(payload))
 	suite.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -538,6 +553,7 @@ func (suite *ServerTestSuite) TestEditCategory() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -563,6 +579,7 @@ func (suite *ServerTestSuite) TestEditTag() {
 	suite.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -824,6 +841,7 @@ func (suite *ServerTestSuite) TestTagEntries() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -1231,6 +1249,7 @@ func (suite *ServerTestSuite) TestAddFeedsToCategory() {
 	suite.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+suite.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -1360,7 +1379,10 @@ func (suite *ServerTestSuite) startServer() {
 	})
 
 	if suite.server == nil {
-		suite.server = NewServer(suite.db, suite.sync, conf.Server)
+		plgnPath := []string{os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/api.so"}
+		plgns := plugins.NewPlugins(plgnPath)
+
+		suite.server = NewServer(suite.db, suite.sync, &plgns, conf.Server)
 		suite.server.handle.HideBanner = true
 		go suite.server.Start()
 	}

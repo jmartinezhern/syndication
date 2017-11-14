@@ -173,7 +173,7 @@ type (
 		Total  int `json:"total"`
 	}
 
-	// APIKey represents an SQL schema for Java Web Tokens created for User objects.
+	// APIKey represents an SQL schema for JSON Web Tokens created for User objects.
 	APIKey struct {
 		ID        uint      `json:"-" gorm:"primary_key"`
 		CreatedAt time.Time `json:"-"`

@@ -84,6 +84,17 @@ func (suite *ConfigTestSuite) TestMinimalConfig() {
 	suite.Equal(DefaultAdminConfig, config.Admin)
 }
 
+func (suite *ConfigTestSuite) TestValidPlugins() {
+	_, err := os.Stat("/tmp/libtest.so")
+	if err != nil {
+		os.OpenFile("/tmp/libtest.so", os.O_RDONLY|os.O_CREATE, 0666)
+	}
+
+	config, err := NewConfig("valid_plugins.toml")
+	suite.Require().Nil(err)
+	suite.Len(config.Plugins, 1)
+}
+
 func (suite *ConfigTestSuite) TestNewInvalidConfig() {
 	_, err := NewConfig("invalid.toml")
 	suite.IsType(err, InvalidFieldValue{})
@@ -128,6 +139,12 @@ func (suite *ConfigTestSuite) TestPostgresConfig() {
 func (suite *ConfigTestSuite) TestUnknownDB() {
 	_, err := NewConfig("with_unknown_db.toml")
 	suite.Require().Nil(err)
+}
+
+func (suite *ConfigTestSuite) TestInvalidPlugins() {
+	config, err := NewConfig("invalid_plugins.toml")
+	suite.Require().Nil(err)
+	suite.Empty(config.Plugins)
 }
 
 func (suite *ConfigTestSuite) TestNoDB() {

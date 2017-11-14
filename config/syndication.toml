@@ -11,9 +11,7 @@
 #binary_path= ".config/lib"
 #custom_config_pair = "key-id"
 
-#[[plugins]]
-#name = "pinboard"
-#lib_path = "pinboard"
+plugins = [ "/home/varddum/workspace/projects/syndication/src/github.com/varddum/syndication/api.so" ]
 
 [admin]
 enable = true

@@ -1,5 +1,5 @@
 hash: f2f24d6f9dada60a57686533584452cbbf2f37314c2fa3c851fd948262b0a672
-updated: 2017-09-03T16:26:02.151477065-05:00
+updated: 2017-11-17T15:30:04.334214721-06:00
 imports:
 - name: github.com/andybalholm/cascadia
   version: 349dd0209470eabd9514242c688c403c0926d266
@@ -20,7 +20,7 @@ imports:
 - name: github.com/jinzhu/inflection
   version: 1c35d901db3da928c72a72d8458480cc9ade058f
 - name: github.com/labstack/echo
-  version: cec7629194fe4bf83b0c72d9a02d340c7a1468ac
+  version: b28538b2e3f5446fe6e0e47ee34cd74b662ca2ab
   subpackages:
   - middleware
 - name: github.com/labstack/gommon
