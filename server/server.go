@@ -23,6 +23,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
+	"github.com/varddum/syndication/plugins"
 	"github.com/varddum/syndication/sync"
 
 	"github.com/dgrijalva/jwt-go"
@@ -39,6 +41,8 @@ import (
 )
 
 const echoSyndUserKey = "syndUser"
+
+var unauthorizedPaths []string
 
 type (
 	// EntryQueryParams maps query parameters used when GETting entries resources
@@ -51,11 +55,12 @@ type (
 	// Server represents a echo server instance and holds references to other components
 	// needed for the REST API handlers.
 	Server struct {
-		handle        *echo.Echo
-		db            *database.DB
-		sync          *sync.Sync
-		config        config.Server
-		versionGroups map[string]*echo.Group
+		handle  *echo.Echo
+		db      *database.DB
+		sync    *sync.Sync
+		plugins *plugins.Plugins
+		config  config.Server
+		groups  map[string]*echo.Group
 	}
 
 	// ErrorResp represents a common format for error responses returned by a Server
@@ -66,24 +71,34 @@ type (
 )
 
 // NewServer creates a new server instance
-func NewServer(db *database.DB, sync *sync.Sync, config config.Server) *Server {
+func NewServer(db *database.DB, sync *sync.Sync, plugins *plugins.Plugins, config config.Server) *Server {
 	server := Server{
-		handle:        echo.New(),
-		db:            db,
-		sync:          sync,
-		config:        config,
-		versionGroups: map[string]*echo.Group{},
+		handle:  echo.New(),
+		db:      db,
+		sync:    sync,
+		plugins: plugins,
+		config:  config,
+		groups:  map[string]*echo.Group{},
 	}
 
-	server.versionGroups["v1"] = server.handle.Group("v1")
+	server.groups["v1"] = server.handle.Group("v1")
+	apiPlugins := plugins.APIPlugins()
+	for _, plugin := range apiPlugins {
+		for _, endpnt := range plugin.Endpoints() {
+			if endpnt.Group != "" {
+				server.groups[endpnt.Group] = server.handle.Group(endpnt.Group)
+			}
+		}
+	}
 
 	if config.EnableTLS {
 		server.handle.AutoTLSManager.HostPolicy = autocert.HostWhitelist(config.Domain)
 		server.handle.AutoTLSManager.Cache = autocert.DirCache(config.CertCacheDir)
 	}
 
-	server.registerMiddleware()
 	server.registerHandlers()
+	server.registerPluginHandlers()
+	server.registerMiddleware()
 
 	return &server
 }
@@ -107,30 +122,9 @@ func (s *Server) Start() error {
 	return err
 }
 
-func (s *Server) assumeJSONContentType(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		if !strings.HasSuffix(c.Path(), "/login") && !strings.HasSuffix(c.Path(), "/register") {
-			if c.Request().Header.Get("Content-Type") == "" {
-				c.Request().Header.Set("Content-Type", "application/json")
-			} else if c.Request().Header.Get("Content-Type") != "application/json" {
-				return c.JSON(http.StatusBadRequest, ErrorResp{
-					Reason:  "Bad Request",
-					Message: "Content should be JSON",
-				})
-			}
-		}
-
-		return next(c)
-	}
-}
-
 func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		if c.Request().Method == "OPTIONS" {
-			return next(c)
-		}
-
-		if strings.HasSuffix(c.Path(), "/login") || strings.HasSuffix(c.Path(), "/register") {
+		if c.Request().Method == "OPTIONS" || isPathUnauthorized(c.Path()) {
 			return next(c)
 		}
 
@@ -163,6 +157,11 @@ func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
 
 // Stop the server gracefully
 func (s *Server) Stop() error {
+	apiPlugins := s.plugins.APIPlugins()
+	for _, plugin := range apiPlugins {
+		plugin.Shutdown()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout.Duration*time.Second)
 	defer cancel()
 	return s.handle.Shutdown(ctx)
@@ -745,51 +744,56 @@ func (s *Server) GetStatsForEntries(c echo.Context) error {
 }
 
 func (s *Server) registerMiddleware() {
-	for version, group := range s.versionGroups {
-		group.Use(s.assumeJSONContentType)
+	s.handle.Use(middleware.CORS())
 
-		group.Use(middleware.CORS())
+	s.handle.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+		XSSProtection:      "",
+		XFrameOptions:      "",
+		ContentTypeNosniff: "nosniff", HSTSMaxAge: 3600,
+		ContentSecurityPolicy: "default-src 'self'",
+	}))
 
-		group.Use(middleware.SecureWithConfig(middleware.SecureConfig{
-			XSSProtection:      "",
-			XFrameOptions:      "",
-			ContentTypeNosniff: "nosniff", HSTSMaxAge: 3600,
-			ContentSecurityPolicy: "default-src 'self'",
-		}))
+	s.handle.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
+		StackSize:         1 << 10, // 1 KB
+		DisablePrintStack: s.config.EnablePanicPrintStack,
+	}))
 
-		group.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
-			StackSize:         1 << 10, // 1 KB
-			DisablePrintStack: s.config.EnablePanicPrintStack,
-		}))
+	s.handle.Use(middleware.JWTWithConfig(middleware.JWTConfig{
+		Skipper: func(c echo.Context) bool {
+			if c.Request().Method == "OPTIONS" {
+				return true
+			}
 
-		group.Use(middleware.JWTWithConfig(middleware.JWTConfig{
-			Skipper: func(c echo.Context) bool {
-				if c.Request().Method == "OPTIONS" {
-					return true
-				}
+			return isPathUnauthorized(c.Path())
+		},
+		SigningKey:    []byte(s.config.AuthSecret),
+		SigningMethod: "HS256",
+	}))
 
-				if c.Path() == "/"+version+"/login" || c.Path() == "/"+version+"/register" {
-					return true
-				}
-				return false
-			},
-			SigningKey:    []byte(s.config.AuthSecret),
-			SigningMethod: "HS256",
-		}))
+	s.handle.Use(s.checkAuth)
 
-		group.Use(s.checkAuth)
-
-		if s.config.EnableRequestLogs {
-			group.Use(middleware.Logger())
-		}
+	if s.config.EnableRequestLogs {
+		s.handle.Use(middleware.Logger())
 	}
 }
 
+func isPathUnauthorized(path string) bool {
+	for _, skpPath := range unauthorizedPaths {
+		if skpPath == path {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (s *Server) registerHandlers() {
-	v1 := s.versionGroups["v1"]
+	v1 := s.groups["v1"]
 
 	v1.POST("/login", s.Login)
 	v1.POST("/register", s.Register)
+
+	unauthorizedPaths = append(unauthorizedPaths, "/v1/login", "/v1/register")
 
 	v1.POST("/feeds", s.NewFeed)
 	v1.GET("/feeds", s.GetFeeds)
@@ -845,6 +849,50 @@ func (s *Server) registerHandlers() {
 	v1.OPTIONS("/entries/stats", s.OptionsHandler)
 	v1.OPTIONS("/entries/:entryID", s.OptionsHandler)
 	v1.OPTIONS("/entries/:entryID/mark", s.OptionsHandler)
+}
+
+func (s *Server) registerPluginHandlers() {
+	apiPlugins := s.plugins.APIPlugins()
+	for _, plugin := range apiPlugins {
+		endpoints := plugin.Endpoints()
+		for _, endpoint := range endpoints {
+			s.registerEndpoint(endpoint)
+		}
+	}
+}
+
+func (s *Server) registerEndpoint(endpoint plugins.Endpoint) {
+	var fullPath string
+	handlerWrapper := func(c echo.Context) error {
+		var ctx plugins.APICtx
+		var userCtx plugins.UserCtx
+		user, ok := c.Get(echoSyndUserKey).(models.User)
+		if endpoint.NeedsUser && ok {
+			userCtx = plugins.NewUserCtx(s.db, &user)
+			ctx = plugins.APICtx{User: &userCtx}
+		} else {
+			ctx = plugins.APICtx{}
+		}
+
+		endpoint.Handler(ctx, c.Response().Writer, c.Request())
+		return nil
+	}
+
+	if endpoint.Group != "" {
+		grp := s.handle.Group(endpoint.Group)
+		s.groups[endpoint.Group] = grp
+		grp.Add(endpoint.Method, endpoint.Path, handlerWrapper)
+
+		fullPath = path.Join("/", endpoint.Group, "/", endpoint.Path)
+	} else {
+		s.handle.Add(endpoint.Method, endpoint.Path, handlerWrapper)
+
+		fullPath = path.Join("/", endpoint.Path)
+	}
+
+	if !endpoint.NeedsUser {
+		unauthorizedPaths = append(unauthorizedPaths, fullPath)
+	}
 }
 
 func newError(err error, c *echo.Context) error {

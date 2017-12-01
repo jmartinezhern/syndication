@@ -44,8 +44,7 @@ const (
 	SystemConfigPath = "/etc/syndication/config.toml"
 
 	// UserConfigRelativePath is the relative path to a user configuration.
-	// This should be added to a full path to make a complete path to a configuration.
-	// Internally when concatenate this with the full path $HOME/.config.
+	// This should be concatenaded with the running user's home directory.
 	UserConfigRelativePath = "syndication/config.toml"
 )
 
@@ -87,6 +86,7 @@ type (
 
 	// Config collects all configuration types
 	Config struct {
+		Plugins   []string
 		Database  `toml:"-"`
 		Databases map[string]Database `toml:"database"`
 		Server    Server
@@ -169,6 +169,11 @@ func (c *Config) verifyConfig() error {
 		return err
 	}
 
+	err = c.parsePlugins()
+	if err != nil {
+		return err
+	}
+
 	return c.parseServer()
 }
 
@@ -193,6 +198,23 @@ func (c *Config) getSecretFromFile(path string) error {
 	c.Server.AuthSecret = string(buf)
 
 	return fi.Close()
+}
+
+func (c *Config) parsePlugins() error {
+	var validPlugins []string
+	for _, plugin := range c.Plugins {
+		_, err := os.Stat(plugin)
+		if err != nil {
+			log.Warn(err, ". Skipping")
+			continue
+		}
+
+		validPlugins = append(validPlugins, plugin)
+	}
+
+	c.Plugins = validPlugins
+
+	return nil
 }
 
 func (c *Config) parseServer() error {
