@@ -208,44 +208,6 @@ func convertItemsToEntries(feed models.Feed, item *gofeed.Item) models.Entry {
 	return entry
 }
 
-// FetchFeed fetches a feed and populates a Feed model.
-func FetchFeed(feed *models.Feed) error {
-	client := &http.Client{
-		CheckRedirect: (func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse }),
-	}
-	req, err := http.NewRequest("GET", feed.Subscription, nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	fp := gofeed.NewParser()
-	fetchedFeed, err := fp.Parse(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if feed.Title == "" {
-		feed.Title = fetchedFeed.Title
-	}
-
-	feed.Description = fetchedFeed.Description
-	feed.Source = fetchedFeed.Link
-
-	err = resp.Body.Close()
-	if err != nil {
-		log.Error(err)
-		// Only report this error
-		err = nil
-	}
-
-	return err
-}
-
 // SyncUsers sync's all user's feeds.
 func (s *Sync) SyncUsers() {
 	users := s.db.Users()
@@ -288,14 +250,15 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 		return err
 	}
 
-	s.dbLock.Lock()
-	defer s.dbLock.Unlock()
-	err = s.db.NewEntries(entries, feed, user)
+	err = s.db.EditFeed(feed, user)
 	if err != nil {
 		return err
 	}
 
-	return s.db.EditFeed(feed, user)
+	s.dbLock.Lock()
+	defer s.dbLock.Unlock()
+
+	return s.db.NewEntries(entries, feed, user)
 }
 
 // SyncUser sync's all feeds owned by user

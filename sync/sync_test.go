@@ -79,25 +79,6 @@ func (suite *SyncTestSuite) TearDownTest() {
 	suite.db.DeleteUser(suite.user.APIID)
 }
 
-func (suite *SyncTestSuite) TestFetchFeed() {
-	f, err := ioutil.ReadFile(os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/sync/rss.xml")
-	suite.Require().Nil(err)
-
-	fp := gofeed.NewParser()
-	originalFeed, err := fp.Parse(bytes.NewReader(f))
-
-	suite.Require().Nil(err)
-
-	feed := &models.Feed{
-		Subscription: "http://localhost:9090/rss.xml",
-	}
-	err = FetchFeed(feed)
-	suite.Require().Nil(err)
-
-	suite.Equal(originalFeed.Title, feed.Title)
-	suite.Equal(originalFeed.Link, feed.Source)
-}
-
 func (suite *SyncTestSuite) TestFeedWithNonMatchingEtag() {
 	feed := models.Feed{
 		Title:        "Sync Test",
