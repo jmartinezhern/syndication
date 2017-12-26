@@ -72,29 +72,36 @@ func findUserConfig() (config.Config, error) {
 	return conf, nil
 }
 
-func startApp(c *cli.Context) error {
-	var conf config.Config
-	var err error
-
+func readConfig(c *cli.Context) (conf config.Config, err error) {
 	if c.String("config") == "" {
 		conf, err = findUserConfig()
 		if err != nil {
 			color.Yellow(err.Error())
 			color.Yellow("Trying system configuration")
 			conf, err = findSystemConfig()
+			return
 		}
 
 		if err != nil {
 			color.Yellow(err.Error())
 			color.Red("Failed to find a configuration file.")
-			return nil
+			return
 		}
 	} else {
 		conf, err = config.NewConfig(c.String("config"))
 		if err != nil {
 			color.Red(err.Error())
-			return nil
+			return
 		}
+	}
+
+	return
+}
+
+func startApp(c *cli.Context) error {
+	conf, err := readConfig(c)
+	if err != nil {
+		return err
 	}
 
 	db, err := database.NewDB(conf.Database)

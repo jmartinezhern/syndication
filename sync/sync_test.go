@@ -18,16 +18,12 @@
 package sync
 
 import (
-	"bytes"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/mmcdole/gofeed"
 
 	"github.com/stretchr/testify/suite"
 	"github.com/varddum/syndication/config"
