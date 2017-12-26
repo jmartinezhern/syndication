@@ -1,4 +1,4 @@
-FROM golang:1.8
+FROM golang:1.9
 
 WORKDIR /go/src/github.com/varddum/syndication
 COPY ./config/syndication.toml /etc/syndication/config.toml
