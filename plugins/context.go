@@ -46,33 +46,33 @@ func (c APICtx) HasUser() bool {
 }
 
 // Entries retrives all entries from a user with an order and marker
-func (c UserCtx) Entries(orderByNewest bool, marker models.Marker) ([]models.Entry, error) {
+func (c UserCtx) Entries(orderByNewest bool, marker models.Marker) []models.Entry {
 	return c.db.Entries(orderByNewest, marker, c.user)
 }
 
 // EntriesFromCategory retrieves entries in a category from a user
-func (c UserCtx) EntriesFromCategory(categoryID string, orderByNewest bool, marker models.Marker) ([]models.Entry, error) {
+func (c UserCtx) EntriesFromCategory(categoryID string, orderByNewest bool, marker models.Marker) []models.Entry {
 	return c.db.EntriesFromCategory(categoryID, orderByNewest, marker, c.user)
 }
 
 // EntriesFromFeed retrieves entries belonging to a feed owned by a user
-func (c UserCtx) EntriesFromFeed(feedID string, orderByNewest bool, marker models.Marker) ([]models.Entry, error) {
+func (c UserCtx) EntriesFromFeed(feedID string, orderByNewest bool, marker models.Marker) []models.Entry {
 	return c.db.EntriesFromFeed(feedID, orderByNewest, marker, c.user)
 }
 
 // EntriesFromTag retrieves all entries related to the given tag which is owned by a user
-func (c UserCtx) EntriesFromTag(tagID string, orderByNewest bool, marker models.Marker) ([]models.Entry, error) {
+func (c UserCtx) EntriesFromTag(tagID string, orderByNewest bool, marker models.Marker) []models.Entry {
 	return c.db.EntriesFromTag(tagID, marker, orderByNewest, c.user)
 }
 
 // EntriesFromMultipleTags retrieves all entries related to the given tags which are owned by a user
-func (c UserCtx) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marker models.Marker) ([]models.Entry, error) {
+func (c UserCtx) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marker models.Marker) []models.Entry {
 	return c.db.EntriesFromMultipleTags(tagIDs, orderByNewest, marker, c.user)
 }
 
-// Entry retrieves a single entry
-func (c UserCtx) Entry(id string) (models.Entry, error) {
-	return c.db.Entry(id, c.user)
+// EntryWithAPIID retrieves a single entry
+func (c UserCtx) EntryWithAPIID(id string) (models.Entry, bool) {
+	return c.db.EntryWithAPIID(id, c.user)
 }
 
 // Feeds retrieves all feeds belonging to a user
@@ -81,13 +81,13 @@ func (c UserCtx) Feeds() []models.Feed {
 }
 
 // FeedsFromCategory retrieves feeds contained in category that is owned by a user
-func (c UserCtx) FeedsFromCategory(categoryID string) ([]models.Feed, error) {
+func (c UserCtx) FeedsFromCategory(categoryID string) []models.Feed {
 	return c.db.FeedsFromCategory(categoryID, c.user)
 }
 
-// Feed retrieves a single feed
-func (c UserCtx) Feed(id string) (models.Feed, error) {
-	return c.db.Feed(id, c.user)
+// FeedWithAPIID retrieves a single feed with the given ID
+func (c UserCtx) FeedWithAPIID(id string) (models.Feed, bool) {
+	return c.db.FeedWithAPIID(id, c.user)
 }
 
 // DeleteFeed deletes a feed owned by a user
@@ -105,9 +105,9 @@ func (c UserCtx) Categories() []models.Category {
 	return c.db.Categories(c.user)
 }
 
-// Category retrieves a single category
-func (c UserCtx) Category(id string) (models.Category, error) {
-	return c.db.Category(id, c.user)
+// CategoryWithAPIID retrieves a single category with the given ID
+func (c UserCtx) CategoryWithAPIID(id string) (models.Category, bool) {
+	return c.db.CategoryWithAPIID(id, c.user)
 }
 
 // EditCategory modifies writable properties of a category owned by a user
@@ -130,14 +130,14 @@ func (c UserCtx) Tags() []models.Tag {
 	return c.db.Tags(c.user)
 }
 
-// Tag applies a tag to an entry
-func (c UserCtx) Tag(id string) (models.Tag, error) {
-	return c.db.Tag(id, c.user)
+// TagWithAPIID returns a tag with the give ID
+func (c UserCtx) TagWithAPIID(id string) (models.Tag, bool) {
+	return c.db.TagWithAPIID(id, c.user)
 }
 
-// EditTag modifies writable properties of a tag owned by a user
-func (c UserCtx) EditTag(tag *models.Tag) error {
-	return c.db.EditTag(tag, c.user)
+// EditTagName updates the name of a tag owned by a user
+func (c UserCtx) EditTagName(tagID, name string, user *models.User) error {
+	return c.db.EditTagName(tagID, name, c.user)
 }
 
 // DeleteTag deletes a tag owned by a user
@@ -151,12 +151,12 @@ func (c UserCtx) TagEntries(tagID string, entries []string) error {
 }
 
 // CategoryStats retrieves statistics related to a category
-func (c UserCtx) CategoryStats(id string) (models.Stats, error) {
+func (c UserCtx) CategoryStats(id string) models.Stats {
 	return c.db.CategoryStats(id, c.user)
 }
 
 // FeedStats retrieves statistics related to a feed.
-func (c UserCtx) FeedStats(id string) (models.Stats, error) {
+func (c UserCtx) FeedStats(id string) models.Stats {
 	return c.db.FeedStats(id, c.user)
 }
 

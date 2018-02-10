@@ -165,7 +165,7 @@ func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.E
 		}
 
 		s.dbLock.Lock()
-		if found, err := s.db.EntryWithGUIDExists(itemGUID, feed.APIID, user); err != nil || found {
+		if found := s.db.EntryWithGUIDExists(itemGUID, feed.APIID, user); found {
 			s.dbLock.Unlock()
 			continue
 		}
@@ -210,7 +210,9 @@ func convertItemsToEntries(feed models.Feed, item *gofeed.Item) models.Entry {
 
 // SyncUsers sync's all user's feeds.
 func (s *Sync) SyncUsers() {
+	s.dbLock.Lock()
 	users := s.db.Users()
+	s.dbLock.Unlock()
 
 	for _, user := range users {
 		s.userPool.put(user)
@@ -250,15 +252,16 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 		return err
 	}
 
+	s.dbLock.Lock()
+	defer s.dbLock.Unlock()
+
 	err = s.db.EditFeed(feed, user)
 	if err != nil {
 		return err
 	}
 
-	s.dbLock.Lock()
-	defer s.dbLock.Unlock()
-
-	return s.db.NewEntries(entries, feed, user)
+	_, err = s.db.NewEntries(entries, feed.APIID, user)
+	return err
 }
 
 // SyncUser sync's all feeds owned by user

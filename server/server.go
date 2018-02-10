@@ -65,7 +65,6 @@ type (
 
 	// ErrorResp represents a common format for error responses returned by a Server
 	ErrorResp struct {
-		Reason  string `json:"reason"`
 		Message string `json:"message"`
 	}
 )
@@ -130,21 +129,20 @@ func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
 
 		userClaim := c.Get("user").(*jwt.Token)
 		claims := userClaim.Claims.(jwt.MapClaims)
-		user, err := s.db.UserWithAPIID(claims["id"].(string))
-		if err != nil {
+		user, found := s.db.UserWithAPIID(claims["id"].(string))
+		if !found {
 			return c.JSON(http.StatusUnauthorized, ErrorResp{
-				Reason:  "Unauthorized",
 				Message: "Credentials are invalid",
 			})
 		}
 
-		key := &models.APIKey{
+		key := models.APIKey{
 			Key: userClaim.Raw,
 		}
-		found, err := s.db.KeyBelongsToUser(key, &user)
-		if err != nil || !found {
+
+		found = s.db.KeyBelongsToUser(key, &user)
+		if !found {
 			return c.JSON(http.StatusUnauthorized, ErrorResp{
-				Reason:  "Unauthorized",
 				Message: "Credentials are invalid",
 			})
 		}
@@ -177,19 +175,16 @@ func (s *Server) Login(c echo.Context) error {
 	username := c.FormValue("username")
 	password := c.FormValue("password")
 
-	user, err := s.db.Authenticate(username, password)
-	if err != nil {
-		// Do not return NotFound errors on invalid credentials
-		if dbErr, ok := err.(database.DBError); ok && dbErr.Code() == 404 {
-			err = database.Unauthorized{}
-		}
-
-		return newError(err, &c)
+	user, found := s.db.UserWithCredentials(username, password)
+	if !found {
+		return c.JSON(http.StatusUnauthorized, ErrorResp{
+			Message: "Credentials are invalid",
+		})
 	}
 
 	key, err := s.db.NewAPIKey(s.config.AuthSecret, &user)
 	if err != nil {
-		return newError(err, &c)
+		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
 
 	return c.JSON(http.StatusOK, key)
@@ -197,9 +192,16 @@ func (s *Server) Login(c echo.Context) error {
 
 // Register a user
 func (s *Server) Register(c echo.Context) error {
-	err := s.db.NewUser(c.FormValue("username"), c.FormValue("password"))
-	if err != nil {
-		return newError(err, &c)
+	username := c.FormValue("username")
+	if _, found := s.db.UserWithName(username); found {
+		return c.JSON(http.StatusConflict, ErrorResp{
+			Message: "User already exists",
+		})
+	}
+
+	user := s.db.NewUser(username, c.FormValue("password"))
+	if user.ID == 0 {
+		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -214,15 +216,13 @@ func (s *Server) NewFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err := s.db.NewFeed(&feed, &user)
-	if err != nil {
-		return newError(err, &c)
-	}
+	feed = s.db.NewFeed(feed.Title, feed.Subscription, &user)
 
-	err = s.sync.SyncFeed(&feed, &user)
+	/* TODO
+	err := s.sync.SyncFeed(&feed, &user)
 	if err != nil {
 		return newError(err, &c)
-	}
+	}*/
 
 	return c.JSON(http.StatusCreated, feed)
 }
@@ -246,9 +246,11 @@ func (s *Server) GetFeeds(c echo.Context) error {
 func (s *Server) GetFeed(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	feed, err := s.db.Feed(c.Param("feedID"), &user)
-	if err != nil {
-		return newError(err, &c)
+	feed, found := s.db.FeedWithAPIID(c.Param("feedID"), &user)
+	if !found {
+		return c.JSON(http.StatusNotFound, ErrorResp{
+			Message: "Feed does not exist",
+		})
 	}
 
 	return c.JSON(http.StatusOK, feed)
@@ -266,9 +268,17 @@ func (s *Server) EditFeed(c echo.Context) error {
 
 	feed.APIID = c.Param("feedID")
 
+	if _, found := s.db.FeedWithAPIID(feed.APIID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Feed does not exist",
+		})
+	}
+
 	err := s.db.EditFeed(&feed, &user)
 	if err != nil {
-		return newError(err, &c)
+		return c.JSON(http.StatusInternalServerError, ErrorResp{
+			Message: "Feed could not be edited",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -279,9 +289,17 @@ func (s *Server) DeleteFeed(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
 	feedID := c.Param("feedID")
+
+	if _, found := s.db.FeedWithAPIID(feedID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Feed does not exist",
+		})
+	}
 	err := s.db.DeleteFeed(feedID, &user)
 	if err != nil {
-		return newError(err, &c)
+		return c.JSON(http.StatusInternalServerError, ErrorResp{
+			Message: "Feed could not be deleted",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -306,9 +324,11 @@ func (s *Server) GetCategories(c echo.Context) error {
 func (s *Server) GetCategory(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	ctg, err := s.db.Category(c.Param("categoryID"), &user)
-	if err != nil {
-		return newError(err, &c)
+	ctg, found := s.db.CategoryWithAPIID(c.Param("categoryID"), &user)
+	if !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Category does not exist",
+		})
 	}
 
 	return c.JSON(http.StatusOK, ctg)
@@ -320,12 +340,14 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
-		return newError(err, &c)
+		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feed, err := s.db.Feed(c.Param("feedID"), &user)
-	if err != nil {
-		return newError(err, &c)
+	feed, found := s.db.FeedWithAPIID(c.Param("feedID"), &user)
+	if !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Feed does not exist",
+		})
 	}
 
 	markedAs := models.MarkerFromString(params.Marker)
@@ -333,10 +355,10 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 		markedAs = models.Any
 	}
 
-	entries, err := s.db.EntriesFromFeed(feed.APIID, convertOrderByParamToValue(params.OrderBy), markedAs, &user)
-	if err != nil {
-		return newError(err, &c)
-	}
+	entries := s.db.EntriesFromFeed(feed.APIID,
+		convertOrderByParamToValue(params.OrderBy),
+		markedAs,
+		&user)
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
@@ -354,12 +376,14 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
-		return newError(err, &c)
+		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	ctg, err := s.db.Category(c.Param("categoryID"), &user)
-	if err != nil {
-		return newError(err, &c)
+	ctg, found := s.db.CategoryWithAPIID(c.Param("categoryID"), &user)
+	if !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Category does not exist",
+		})
 	}
 
 	markedAs := models.MarkerFromString(params.Marker)
@@ -367,10 +391,10 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 		markedAs = models.Any
 	}
 
-	entries, err := s.db.EntriesFromCategory(ctg.APIID, convertOrderByParamToValue(params.OrderBy), markedAs, &user)
-	if err != nil {
-		return newError(err, &c)
-	}
+	entries := s.db.EntriesFromCategory(ctg.APIID,
+		convertOrderByParamToValue(params.OrderBy),
+		markedAs,
+		&user)
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
@@ -385,10 +409,14 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 func (s *Server) GetFeedsFromCategory(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	feeds, err := s.db.FeedsFromCategory(c.Param("categoryID"), &user)
-	if err != nil {
-		return newError(err, &c)
+	ctg, found := s.db.CategoryWithAPIID(c.Param("categoryID"), &user)
+	if !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Category does not exist",
+		})
 	}
+
+	feeds := s.db.FeedsFromCategory(ctg.APIID, &user)
 
 	type Feeds struct {
 		Feeds []models.Feed `json:"feeds"`
@@ -408,10 +436,13 @@ func (s *Server) NewCategory(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err := s.db.NewCategory(&ctg, &user)
-	if err != nil {
-		return newError(err, &c)
+	if _, found := s.db.CategoryWithName(ctg.Name, &user); found {
+		return c.JSON(http.StatusConflict, ErrorResp{
+			Message: "Category already exists",
+		})
 	}
+
+	ctg = s.db.NewCategory(ctg.Name, &user)
 
 	return c.JSON(http.StatusCreated, ctg)
 }
@@ -427,9 +458,17 @@ func (s *Server) EditCategory(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
+	if _, found := s.db.CategoryWithAPIID(ctg.APIID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Category does not exist",
+		})
+	}
+
 	err := s.db.EditCategory(&ctg, &user)
 	if err != nil {
-		return newError(err, &c)
+		return c.JSON(http.StatusInternalServerError, ErrorResp{
+			Message: "Category could not be edited",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -447,14 +486,17 @@ func (s *Server) AddFeedsToCategory(c echo.Context) error {
 
 	feedIds := new(FeedIds)
 	if err := c.Bind(feedIds); err != nil {
-		return newError(err, &c)
+		return echo.NewHTTPError(http.StatusBadRequest)
+	}
+
+	if _, found := s.db.CategoryWithAPIID(ctgID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Category does not exist",
+		})
 	}
 
 	for _, id := range feedIds.Feeds {
-		err := s.db.ChangeFeedCategory(id, ctgID, &user)
-		if err != nil {
-			return newError(err, &c)
-		}
+		s.db.ChangeFeedCategory(id, ctgID, &user)
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -466,9 +508,17 @@ func (s *Server) DeleteCategory(c echo.Context) error {
 
 	ctgID := c.Param("categoryID")
 
+	if _, found := s.db.CategoryWithAPIID(ctgID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Category does not exist",
+		})
+	}
+
 	err := s.db.DeleteCategory(ctgID, &user)
 	if err != nil {
-		return newError(err, &c)
+		return c.JSON(http.StatusInternalServerError, ErrorResp{
+			Message: "Category could not be deleted",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -480,10 +530,13 @@ func (s *Server) GetStatsForCategory(c echo.Context) error {
 
 	ctgID := c.Param("categoryID")
 
-	marks, err := s.db.CategoryStats(ctgID, &user)
-	if err != nil {
-		return newError(err, &c)
+	if _, found := s.db.CategoryWithAPIID(ctgID, &user); !found {
+		return c.JSON(http.StatusNotFound, ErrorResp{
+			Message: "Category does not exist",
+		})
 	}
+
+	marks := s.db.CategoryStats(ctgID, &user)
 
 	return c.JSON(http.StatusOK, marks)
 }
@@ -499,9 +552,17 @@ func (s *Server) MarkCategory(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
+	if _, found := s.db.CategoryWithAPIID(ctgID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Category does not exist",
+		})
+	}
+
 	err := s.db.MarkCategory(ctgID, marker, &user)
 	if err != nil {
-		return newError(err, &c)
+		return c.JSON(http.StatusInternalServerError, ErrorResp{
+			Message: "Category could not be marked",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -516,10 +577,13 @@ func (s *Server) NewTag(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err := s.db.NewTag(&tag, &user)
-	if err != nil {
-		return newError(err, &c)
+	if _, found := s.db.TagWithName(tag.Name, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Tag already exists",
+		})
 	}
+
+	tag = s.db.NewTag(tag.Name, &user)
 
 	return c.JSON(http.StatusCreated, tag)
 }
@@ -545,9 +609,17 @@ func (s *Server) DeleteTag(c echo.Context) error {
 
 	tagID := c.Param("tagID")
 
+	if _, found := s.db.TagWithAPIID(tagID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Tag does not exist",
+		})
+	}
+
 	err := s.db.DeleteTag(tagID, &user)
 	if err != nil {
-		return newError(err, &c)
+		return c.JSON(http.StatusInternalServerError, ErrorResp{
+			Message: "Tag could no be deleted",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -558,15 +630,17 @@ func (s *Server) EditTag(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
 	tag := models.Tag{}
-	tag.APIID = c.Param("tagID")
+	tagID := c.Param("tagID")
 
 	if err := c.Bind(&tag); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err := s.db.EditTag(&tag, &user)
-	if err != nil {
-		return newError(err, &c)
+	err := s.db.EditTagName(tagID, tag.Name, &user)
+	if err == database.ErrModelNotFound {
+		return c.JSON(http.StatusNotFound, ErrorResp{
+			"Tag does not exist",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -579,12 +653,14 @@ func (s *Server) GetEntriesFromTag(c echo.Context) error {
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
-		return newError(err, &c)
+		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	tag, err := s.db.Tag(c.Param("tagID"), &user)
-	if err != nil {
-		return newError(err, &c)
+	tag, found := s.db.TagWithAPIID(c.Param("tagID"), &user)
+	if !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Tag does not exist",
+		})
 	}
 
 	withMarker := models.MarkerFromString(params.Marker)
@@ -592,10 +668,7 @@ func (s *Server) GetEntriesFromTag(c echo.Context) error {
 		withMarker = models.Any
 	}
 
-	entries, err := s.db.EntriesFromTag(tag.APIID, withMarker, true, &user)
-	if err != nil {
-		return newError(err, &c)
-	}
+	entries := s.db.EntriesFromTag(tag.APIID, withMarker, true, &user)
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
@@ -610,9 +683,11 @@ func (s *Server) GetEntriesFromTag(c echo.Context) error {
 func (s *Server) TagEntries(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	tag, err := s.db.Tag(c.Param("tagID"), &user)
-	if err != nil {
-		return newError(err, &c)
+	tag, found := s.db.TagWithAPIID(c.Param("tagID"), &user)
+	if !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Tag does not exist",
+		})
 	}
 
 	type EntryIds struct {
@@ -620,13 +695,21 @@ func (s *Server) TagEntries(c echo.Context) error {
 	}
 
 	entryIds := new(EntryIds)
-	if err = c.Bind(entryIds); err != nil {
-		return newError(err, &c)
+	if err := c.Bind(entryIds); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err = s.db.TagEntries(tag.APIID, entryIds.Entries, &user)
+	if _, found := s.db.TagWithAPIID(tag.APIID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Tag does not exist",
+		})
+	}
+
+	err := s.db.TagEntries(tag.APIID, entryIds.Entries, &user)
 	if err != nil {
-		return newError(err, &c)
+		return c.JSON(http.StatusInternalServerError, ErrorResp{
+			Message: "Tag entries could no be fetched",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -636,9 +719,11 @@ func (s *Server) TagEntries(c echo.Context) error {
 func (s *Server) GetTag(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	tag, err := s.db.Tag(c.Param("tagID"), &user)
-	if err != nil {
-		return newError(err, &c)
+	tag, found := s.db.TagWithAPIID(c.Param("tagID"), &user)
+	if !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Tag does not exist",
+		})
 	}
 
 	return c.JSON(http.StatusOK, tag)
@@ -655,9 +740,17 @@ func (s *Server) MarkFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
+	if _, found := s.db.FeedWithAPIID(feedID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Feed does not exist",
+		})
+	}
+
 	err := s.db.MarkFeed(feedID, marker, &user)
 	if err != nil {
-		return newError(err, &c)
+		return c.JSON(http.StatusInternalServerError, ErrorResp{
+			Message: "Feed could not be marked",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -669,21 +762,25 @@ func (s *Server) GetStatsForFeed(c echo.Context) error {
 
 	feedID := c.Param("feedID")
 
-	marks, err := s.db.FeedStats(feedID, &user)
-	if err != nil {
-		return newError(err, &c)
+	if _, found := s.db.FeedWithAPIID(feedID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Feed does not exist",
+		})
 	}
 
-	return c.JSON(http.StatusOK, marks)
+	return c.JSON(http.StatusOK,
+		s.db.FeedStats(feedID, &user))
 }
 
 // GetEntry with id
 func (s *Server) GetEntry(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	entry, err := s.db.Entry(c.Param("entryID"), &user)
-	if err != nil {
-		return newError(err, &c)
+	entry, found := s.db.EntryWithAPIID(c.Param("entryID"), &user)
+	if !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Entry does not exist",
+		})
 	}
 
 	return c.JSON(http.StatusOK, entry)
@@ -695,7 +792,7 @@ func (s *Server) GetEntries(c echo.Context) error {
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
-		return newError(err, &c)
+		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
 	markedAs := models.MarkerFromString(params.Marker)
@@ -703,10 +800,9 @@ func (s *Server) GetEntries(c echo.Context) error {
 		markedAs = models.Any
 	}
 
-	entries, err := s.db.Entries(convertOrderByParamToValue(params.OrderBy), markedAs, &user)
-	if err != nil {
-		return newError(err, &c)
-	}
+	entries := s.db.Entries(convertOrderByParamToValue(params.OrderBy),
+		markedAs,
+		&user)
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
@@ -728,9 +824,17 @@ func (s *Server) MarkEntry(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
+	if _, found := s.db.EntryWithAPIID(entryID, &user); !found {
+		return c.JSON(http.StatusBadRequest, ErrorResp{
+			Message: "Entry does not exist",
+		})
+	}
+
 	err := s.db.MarkEntry(entryID, marker, &user)
 	if err != nil {
-		return newError(err, &c)
+		return c.JSON(http.StatusInternalServerError, ErrorResp{
+			Message: "Entry could not be marked",
+		})
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -893,27 +997,6 @@ func (s *Server) registerEndpoint(endpoint plugins.Endpoint) {
 	if !endpoint.NeedsUser {
 		unauthorizedPaths = append(unauthorizedPaths, fullPath)
 	}
-}
-
-func newError(err error, c *echo.Context) error {
-	if dbErr, ok := err.(database.DBError); ok {
-		return (*c).JSON(dbErr.Code(), ErrorResp{
-			Reason:  dbErr.String(),
-			Message: dbErr.Error(),
-		})
-	}
-
-	if syncErr, ok := err.(sync.Error); ok {
-		return (*c).JSON(syncErr.Code(), ErrorResp{
-			Reason:  syncErr.String(),
-			Message: syncErr.Error(),
-		})
-	}
-
-	return (*c).JSON(http.StatusInternalServerError, ErrorResp{
-		Reason:  "InternalServerError",
-		Message: "Internal Server Error",
-	})
 }
 
 func convertOrderByParamToValue(param string) bool {
