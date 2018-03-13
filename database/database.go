@@ -222,13 +222,13 @@ func (db *DB) UserWithName(username string) (user models.User, found bool) {
 
 // CategoryWithName returns a Category that has a matching name and belongs to the given user
 func (db *DB) CategoryWithName(name string, user *models.User) (ctg models.Category, found bool) {
-	found = !db.db.Model(user).First(&ctg, "name = ?", name).RecordNotFound()
+	found = !db.db.Model(user).Where("name = ?", name).Related(&ctg).RecordNotFound()
 	return
 }
 
 // TagWithName returns a Tag that has a matching name and belongs to the given user
 func (db *DB) TagWithName(name string, user *models.User) (tag models.Tag, found bool) {
-	found = !db.db.Model(user).First(&tag, "name = ?", name).RecordNotFound()
+	found = !db.db.Model(user).Where("name = ?", name).Related(&tag).RecordNotFound()
 	return
 }
 
@@ -240,13 +240,13 @@ func (db *DB) UserWithAPIID(apiID string) (user models.User, found bool) {
 
 // EntryWithAPIID returns an Entry with id that belongs to user
 func (db *DB) EntryWithAPIID(apiID string, user *models.User) (entry models.Entry, found bool) {
-	found = !db.db.Model(user).First(&entry, "api_id = ?", apiID).RecordNotFound()
+	found = !db.db.Model(user).Where("api_id = ?", apiID).Related(&entry).RecordNotFound()
 	return
 }
 
 // TagWithAPIID returns a Tag with id that belongs to user
 func (db *DB) TagWithAPIID(apiID string, user *models.User) (tag models.Tag, found bool) {
-	found = !db.db.Model(user).First(&tag, "api_id = ?", apiID).RecordNotFound()
+	found = !db.db.Model(user).Where("api_id = ?", apiID).Related(&tag).RecordNotFound()
 	return
 }
 

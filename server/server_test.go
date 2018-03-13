@@ -322,7 +322,7 @@ func (s *ServerTestSuite) TestNewCategory() {
 }
 
 func (s *ServerTestSuite) TestNewTag() {
-	payload := []byte(`{"name": "News"}`)
+	payload := []byte(`{"name": "` + RandStringRunes(8) + `"}`)
 	req, err := http.NewRequest("POST", "http://localhost:9876/v1/tags", bytes.NewBuffer(payload))
 	s.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+s.token)

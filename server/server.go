@@ -577,8 +577,8 @@ func (s *Server) NewTag(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	if _, found := s.db.TagWithName(tag.Name, &user); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+	if _, found := s.db.TagWithName(tag.Name, &user); found {
+		return c.JSON(http.StatusConflict, ErrorResp{
 			Message: "Tag already exists",
 		})
 	}
@@ -776,7 +776,9 @@ func (s *Server) GetStatsForFeed(c echo.Context) error {
 func (s *Server) GetEntry(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	entry, found := s.db.EntryWithAPIID(c.Param("entryID"), &user)
+	entryID := c.Param("entryID")
+
+	entry, found := s.db.EntryWithAPIID(entryID, &user)
 	if !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Entry does not exist",

@@ -570,7 +570,7 @@ func (suite *DatabaseTestSuite) TestNewEntries() {
 
 func (suite *DatabaseTestSuite) TestNewEntriesWithBadFeed() {
 	entries := []models.Entry{
-		models.Entry{},
+		{},
 	}
 	_, err := suite.db.NewEntries(entries, "", &suite.user)
 	suite.NotNil(err)

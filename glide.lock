@@ -1,5 +1,5 @@
 hash: f2f24d6f9dada60a57686533584452cbbf2f37314c2fa3c851fd948262b0a672
-updated: 2017-11-17T15:30:04.334214721-06:00
+updated: 2018-03-12T20:31:41.295565415-05:00
 imports:
 - name: github.com/andybalholm/cascadia
   version: 349dd0209470eabd9514242c688c403c0926d266
@@ -20,7 +20,7 @@ imports:
 - name: github.com/jinzhu/inflection
   version: 1c35d901db3da928c72a72d8458480cc9ade058f
 - name: github.com/labstack/echo
-  version: b28538b2e3f5446fe6e0e47ee34cd74b662ca2ab
+  version: b338075a0fc6e1a0683dbf03d09b4957a289e26f
   subpackages:
   - middleware
 - name: github.com/labstack/gommon
@@ -44,7 +44,7 @@ imports:
 - name: github.com/mattn/go-sqlite3
   version: 144deb6596cd6dbb49158b3d6f6a0e742715f9a5
 - name: github.com/mmcdole/gofeed
-  version: 303223474e837398b2f8a265e5572958bb5568c0
+  version: 42010a154d249f5f753dfe03a6390b59671e403e
   subpackages:
   - atom
   - extensions
@@ -55,7 +55,7 @@ imports:
 - name: github.com/PuerkitoBio/goquery
   version: ce645ea5e67a713599b7415f21f0786451fa9554
 - name: github.com/sirupsen/logrus
-  version: f006c2ac4710855cf0f916dd6b77acf6b048dc6e
+  version: c155da19408a8799da419ed3eeb0cb5db0ad5dbc
 - name: github.com/urfave/cli
   version: cfb38830724cc34fedffe9a2a29fb54fa9169cd1
 - name: github.com/valyala/bytebufferpool
