@@ -5,9 +5,9 @@ go:
   - tip
 
 before_install:
-  - go get -t -v ./...
   - go get -v github.com/Masterminds/glide
   - cd $GOPATH/src/github.com/Masterminds/glide && git checkout v0.12.3 && make && cd -
+  - glide install
   - go get github.com/alecthomas/gometalinter/...
   - gometalinter --install --update
 

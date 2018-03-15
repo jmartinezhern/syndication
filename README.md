@@ -11,7 +11,7 @@
 * Support for SQLite, MySQL and Postgres
 
 ## Planned Features
-- [ ] Plugins
+- [X] Plugins
 - [X] Tags
 
 ## Building

@@ -56,218 +56,151 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func (suite *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("If-None-Match") != RSSFeedEtag {
 		http.FileServer(http.Dir(os.Getenv("GOPATH")+"/src/github.com/varddum/syndication/sync/")).ServeHTTP(w, r)
 	}
 }
 
-func (suite *SyncTestSuite) SetupTest() {
+func (s *SyncTestSuite) SetupTest() {
 	randUserName := RandStringRunes(8)
-	err := suite.db.NewUser(randUserName, "golang")
-	suite.Require().Nil(err)
-
-	suite.user, err = suite.db.UserWithName(randUserName)
-	suite.Require().Nil(err)
+	s.user = s.db.NewUser(randUserName, "golang")
+	s.Require().NotEmpty(s.user.APIID)
 }
 
-func (suite *SyncTestSuite) TearDownTest() {
-	suite.db.DeleteUser(suite.user.APIID)
+func (s *SyncTestSuite) TearDownTest() {
+	s.db.DeleteUser(s.user.APIID)
 }
 
-func (suite *SyncTestSuite) TestFeedWithNonMatchingEtag() {
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: "http://localhost:9090/rss.xml",
-	}
+func (s *SyncTestSuite) TestFeedWithNonMatchingEtag() {
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml", &s.user)
+	s.Require().NotEmpty(feed.APIID)
 
-	err := suite.db.NewFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.APIID)
+	err := s.sync.SyncFeed(&feed, &s.user)
+	s.Require().Nil(err)
 
-	err = suite.sync.SyncFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-
-	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
-	suite.Require().Nil(err)
-	suite.Len(entries, 5)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	s.Len(entries, 5)
 }
 
-func (suite *SyncTestSuite) TestFeedWithMatchingEtag() {
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: "http://localhost:9090/rss.xml",
-		Etag:         RSSFeedEtag,
-	}
+func (s *SyncTestSuite) TestFeedWithMatchingEtag() {
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml", &s.user)
+	s.Require().NotEmpty(feed.APIID)
 
-	err := suite.db.NewFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.APIID)
+	feed.Etag = RSSFeedEtag
 
-	err = suite.sync.SyncFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
+	err := s.db.EditFeed(&feed, &s.user)
+	s.Require().Nil(err)
 
-	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
-	suite.Require().Nil(err)
-	suite.Len(entries, 0)
+	err = s.sync.SyncFeed(&feed, &s.user)
+	s.Require().Nil(err)
+
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	s.Len(entries, 0)
 }
 
-func (suite *SyncTestSuite) TestFeedWithRecentLastUpdateDate() {
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: "http://localhost:9090/rss.xml",
-		LastUpdated:  time.Now(),
-	}
+func (s *SyncTestSuite) TestFeedWithRecentLastUpdateDate() {
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml", &s.user)
+	s.Require().NotEmpty(feed.APIID)
 
-	err := suite.db.NewFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.APIID)
+	feed.LastUpdated = time.Now()
 
-	err = suite.sync.SyncFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
+	err := s.db.EditFeed(&feed, &s.user)
+	s.Require().Nil(err)
 
-	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
-	suite.Require().Nil(err)
-	suite.Len(entries, 0)
+	err = s.sync.SyncFeed(&feed, &s.user)
+	s.Require().Nil(err)
+
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	s.Len(entries, 0)
 }
 
-func (suite *SyncTestSuite) TestFeedWithNewEntriesWithGUIDs() {
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: "http://localhost:9090/rss.xml",
-	}
+func (s *SyncTestSuite) TestFeedWithNewEntriesWithGUIDs() {
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml", &s.user)
+	s.Require().NotEmpty(feed.APIID)
 
-	err := suite.db.NewFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.APIID)
+	err := s.sync.SyncFeed(&feed, &s.user)
+	s.Require().Nil(err)
 
-	err = suite.sync.SyncFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-
-	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
-	suite.Require().Nil(err)
-	suite.Len(entries, 5)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	s.Require().Nil(err)
+	s.Len(entries, 5)
 
 	feed.LastUpdated = time.Time{}
 
-	err = suite.sync.SyncFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
+	err = s.sync.SyncFeed(&feed, &s.user)
+	s.Require().Nil(err)
 
-	entries, err = suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
-	suite.Require().Nil(err)
-	suite.Len(entries, 5)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	s.Require().Nil(err)
+	s.Len(entries, 5)
 }
 
-func (suite *SyncTestSuite) TestFeedWithNewEntriesWithoutGUIDs() {
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: "http://localhost:9090/rss_minimal.xml",
-	}
+func (s *SyncTestSuite) TestFeedWithNewEntriesWithoutGUIDs() {
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss_minimal.xml", &s.user)
+	s.Require().NotEmpty(feed.APIID)
 
-	err := suite.db.NewFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.APIID)
+	err := s.sync.SyncFeed(&feed, &s.user)
+	s.Require().Nil(err)
 
-	err = suite.sync.SyncFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-
-	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
-	suite.Require().Nil(err)
-	suite.Len(entries, 5)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	s.Require().Nil(err)
+	s.Len(entries, 5)
 }
 
-func (suite *SyncTestSuite) TestSyncUser() {
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: "http://localhost:9090/rss_minimal.xml",
-	}
+func (s *SyncTestSuite) TestSyncUser() {
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss_minimal.xml", &s.user)
+	s.Require().NotEmpty(feed.APIID)
 
-	err := suite.db.NewFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.APIID)
+	err := s.sync.SyncUser(&s.user)
+	s.Require().Nil(err)
 
-	err = suite.sync.SyncUser(&suite.user)
-	suite.Require().Nil(err)
-
-	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
-	suite.Require().Nil(err)
-	suite.Len(entries, 5)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	s.Require().Nil(err)
+	s.Len(entries, 5)
 }
 
-func (suite *SyncTestSuite) TestSyncUsers() {
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: "http://localhost:9090/rss_minimal.xml",
+func (s *SyncTestSuite) TestSyncUsers() {
+	for i := 0; i < 10; i++ {
+		user := s.db.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
+
+		_, found := s.db.UserWithName("test" + strconv.Itoa(i))
+		s.Require().True(found)
+
+		s.db.NewFeed("Sync Test", "http://localhost:9090/rss_minimal.xml", &user)
 	}
 
-	err := suite.db.NewFeed(&feed, &suite.user)
-	suite.Require().Nil(err)
-	suite.Require().NotEmpty(feed.APIID)
+	s.sync = NewSync(s.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 2}})
 
-	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 2}})
+	s.sync.SyncUsers()
 
-	suite.sync.Start()
+	s.sync.userWaitGroup.Wait()
 
-	time.Sleep(time.Second * 3)
-
-	suite.sync.Stop()
-
-	entries, err := suite.db.EntriesFromFeed(feed.APIID, true, models.Any, &suite.user)
-	suite.Require().Nil(err)
-	suite.Len(entries, 5)
-}
-
-func (suite *SyncTestSuite) TestUserThreadAllocation() {
-	for i := 0; i < 150; i++ {
-		err := suite.db.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
-		suite.Require().Nil(err)
-
-		user, err := suite.db.UserWithName("test" + strconv.Itoa(i))
-		suite.Require().Nil(err)
-
-		feed := models.Feed{
-			Title:        "Sync Test",
-			Subscription: "http://localhost:9090/rss_minimal.xml",
-		}
-
-		err = suite.db.NewFeed(&feed, &user)
-		suite.Require().Nil(err)
-	}
-
-	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 2}})
-
-	suite.sync.Start()
-
-	time.Sleep(time.Second * 3)
-
-	suite.sync.Stop()
-
-	users := suite.db.Users()
+	users := s.db.Users()
 	users = users[1:]
 
 	for _, user := range users {
-		entries, err := suite.db.Entries(true, models.Any, &user)
-		suite.Require().Nil(err)
-		suite.Len(entries, 5)
+		entries := s.db.Entries(true, models.Any, &user)
+		s.Len(entries, 5)
 	}
 }
 
-func (suite *SyncTestSuite) startServer() {
-	suite.db, _ = database.NewDB(config.Database{
+func (s *SyncTestSuite) startServer() {
+	s.db, _ = database.NewDB(config.Database{
 		Type:       "sqlite3",
 		Connection: TestDatabasePath,
 	})
 
-	suite.server = &http.Server{
+	s.server = &http.Server{
 		Addr:    ":9090",
-		Handler: suite,
+		Handler: s,
 	}
 
-	go suite.server.ListenAndServe()
+	go s.server.ListenAndServe()
 
 	time.Sleep(time.Second)
 
-	suite.sync = NewSync(suite.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
+	s.sync = NewSync(s.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 }
 
 func TestSyncTestSuite(t *testing.T) {

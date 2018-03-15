@@ -21,6 +21,7 @@ package admin
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -103,6 +104,11 @@ const (
 )
 
 const defaultSocketPath = "/var/run/syndication/admin"
+const userDoesNotExistErrStr = "User does not exist"
+
+func badArgumentErrorStr(argNum int) string {
+	return fmt.Sprintf("Arg %d is invalid", argNum)
+}
 
 // NewUser creates a user
 func (a *Admin) NewUser(args args, r *Response) error {
@@ -126,10 +132,11 @@ func (a *Admin) NewUser(args args, r *Response) error {
 	username = aVal.String()
 	password = bVal.String()
 
-	if err := a.db.NewUser(username, password); err != nil {
-		dbError := err.(database.DBError)
+	user := a.db.NewUser(username, password)
+
+	if user.ID == 0 {
 		r.Status = DatabaseError
-		r.Error = dbError.Error()
+		r.Error = "Failed to create user"
 		return nil
 	}
 
@@ -141,7 +148,7 @@ func (a *Admin) NewUser(args args, r *Response) error {
 // DeleteUser deletes a user
 func (a *Admin) DeleteUser(args args, r *Response) error {
 	r.Status = BadArgument
-	r.Error = "Bad first argument"
+	r.Error = badArgumentErrorStr(1)
 
 	aVal := reflect.ValueOf(args["userID"])
 	if aVal.Kind() != reflect.String {
@@ -150,16 +157,13 @@ func (a *Admin) DeleteUser(args args, r *Response) error {
 
 	userID := aVal.String()
 
-	err := a.db.DeleteUser(userID)
-	if err != nil {
-		dbError := err.(database.DBError)
+	if err := a.db.DeleteUser(userID); err != nil {
 		r.Status = DatabaseError
-		r.Error = dbError.Error()
-		return nil
+		r.Error = err.Error()
+	} else {
+		r.Status = OK
+		r.Error = "OK"
 	}
-
-	r.Status = OK
-	r.Error = "OK"
 
 	return nil
 }
@@ -170,24 +174,22 @@ func (a *Admin) ChangeUserName(args args, r *Response) error {
 
 	aVal := reflect.ValueOf(args["userID"])
 	if aVal.Kind() != reflect.String {
-		r.Error = "Bad first argument"
+		r.Error = badArgumentErrorStr(1)
 		return nil
 	}
 
 	bVal := reflect.ValueOf(args["newName"])
 	if bVal.Kind() != reflect.String {
-		r.Error = "Bad second argument"
+		r.Error = badArgumentErrorStr(2)
 		return nil
 	}
 
 	userID := aVal.String()
 	newName := bVal.String()
 
-	err := a.db.ChangeUserName(userID, newName)
-	if err != nil {
-		dbError := err.(database.DBError)
+	if err := a.db.ChangeUserName(userID, newName); err != nil {
 		r.Status = DatabaseError
-		r.Error = dbError.Error()
+		r.Error = err.Error()
 		return nil
 	}
 
@@ -203,26 +205,25 @@ func (a *Admin) ChangeUserPassword(args args, r *Response) error {
 
 	aVal := reflect.ValueOf(args["userID"])
 	if aVal.Kind() != reflect.String {
-		r.Error = "Bad first argument"
+		r.Error = badArgumentErrorStr(1)
 		return nil
 	}
 
 	bVal := reflect.ValueOf(args["newPassword"])
 	if bVal.Kind() != reflect.String {
-		r.Error = "Bad second argument"
+		r.Error = badArgumentErrorStr(2)
 		return nil
 	}
 
 	userID := aVal.String()
 	newPassword := bVal.String()
 
-	err := a.db.ChangeUserPassword(userID, newPassword)
-	if err != nil {
-		dbError := err.(database.DBError)
-		r.Status = DatabaseError
-		r.Error = dbError.Error()
-		return nil
+	if _, ok := a.db.UserWithAPIID(userID); !ok {
+		r.Status = BadRequest
+		r.Error = userDoesNotExistErrStr
 	}
+
+	a.db.ChangeUserPassword(userID, newPassword)
 
 	r.Status = OK
 	r.Error = "OK"
@@ -252,17 +253,15 @@ func (a *Admin) GetUser(args args, r *Response) error {
 
 	userID := aVal.String()
 
-	user, err := a.db.UserWithAPIID(userID)
-	if err != nil {
-		dbError := err.(database.DBError)
-		r.Status = DatabaseError
-		r.Error = dbError.Error()
-		return nil
+	user, found := a.db.UserWithAPIID(userID)
+	if !found {
+		r.Status = BadRequest
+		r.Error = userDoesNotExistErrStr
+	} else {
+		r.Result = user
+		r.Status = OK
+		r.Error = "OK"
 	}
-
-	r.Result = user
-	r.Status = OK
-	r.Error = "OK"
 
 	return nil
 }
@@ -346,7 +345,10 @@ func (a *Admin) listen() {
 			}
 		case stopping:
 			for _, conn := range a.connections {
-				conn.Close()
+				err := conn.Close()
+				if err != nil {
+					log.Error(err)
+				}
 			}
 
 			shouldStop = true
