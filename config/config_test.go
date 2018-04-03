@@ -37,13 +37,13 @@ func (suite *ConfigTestSuite) TearDown() {
 }
 
 func (suite *ConfigTestSuite) TestNewConfig() {
-	config, err := NewConfig("simple.toml")
+	config, err := NewConfig("test_config_files/simple.toml")
 	suite.Nil(err)
 	suite.Equal("/tmp/syndication.db", config.Database.Connection)
 }
 
 func (suite *ConfigTestSuite) TestNewConfigOnInvalidPath() {
-	_, err := NewConfig("bogus.toml")
+	_, err := NewConfig("test_config_files/bogus.toml")
 	suite.NotNil(err)
 }
 
@@ -55,7 +55,7 @@ func (suite *ConfigTestSuite) TestNewConfigWithSecretFile() {
 	suite.Require().Nil(err)
 	defer os.Remove("/tmp/sample_secret")
 
-	_, err = NewConfig("simple_with_file_secret.toml")
+	_, err = NewConfig("test_config_files/simple_with_file_secret.toml")
 	suite.Nil(err)
 }
 
@@ -67,7 +67,7 @@ func (suite *ConfigTestSuite) TestNewConfigWithBadSecretFile() {
 	suite.Require().Nil(err)
 	defer os.Remove("/tmp/sample_secret")
 
-	config, err := NewConfig("simple_with_file_secret.toml")
+	config, err := NewConfig("test_config_files/simple_with_file_secret.toml")
 	suite.Require().Nil(err)
 
 	config.Server.AuthSecreteFilePath = "bogus"
@@ -77,7 +77,7 @@ func (suite *ConfigTestSuite) TestNewConfigWithBadSecretFile() {
 }
 
 func (suite *ConfigTestSuite) TestMinimalConfig() {
-	config, err := NewConfig("simple.toml")
+	config, err := NewConfig("test_config_files/simple.toml")
 	suite.Require().Nil(err)
 
 	suite.Equal(DefaultSyncConfig, config.Sync)
@@ -90,24 +90,24 @@ func (suite *ConfigTestSuite) TestValidPlugins() {
 		os.OpenFile("/tmp/libtest.so", os.O_RDONLY|os.O_CREATE, 0666)
 	}
 
-	config, err := NewConfig("valid_plugins.toml")
+	config, err := NewConfig("test_config_files/valid_plugins.toml")
 	suite.Require().Nil(err)
 	suite.Len(config.Plugins, 1)
 }
 
 func (suite *ConfigTestSuite) TestNewInvalidConfig() {
-	_, err := NewConfig("invalid.toml")
+	_, err := NewConfig("test_config_files/invalid.toml")
 	suite.IsType(err, InvalidFieldValue{})
 }
 
 func (suite *ConfigTestSuite) TestSQLiteConfig() {
-	config, err := NewConfig("sqlite.toml")
+	config, err := NewConfig("test_config_files/sqlite.toml")
 	suite.Require().Nil(err)
 	suite.Equal("/tmp/syndication.db", config.Database.Connection)
 }
 
 func (suite *ConfigTestSuite) TestBadSQLiteConfig() {
-	config, err := NewConfig("sqlite.toml")
+	config, err := NewConfig("test_config_files/sqlite.toml")
 	suite.Require().Nil(err)
 
 	config.Database = Database{}
@@ -122,53 +122,53 @@ func (suite *ConfigTestSuite) TestBadSQLiteConfig() {
 }
 
 func (suite *ConfigTestSuite) TestMySQLConfig() {
-	_, err := NewConfig("mysql.toml")
+	_, err := NewConfig("test_config_files/mysql.toml")
 	suite.Require().Nil(err)
 }
 
 func (suite *ConfigTestSuite) TestBadMySQLConfig() {
-	_, err := NewConfig("bad_mysql.toml")
+	_, err := NewConfig("test_config_files/bad_mysql.toml")
 	suite.Require().NotNil(err)
 }
 
 func (suite *ConfigTestSuite) TestPostgresConfig() {
-	_, err := NewConfig("postgres.toml")
+	_, err := NewConfig("test_config_files/postgres.toml")
 	suite.Require().Nil(err)
 }
 
 func (suite *ConfigTestSuite) TestUnknownDB() {
-	_, err := NewConfig("with_unknown_db.toml")
+	_, err := NewConfig("test_config_files/with_unknown_db.toml")
 	suite.Require().Nil(err)
 }
 
 func (suite *ConfigTestSuite) TestInvalidPlugins() {
-	config, err := NewConfig("invalid_plugins.toml")
+	config, err := NewConfig("test_config_files/invalid_plugins.toml")
 	suite.Require().Nil(err)
 	suite.Empty(config.Plugins)
 }
 
 func (suite *ConfigTestSuite) TestNoDB() {
-	_, err := NewConfig("no_db.toml")
+	_, err := NewConfig("test_config_files/no_db.toml")
 	suite.Require().NotNil(err)
 }
 
 func (suite *ConfigTestSuite) TestNoDBEnabled() {
-	_, err := NewConfig("no_db_enabled.toml")
+	_, err := NewConfig("test_config_files/no_db_enabled.toml")
 	suite.Require().NotNil(err)
 }
 
 func (suite *ConfigTestSuite) TestSyncConfig() {
-	_, err := NewConfig("simple_sync.toml")
+	_, err := NewConfig("test_config_files/simple_sync.toml")
 	suite.Require().Nil(err)
 }
 
 func (suite *ConfigTestSuite) TestShortSyncInterval() {
-	_, err := NewConfig("invalid_sync.toml")
+	_, err := NewConfig("test_config_files/invalid_sync.toml")
 	suite.Require().NotNil(err)
 }
 
 func (suite *ConfigTestSuite) TestInvalidAdmin() {
-	_, err := NewConfig("invalid_admin.toml")
+	_, err := NewConfig("test_config_files/invalid_admin.toml")
 	suite.Require().NotNil(err)
 }
 
