@@ -20,7 +20,6 @@ package main
 import (
 	"os"
 	"os/signal"
-	"os/user"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli"
@@ -35,50 +34,40 @@ import (
 
 var intSignal chan os.Signal
 
+const appName = "syndication"
+const appUsage = "An flexible RSS server"
+
+var appFlags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "config",
+		Usage: "Path to a configuration file",
+	},
+	cli.StringFlag{
+		Name:  "socket",
+		Usage: "Path to admin socket",
+	},
+	cli.BoolFlag{
+		Name:  "admin",
+		Usage: "Enable/Disable admin",
+	},
+	cli.BoolFlag{
+		Name:  "sync",
+		Usage: "Enable/Disable sync",
+	},
+}
+
 func listenForInterrupt() {
 	intSignal = make(chan os.Signal, 1)
 	signal.Notify(intSignal, os.Interrupt)
 }
 
-func findSystemConfig() (config.Config, error) {
-	if _, err := os.Stat(config.SystemConfigPath); err != nil {
-		return config.Config{}, err
-	}
-
-	conf, err := config.NewConfig(config.SystemConfigPath)
-	if err != nil {
-		return config.Config{}, err
-	}
-
-	return conf, nil
-}
-
-func findUserConfig() (config.Config, error) {
-	currentUser, err := user.Current()
-	if err != nil {
-		return config.Config{}, err
-	}
-
-	configPath := currentUser.HomeDir + "/.config/" + config.UserConfigRelativePath
-	if _, err = os.Stat(configPath); err != nil {
-		return config.Config{}, err
-	}
-
-	conf, err := config.NewConfig(configPath)
-	if err != nil {
-		return config.Config{}, err
-	}
-
-	return conf, nil
-}
-
 func readConfig(c *cli.Context) (conf config.Config, err error) {
 	if c.String("config") == "" {
-		conf, err = findUserConfig()
+		conf, err = config.ReadUserConfig()
 		if err != nil {
 			color.Yellow(err.Error())
 			color.Yellow("Trying system configuration")
-			conf, err = findSystemConfig()
+			conf, err = config.ReadSystemConfig()
 			return
 		}
 
@@ -147,27 +136,9 @@ func startApp(c *cli.Context) error {
 func main() {
 	app := cli.NewApp()
 
-	app.Name = "syndication"
-	app.Usage = "An flexible RSS server"
-
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "config",
-			Usage: "Path to a configuration file",
-		},
-		cli.StringFlag{
-			Name:  "socket",
-			Usage: "Path to admin socket",
-		},
-		cli.BoolFlag{
-			Name:  "admin",
-			Usage: "Enable/Disable admin",
-		},
-		cli.BoolFlag{
-			Name:  "sync",
-			Usage: "Enable/Disable sync",
-		},
-	}
+	app.Name = appName
+	app.Usage = appUsage
+	app.Flags = appFlags
 
 	app.Action = startApp
 

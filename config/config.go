@@ -423,6 +423,38 @@ func (c *Config) parsePostgresDB() error {
 	return nil
 }
 
+func ReadUserConfig() (Config, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return Config{}, err
+	}
+
+	configPath := currentUser.HomeDir + "/.config/" + UserConfigRelativePath
+	if _, err = os.Stat(configPath); err != nil {
+		return Config{}, err
+	}
+
+	conf, err := NewConfig(configPath)
+	if err != nil {
+		return Config{}, err
+	}
+
+	return conf, nil
+}
+
+func ReadSystemConfig() (Config, error) {
+	if _, err := os.Stat(SystemConfigPath); err != nil {
+		return Config{}, err
+	}
+
+	conf, err := NewConfig(SystemConfigPath)
+	if err != nil {
+		return Config{}, err
+	}
+
+	return conf, nil
+}
+
 // NewConfig creates new configuration from a file located at path.
 func NewConfig(path string) (config Config, err error) {
 	config.path = path
