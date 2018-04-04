@@ -18,13 +18,17 @@ package config
 
 import (
 	"bufio"
-	"github.com/BurntSushi/toml"
-	log "github.com/sirupsen/logrus"
+	"crypto/rand"
+	"encoding/base64"
 	"io"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/BurntSushi/toml"
+	log "github.com/sirupsen/logrus"
 )
 
 // Duration represents a duration string such as "3m4s" as a time.Duration
@@ -44,8 +48,12 @@ const (
 	SystemConfigPath = "/etc/syndication/config.toml"
 
 	// UserConfigRelativePath is the relative path to a user configuration.
-	// This should be concatenaded with the running user's home directory.
+	// This should be concatenated with the running user's home directory.
 	UserConfigRelativePath = "syndication/config.toml"
+
+	// UserSecretRelativePath defines the relative path to a user authentication secret.
+	// This should be concatenated with the running user's home directory.
+	UserSecretRelativePath = "syndication/auth_secret"
 )
 
 type (
@@ -68,7 +76,7 @@ type (
 	Database struct {
 		Type             string `toml:"-"`
 		Enable           bool
-		Connection       string
+		Connection       string   `toml:"connection"`
 		APIKeyExpiration Duration `toml:"api_key_expiration"`
 	}
 
@@ -153,6 +161,21 @@ type (
 	}
 )
 
+func generateRandomBytes(n int) ([]byte, error) {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+func generateRandomString(s int) (string, error) {
+	b, err := generateRandomBytes(s)
+	return base64.URLEncoding.EncodeToString(b)[0:s], err
+}
+
 func (c *Config) verifyConfig() error {
 	err := c.parseDatabase()
 	if err != nil {
@@ -185,6 +208,8 @@ func (c *Config) getSecretFromFile(path string) error {
 	c.Server.AuthSecreteFilePath = path
 
 	fi, err := os.Open(c.Server.AuthSecreteFilePath)
+	defer fi.Close()
+
 	if err != nil {
 		return err
 	}
@@ -217,14 +242,70 @@ func (c *Config) parsePlugins() error {
 	return nil
 }
 
+func (c *Config) setGeneratedSecret() error {
+	currentUser, err := user.Current()
+	if err != nil {
+		return err
+	}
+
+	secretPath := currentUser.HomeDir + "/.config/" + UserSecretRelativePath
+	file, err := os.Create(secretPath)
+	defer file.Close()
+
+	w := bufio.NewWriter(file)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.WriteString(c.Server.AuthSecret)
+	if err != nil {
+		return err
+	}
+
+	err = w.Flush()
+
+	return err
+}
+
+func (c *Config) generateSecret() error {
+	secret, err := generateRandomString(128)
+	if err != nil {
+		return err
+	}
+
+	c.Server.AuthSecret = secret
+
+	err = c.setGeneratedSecret()
+
+	return err
+}
+
 func (c *Config) parseServer() error {
-	if c.Server.AuthSecreteFilePath != "" {
+	currentUser, err := user.Current()
+	if err != nil {
+		return err
+	}
+
+	defaultSecretFilePath := currentUser.HomeDir + "/.config/" + UserSecretRelativePath
+	_, err = os.Stat(defaultSecretFilePath)
+	if err == nil {
+		err := c.getSecretFromFile(defaultSecretFilePath)
+		if err != nil {
+			return err
+		}
+	} else if c.Server.AuthSecreteFilePath != "" {
 		err := c.getSecretFromFile(c.Server.AuthSecreteFilePath)
 		if err != nil {
 			return err
 		}
-	} else if c.Server.AuthSecret == "" {
-		return InvalidFieldValue{"Auth secret should not be empty"}
+	}
+
+	if c.Server.AuthSecret == "" {
+		log.Warn("A secret was not provided. Generating it...")
+		err := c.generateSecret()
+		if err != nil {
+			return err
+		}
 	}
 
 	if c.Server.HTTPPort == 0 {
@@ -264,9 +345,7 @@ func (c *Config) parseSync() error {
 	return nil
 }
 
-func (c *Config) parseDatabase() error {
-	c.Database = Database{}
-
+func (c *Config) findValidSQLConfig() {
 	for dbType, db := range c.Databases {
 		if !db.Enable {
 			continue
@@ -291,6 +370,12 @@ func (c *Config) parseDatabase() error {
 			log.Error(err)
 		}
 	}
+}
+
+func (c *Config) parseDatabase() error {
+	c.Database = Database{}
+
+	c.findValidSQLConfig()
 
 	if c.Database == (Database{}) {
 		return InvalidFieldValue{"Database not defined or not enabled"}
@@ -343,6 +428,16 @@ func NewConfig(path string) (config Config, err error) {
 	config.path = path
 
 	_, err = os.Stat(path)
+	if err != nil {
+		return
+	}
+
+	currentUser, err := user.Current()
+	if err != nil {
+		return
+	}
+
+	err = os.MkdirAll(currentUser.HomeDir+"/.config/syndication", os.ModePerm)
 	if err != nil {
 		return
 	}

@@ -84,6 +84,13 @@ func (suite *ConfigTestSuite) TestMinimalConfig() {
 	suite.Equal(DefaultAdminConfig, config.Admin)
 }
 
+func (suite *ConfigTestSuite) TestNoScretConfig() {
+	config, err := NewConfig("test_config_files/simple_no_secret.toml")
+	suite.Require().Nil(err)
+
+	suite.Len(config.Server.AuthSecret, 128)
+}
+
 func (suite *ConfigTestSuite) TestValidPlugins() {
 	_, err := os.Stat("/tmp/libtest.so")
 	if err != nil {
