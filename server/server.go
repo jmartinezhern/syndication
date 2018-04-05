@@ -496,7 +496,10 @@ func (s *Server) AddFeedsToCategory(c echo.Context) error {
 	}
 
 	for _, id := range feedIds.Feeds {
-		s.db.ChangeFeedCategory(id, ctgID, &user)
+		err := s.db.ChangeFeedCategory(id, ctgID, &user)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError)
+		}
 	}
 
 	return echo.NewHTTPError(http.StatusNoContent)
@@ -866,11 +869,7 @@ func (s *Server) registerMiddleware() {
 
 	s.handle.Use(middleware.JWTWithConfig(middleware.JWTConfig{
 		Skipper: func(c echo.Context) bool {
-			if c.Request().Method == "OPTIONS" {
-				return true
-			}
-
-			return isPathUnauthorized(c.Path())
+			return c.Request().Method == "OPTIONS" || isPathUnauthorized(c.Path())
 		},
 		SigningKey:    []byte(s.config.AuthSecret),
 		SigningMethod: "HS256",

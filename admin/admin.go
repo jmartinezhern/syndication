@@ -97,14 +97,14 @@ type args map[string]interface{}
 type state int
 
 const (
-	started state = iota
-	listening
+	listening state = iota
 	stopping
 	stopped
 )
 
 const defaultSocketPath = "/var/run/syndication/admin"
 const userDoesNotExistErrStr = "User does not exist"
+const internalErrStr = "Internal Error"
 
 func badArgumentErrorStr(argNum int) string {
 	return fmt.Sprintf("Arg %d is invalid", argNum)
@@ -221,9 +221,15 @@ func (a *Admin) ChangeUserPassword(args args, r *Response) error {
 	if _, ok := a.db.UserWithAPIID(userID); !ok {
 		r.Status = BadRequest
 		r.Error = userDoesNotExistErrStr
+		return nil
 	}
 
-	a.db.ChangeUserPassword(userID, newPassword)
+	err := a.db.ChangeUserPassword(userID, newPassword)
+	if err != nil {
+		r.Status = InternalError
+		r.Error = internalErrStr
+		return nil
+	}
 
 	r.Status = OK
 	r.Error = "OK"
@@ -232,7 +238,7 @@ func (a *Admin) ChangeUserPassword(args args, r *Response) error {
 }
 
 // GetUsers returns a list of all existing users.
-func (a *Admin) GetUsers(args args, r *Response) error {
+func (a *Admin) GetUsers(_ args, r *Response) error {
 	r.Status = OK
 	r.Error = "OK"
 
@@ -267,8 +273,8 @@ func (a *Admin) GetUser(args args, r *Response) error {
 }
 
 // NewAdmin creates a new Admin socket and initializes administration handlers
-func NewAdmin(db *database.DB, socketPath string) (a *Admin, err error) {
-	a = &Admin{
+func NewAdmin(db *database.DB, socketPath string) (*Admin, error) {
+	a := &Admin{
 		db:    db,
 		State: make(chan state),
 	}
@@ -279,10 +285,11 @@ func NewAdmin(db *database.DB, socketPath string) (a *Admin, err error) {
 		a.socketPath = defaultSocketPath
 	}
 
-	if _, err = os.Stat(a.socketPath); err == nil {
+	_, err := os.Stat(a.socketPath)
+	if err == nil {
 		err = os.Remove(a.socketPath)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 	}
 
@@ -291,7 +298,7 @@ func NewAdmin(db *database.DB, socketPath string) (a *Admin, err error) {
 		Net:  "unixpacket"})
 
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	aVal := reflect.ValueOf(a)
@@ -304,7 +311,7 @@ func NewAdmin(db *database.DB, socketPath string) (a *Admin, err error) {
 		"ChangeUserPassword": aVal.MethodByName("ChangeUserPassword"),
 	}
 
-	return
+	return a, nil
 }
 
 // Start listening at the administration socket

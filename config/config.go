@@ -56,6 +56,10 @@ const (
 	UserSecretRelativePath = "syndication/auth_secret"
 )
 
+const (
+	generatedSecretLength = 128
+)
+
 type (
 	// Server represents the complete configuration for Syndication's REST server component.
 	Server struct {
@@ -161,8 +165,8 @@ type (
 	}
 )
 
-func generateRandomBytes(n int) ([]byte, error) {
-	b := make([]byte, n)
+func generateRandomBytes() ([]byte, error) {
+	b := make([]byte, generatedSecretLength)
 	_, err := rand.Read(b)
 	if err != nil {
 		return nil, err
@@ -171,9 +175,9 @@ func generateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
-func generateRandomString(s int) (string, error) {
-	b, err := generateRandomBytes(s)
-	return base64.URLEncoding.EncodeToString(b)[0:s], err
+func generateRandomString() (string, error) {
+	b, err := generateRandomBytes()
+	return base64.URLEncoding.EncodeToString(b)[0:generatedSecretLength], err
 }
 
 func (c *Config) verifyConfig() error {
@@ -208,7 +212,11 @@ func (c *Config) getSecretFromFile(path string) error {
 	c.Server.AuthSecreteFilePath = path
 
 	fi, err := os.Open(c.Server.AuthSecreteFilePath)
-	defer fi.Close()
+	defer func() {
+		if err = fi.Close(); err != nil {
+			log.Error(err)
+		}
+	}()
 
 	if err != nil {
 		return err
@@ -222,7 +230,7 @@ func (c *Config) getSecretFromFile(path string) error {
 
 	c.Server.AuthSecret = string(buf)
 
-	return fi.Close()
+	return nil
 }
 
 func (c *Config) parsePlugins() error {
@@ -250,7 +258,11 @@ func (c *Config) setGeneratedSecret() error {
 
 	secretPath := currentUser.HomeDir + "/.config/" + UserSecretRelativePath
 	file, err := os.Create(secretPath)
-	defer file.Close()
+	defer func() {
+		if err = file.Close(); err != nil {
+			log.Error(err)
+		}
+	}()
 
 	w := bufio.NewWriter(file)
 	if err != nil {
@@ -262,22 +274,18 @@ func (c *Config) setGeneratedSecret() error {
 		return err
 	}
 
-	err = w.Flush()
-
-	return err
+	return w.Flush()
 }
 
 func (c *Config) generateSecret() error {
-	secret, err := generateRandomString(128)
+	secret, err := generateRandomString()
 	if err != nil {
 		return err
 	}
 
 	c.Server.AuthSecret = secret
 
-	err = c.setGeneratedSecret()
-
-	return err
+	return c.setGeneratedSecret()
 }
 
 func (c *Config) parseServer() error {
@@ -423,6 +431,8 @@ func (c *Config) parsePostgresDB() error {
 	return nil
 }
 
+// ReadUserConfig parses a configuration for the current running user
+// at a default location. If this file is not found, an error is returned.
 func ReadUserConfig() (Config, error) {
 	currentUser, err := user.Current()
 	if err != nil {
@@ -442,6 +452,8 @@ func ReadUserConfig() (Config, error) {
 	return conf, nil
 }
 
+// ReadSystemConfig parses a system configuration for the current environment.
+// If this file is not found, an error is returned.
 func ReadSystemConfig() (Config, error) {
 	if _, err := os.Stat(SystemConfigPath); err != nil {
 		return Config{}, err
@@ -456,36 +468,37 @@ func ReadSystemConfig() (Config, error) {
 }
 
 // NewConfig creates new configuration from a file located at path.
-func NewConfig(path string) (config Config, err error) {
+func NewConfig(path string) (Config, error) {
+	config := Config{}
+
 	config.path = path
 
-	_, err = os.Stat(path)
+	_, err := os.Stat(path)
 	if err != nil {
-		return
+		return Config{}, err
 	}
 
 	currentUser, err := user.Current()
 	if err != nil {
-		return
+		return Config{}, err
 	}
 
 	err = os.MkdirAll(currentUser.HomeDir+"/.config/syndication", os.ModePerm)
 	if err != nil {
-		return
+		return Config{}, err
 	}
 
 	_, err = toml.DecodeFile(path, &config)
 	if err != nil {
-		return
+		return Config{}, err
 	}
 
 	err = config.verifyConfig()
 	if err != nil {
-		log.Error(err)
-		config = Config{}
+		return Config{}, err
 	}
 
-	return
+	return config, nil
 }
 
 func (e InvalidFieldValue) Error() string {

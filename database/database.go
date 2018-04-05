@@ -63,13 +63,13 @@ var (
 )
 
 // NewDB creates a new DB instance
-func NewDB(conf config.Database) (db *DB, err error) {
+func NewDB(conf config.Database) (*DB, error) {
 	gormDB, err := gorm.Open(conf.Type, conf.Connection)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	db = &DB{
+	db := &DB{
 		config: conf,
 	}
 
@@ -82,7 +82,7 @@ func NewDB(conf config.Database) (db *DB, err error) {
 
 	db.db = gormDB
 
-	return
+	return db, nil
 }
 
 var lastTimeIDWasCreated int64
@@ -123,25 +123,26 @@ func createAPIID() string {
 	return base64.StdEncoding.EncodeToString([]byte(idStr))
 }
 
-func createPasswordHashAndSalt(password string) (hash []byte, salt []byte) {
+func createPasswordHashAndSalt(password string) ([]byte, []byte) {
 	var err error
 
-	salt = make([]byte, PWSaltBytes)
+	salt := make([]byte, PWSaltBytes)
 	_, err = io.ReadFull(rand.Reader, salt)
 	if err != nil {
 		panic(err) // We must be able to read from random
 	}
 
-	hash, err = scrypt.Key([]byte(password), salt, 1<<14, 8, 1, PWHashBytes)
+	hash, err := scrypt.Key([]byte(password), salt, 1<<14, 8, 1, PWHashBytes)
 	if err != nil {
 		panic(err) // We must never get an error
 	}
 
-	return
+	return hash, salt
 }
 
 // NewUser creates a new User object
-func (db *DB) NewUser(username, password string) (user models.User) {
+func (db *DB) NewUser(username, password string) models.User {
+	user := models.User{}
 	hash, salt := createPasswordHashAndSalt(password)
 
 	// Construct the user system categories
@@ -158,7 +159,8 @@ func (db *DB) NewUser(username, password string) (user models.User) {
 	user.Username = username
 
 	db.db.Create(&user).Related(&user.Categories)
-	return
+
+	return user
 }
 
 // DeleteUser with apiID
@@ -203,7 +205,9 @@ func (db *DB) ChangeUserPassword(apiID, newPassword string) error {
 // Users returns a list of all User entries.
 // The parameter fields provides a way to select
 // which fields are populated in the returned models.
-func (db *DB) Users(fields ...string) (users []models.User) {
+func (db *DB) Users(fields ...string) []models.User {
+	users := []models.User{}
+
 	selectFields := "id,api_id"
 	if len(fields) != 0 {
 		for _, field := range fields {
@@ -211,7 +215,8 @@ func (db *DB) Users(fields ...string) (users []models.User) {
 		}
 	}
 	db.db.Select(selectFields).Find(&users)
-	return
+
+	return users
 }
 
 // UserWithName returns a User with username
@@ -252,30 +257,26 @@ func (db *DB) TagWithAPIID(apiID string, user *models.User) (tag models.Tag, fou
 
 // UserWithCredentials returns a user whose credentials matches the ones given.
 // Ok will be false if the user was not found or if the credentials did not match.
-// This function asssumes that the password does not exceed scrypt's payload size.
-func (db *DB) UserWithCredentials(username, password string) (user models.User, ok bool) {
+// This function assumes that the password does not exceed scrypt's payload size.
+func (db *DB) UserWithCredentials(username, password string) (models.User, bool) {
 	foundUser, ok := db.UserWithName(username)
 	if !ok {
-		return
+		return models.User{}, ok
 	}
 
 	hash, err := scrypt.Key([]byte(password), foundUser.PasswordSalt, 1<<14, 8, 1, PWHashBytes)
 	if err != nil {
 		log.Error("Failed to generate a hash: ", err)
-		ok = false
-		return
+		return models.User{}, false
 	}
 
 	for i, hashByte := range hash {
 		if hashByte != foundUser.PasswordHash[i] {
-			ok = false
-			return
+			return models.User{}, false
 		}
 	}
 
-	user = foundUser
-	ok = true
-	return
+	return foundUser, true
 }
 
 // NewAPIKey creates a new APIKey object owned by user
@@ -309,32 +310,35 @@ func (db *DB) KeyBelongsToUser(key models.APIKey, user *models.User) bool {
 }
 
 // NewFeedWithCategory creates a new feed associated to a category with the given API ID
-func (db *DB) NewFeedWithCategory(title, subscription, ctgID string, user *models.User) (feed models.Feed, err error) {
+func (db *DB) NewFeedWithCategory(title, subscription, ctgID string, user *models.User) (models.Feed, error) {
 	ctg, found := db.CategoryWithAPIID(ctgID, user)
 	if !found {
-		err = ErrModelNotFound
-		return
+		return models.Feed{}, ErrModelNotFound
 	}
 
-	feed.Title = title
-	feed.Subscription = subscription
+	feed := models.Feed{
+		Title:        title,
+		Subscription: subscription,
+	}
 
 	db.createFeed(&feed, &ctg, user)
 
-	return
+	return feed, nil
 }
 
 // NewFeed creates a new Feed object owned by user
-func (db *DB) NewFeed(title, subscription string, user *models.User) (feed models.Feed) {
-	feed.Title = title
-	feed.Subscription = subscription
+func (db *DB) NewFeed(title, subscription string, user *models.User) models.Feed {
+	feed := models.Feed{
+		Title:        title,
+		Subscription: subscription,
+	}
 
 	ctg := models.Category{}
 	db.db.Model(user).Where("name = ?", models.Uncategorized).Related(&ctg)
 
 	db.createFeed(&feed, &ctg, user)
 
-	return
+	return feed
 }
 
 // Feeds returns a list of all Feeds owned by a user
@@ -352,12 +356,15 @@ func (db *DB) FeedsFromCategory(categoryID string, user *models.User) (feeds []m
 }
 
 // FeedWithAPIID returns a Feed with id and owned by user
-func (db *DB) FeedWithAPIID(id string, user *models.User) (feed models.Feed, found bool) {
-	found = !db.db.Model(user).Where("api_id = ?", id).Related(&feed).RecordNotFound()
-	if found {
+func (db *DB) FeedWithAPIID(id string, user *models.User) (models.Feed, bool) {
+	feed := models.Feed{}
+
+	if !db.db.Model(user).Where("api_id = ?", id).Related(&feed).RecordNotFound() {
 		db.db.Model(&feed).Related(&feed.Category)
+		return feed, true
 	}
-	return
+
+	return models.Feed{}, false
 }
 
 // DeleteFeed with id and owned by user
@@ -502,9 +509,10 @@ func (db *DB) EntryWithGUIDExists(guid string, feedID string, user *models.User)
 }
 
 // Entries returns a list of all entries owned by user
-func (db *DB) Entries(orderByNewest bool, marker models.Marker, user *models.User) (entries []models.Entry) {
+func (db *DB) Entries(orderByNewest bool, marker models.Marker, user *models.User) []models.Entry {
+	entries := []models.Entry{}
 	if marker == models.None {
-		return
+		return nil
 	}
 
 	query := db.db.Model(user)
@@ -519,19 +527,22 @@ func (db *DB) Entries(orderByNewest bool, marker models.Marker, user *models.Use
 	}
 
 	query.Association("Entries").Find(&entries)
-	return
+
+	return entries
 }
 
 // EntriesFromFeed returns all Entries that belong to a feed with feedID
-func (db *DB) EntriesFromFeed(feedID string, orderByNewest bool, marker models.Marker, user *models.User) (entries []models.Entry) {
+func (db *DB) EntriesFromFeed(feedID string, orderByNewest bool, marker models.Marker, user *models.User) []models.Entry {
 	if marker == models.None {
-		return
+		return nil
 	}
 
 	feed := &models.Feed{}
 	if db.db.Model(user).Where("api_id = ?", feedID).Related(feed).RecordNotFound() {
-		return
+		return nil
 	}
+
+	entries := []models.Entry{}
 
 	query := db.db.Model(user)
 	if marker != models.Any {
@@ -546,21 +557,23 @@ func (db *DB) EntriesFromFeed(feedID string, orderByNewest bool, marker models.M
 
 	query.Where("feed_id = ?", feed.ID).Association("Entries").Find(&entries)
 
-	return
+	return entries
 }
 
 // EntriesFromCategory returns all Entries that are related to a Category with categoryID by the entries' owning Feed
-func (db *DB) EntriesFromCategory(categoryID string, orderByNewest bool, marker models.Marker, user *models.User) (entries []models.Entry) {
+func (db *DB) EntriesFromCategory(categoryID string, orderByNewest bool, marker models.Marker, user *models.User) []models.Entry {
 	if marker == models.None {
-		return
+		return nil
 	}
 
 	category := &models.Category{}
 	if db.db.Model(user).Where("api_id = ?", categoryID).Related(category).RecordNotFound() {
-		return
+		return nil
 	}
 
 	var feeds []models.Feed
+	var entries []models.Entry
+
 	db.db.Model(category).Related(&feeds)
 
 	query := db.db.Model(user)
@@ -580,7 +593,8 @@ func (db *DB) EntriesFromCategory(categoryID string, orderByNewest bool, marker 
 	}
 
 	query.Where("feed_id in (?)", feedIds).Association("Entries").Find(&entries)
-	return
+
+	return entries
 }
 
 // NewTag creates a new Tag object owned by user
@@ -628,10 +642,10 @@ func (db *DB) TagEntries(tagID string, entries []string, user *models.User) erro
 }
 
 // EntriesFromTag returns all Entries which are tagged with tagID
-func (db *DB) EntriesFromTag(tagID string, marker models.Marker, orderByNewest bool, user *models.User) (entries []models.Entry) {
+func (db *DB) EntriesFromTag(tagID string, marker models.Marker, orderByNewest bool, user *models.User) []models.Entry {
 	tag := &models.Tag{}
 	if db.db.Model(user).Where("api_id = ?", tagID).Related(tag).RecordNotFound() {
-		return
+		return nil
 	}
 
 	query := db.db.Model(tag)
@@ -645,13 +659,16 @@ func (db *DB) EntriesFromTag(tagID string, marker models.Marker, orderByNewest b
 		query = query.Order("published ASC")
 	}
 
+	var entries []models.Entry
+
 	query.Association("Entries").Find(&entries)
-	return
+
+	return entries
 }
 
 // EntriesFromMultipleTags returns all Entries that are related to a Category with categoryID by the entries' owning Feed
-func (db *DB) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marker models.Marker, user *models.User) (entries []models.Entry) {
-	order := db.db.Table("entries").Select("entries.title")
+func (db *DB) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marker models.Marker, user *models.User) []models.Entry {
+	order := db.db.Model(user).Select("entries.title")
 	if orderByNewest {
 		order = order.Order("created_at DESC")
 	} else {
@@ -670,9 +687,12 @@ func (db *DB) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marke
 		}
 	}
 
+	var entries []models.Entry
+
 	query := "inner join entry_tags ON entry_tags.entry_id = entries.id"
-	order.Joins(query).Where("entry_tags.tag_id in (?)", tagPrimaryKeys).Scan(&entries)
-	return
+	order.Joins(query).Where("entry_tags.tag_id in (?)", tagPrimaryKeys).Related(&entries)
+
+	return entries
 }
 
 // TagPrimaryKey returns the SQL primary key of a Tag with an api_id
@@ -704,10 +724,10 @@ func (db *DB) DeleteTag(id string, user *models.User) error {
 }
 
 // CategoryStats returns all Stats for a Category with the given id and that is owned by user
-func (db *DB) CategoryStats(id string, user *models.User) (stats models.Stats) {
+func (db *DB) CategoryStats(id string, user *models.User) models.Stats {
 	ctg := &models.Category{}
 	if db.db.Model(user).Where("api_id = ?", id).Related(ctg).RecordNotFound() {
-		return
+		return models.Stats{}
 	}
 
 	var feeds []models.Feed
@@ -720,34 +740,43 @@ func (db *DB) CategoryStats(id string, user *models.User) (stats models.Stats) {
 
 	query := db.db.Model(user).Where("feed_id in (?)", feedIds)
 
+	stats := models.Stats{}
+
 	stats.Unread = query.Where("mark = ?", models.Unread).Association("Entries").Count()
 	stats.Read = query.Where("mark = ?", models.Read).Association("Entries").Count()
 	stats.Saved = query.Where("saved = ?", true).Association("Entries").Count()
 	stats.Total = query.Association("Entries").Count()
-	return
+
+	return stats
 }
 
 // FeedStats returns all Stats for a Feed with the given id and that is owned by user
-func (db *DB) FeedStats(id string, user *models.User) (stats models.Stats) {
+func (db *DB) FeedStats(id string, user *models.User) models.Stats {
 	feed := &models.Feed{}
 	if db.db.Model(user).Where("api_id = ?", id).Related(feed).RecordNotFound() {
-		return
+		return models.Stats{}
 	}
+
+	stats := models.Stats{}
 
 	stats.Unread = db.db.Model(user).Where("feed_id = ? AND mark = ?", feed.ID, models.Unread).Association("Entries").Count()
 	stats.Read = db.db.Model(user).Where("feed_id = ? AND mark = ?", feed.ID, models.Read).Association("Entries").Count()
 	stats.Saved = db.db.Model(user).Where("feed_id = ? AND saved = ?", feed.ID, true).Association("Entries").Count()
 	stats.Total = db.db.Model(user).Where("feed_id = ?", feed.ID).Association("Entries").Count()
-	return
+
+	return stats
 }
 
 // Stats returns all Stats for the given user
-func (db *DB) Stats(user *models.User) (stats models.Stats) {
+func (db *DB) Stats(user *models.User) models.Stats {
+	stats := models.Stats{}
+
 	stats.Unread = db.db.Model(user).Where("mark = ?", models.Unread).Association("Entries").Count()
 	stats.Read = db.db.Model(user).Where("mark = ?", models.Read).Association("Entries").Count()
 	stats.Saved = db.db.Model(user).Where("saved = ?", true).Association("Entries").Count()
 	stats.Total = db.db.Model(user).Association("Entries").Count()
-	return
+
+	return stats
 }
 
 // MarkFeed applies marker to a Feed with id and owned by user

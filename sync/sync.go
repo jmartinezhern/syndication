@@ -18,7 +18,6 @@
 package sync
 
 import (
-	"crypto/md5"
 	"net/http"
 	"sync"
 	"time"
@@ -39,10 +38,7 @@ type userPool struct {
 }
 
 const (
-	idle = iota
-	started
-	running
-	stopping
+	stopping = iota
 	stopped
 )
 
@@ -106,72 +102,51 @@ func (p *userPool) put(user models.User) {
 	p.users = append(p.users, user)
 }
 
-func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.Entry, error) {
+func (s *Sync) updatedFeed(feed *models.Feed) (gofeed.Feed, bool) {
 	client := &http.Client{
 		CheckRedirect: (func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse }),
 	}
 
 	req, err := http.NewRequest("GET", feed.Subscription, nil)
 	if err != nil {
-		return nil, err
+		log.Error(err)
+		return gofeed.Feed{}, false
 	}
 
-	if feed.Etag != "" {
-		req.Header.Add("If-None-Match", feed.Etag)
-	}
+	req.Header.Add("If-None-Match", feed.Etag)
 
 	resp, err := client.Do(req)
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Error(err)
+		}
+	}()
+
 	if err != nil {
-		return nil, BadRequest{err.Error()}
+		log.Error(err)
+		return gofeed.Feed{}, false
 	}
 
 	fp := gofeed.NewParser()
 	fetchedFeed, err := fp.Parse(resp.Body)
 
 	if err != nil {
-		// If there was an error by the feed parser and the
-		// content length is zero or less, it implies that
-		// we got an empty request so we swallow the error.
-		if req.ContentLength <= 0 {
-			return nil, nil
-		}
-
-		return nil, err
+		return gofeed.Feed{}, false
 	}
 
-	if fetchedFeed == nil {
-		return nil, nil
+	if fetchedFeed == nil ||
+		(fetchedFeed.UpdatedParsed != nil && !fetchedFeed.UpdatedParsed.After(feed.LastUpdated)) ||
+		fetchedFeed.Items == nil || len(fetchedFeed.Items) == 0 {
+		return gofeed.Feed{}, false
 	}
 
-	if fetchedFeed.UpdatedParsed != nil {
-		if !fetchedFeed.UpdatedParsed.After(feed.LastUpdated) {
-			return nil, nil
-		}
-	}
+	return *fetchedFeed, true
+}
 
-	if fetchedFeed.Items == nil || len(fetchedFeed.Items) == 0 {
-		return nil, nil
-	}
-
+func (s *Sync) getEntriesFromUpdatedFeed(feed *models.Feed, fetchedFeed gofeed.Feed) []models.Entry {
 	var entries []models.Entry
 	for _, item := range fetchedFeed.Items {
-		var itemGUID string
-		if item.GUID != "" {
-			itemGUID = item.GUID
-		} else {
-			itemHash := md5.Sum([]byte(item.Title + item.Link))
-			itemGUID = string(itemHash[:md5.Size])
-			item.GUID = itemGUID
-		}
-
-		s.dbLock.Lock()
-		if found := s.db.EntryWithGUIDExists(itemGUID, feed.APIID, user); found {
-			s.dbLock.Unlock()
-			continue
-		}
-		s.dbLock.Unlock()
-
-		entries = append(entries, convertItemsToEntries(*feed, item))
+		entries = append(entries, convertItemsToEntries(item))
 	}
 
 	feed.Title = fetchedFeed.Title
@@ -179,15 +154,10 @@ func (s *Sync) checkForUpdates(feed *models.Feed, user *models.User) ([]models.E
 	feed.Source = fetchedFeed.Link
 	feed.LastUpdated = time.Now()
 
-	err = resp.Body.Close()
-	if err != nil {
-		log.Error(err)
-	}
-
-	return entries, nil
+	return entries
 }
 
-func convertItemsToEntries(feed models.Feed, item *gofeed.Item) models.Entry {
+func convertItemsToEntries(item *gofeed.Item) models.Entry {
 	entry := models.Entry{
 		Title: item.Title,
 		Link:  item.Link,
@@ -247,15 +217,17 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 		return nil
 	}
 
-	entries, err := s.checkForUpdates(feed, user)
-	if err != nil {
-		return err
+	fetchedFeed, ok := s.updatedFeed(feed)
+	if !ok {
+		return nil
 	}
+
+	entries := s.getEntriesFromUpdatedFeed(feed, fetchedFeed)
 
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
-	err = s.db.EditFeed(feed, user)
+	err := s.db.EditFeed(feed, user)
 	if err != nil {
 		return err
 	}

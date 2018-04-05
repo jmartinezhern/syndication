@@ -61,35 +61,25 @@ func listenForInterrupt() {
 	signal.Notify(intSignal, os.Interrupt)
 }
 
-func readConfig(c *cli.Context) (conf config.Config, err error) {
+func readConfig(c *cli.Context) (config.Config, error) {
 	if c.String("config") == "" {
-		conf, err = config.ReadUserConfig()
+		conf, err := config.ReadUserConfig()
 		if err != nil {
 			color.Yellow(err.Error())
 			color.Yellow("Trying system configuration")
-			conf, err = config.ReadSystemConfig()
-			return
+			return config.ReadSystemConfig()
 		}
 
-		if err != nil {
-			color.Yellow(err.Error())
-			color.Red("Failed to find a configuration file.")
-			return
-		}
-	} else {
-		conf, err = config.NewConfig(c.String("config"))
-		if err != nil {
-			color.Red(err.Error())
-			return
-		}
+		return conf, err
 	}
 
-	return
+	return config.NewConfig(c.String("config"))
 }
 
 func startApp(c *cli.Context) error {
 	conf, err := readConfig(c)
 	if err != nil {
+		color.Red("Failed to find a configuration file.")
 		return err
 	}
 
