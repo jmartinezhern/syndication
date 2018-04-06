@@ -20,7 +20,9 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -33,6 +35,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/importer"
 	"github.com/varddum/syndication/models"
 	"github.com/varddum/syndication/plugins"
 	"github.com/varddum/syndication/sync"
@@ -1103,6 +1106,95 @@ func (s *ServerTestSuite) TestLoginWithBadPassword() {
 
 	err = loginResp.Body.Close()
 	s.Nil(err)
+}
+
+func (s *ServerTestSuite) TestOPMLImport() {
+	data := []byte(`
+	<opml>
+		<body>
+			<outline text="Sports" title="Sports">
+				<outline type="rss"  text="Basketball" title="Basketball" xmlUrl="http://example.com/basketball" htmlUrl="http://example.com/basketball"/>
+			</outline>
+			<outline type="rss" text="Baseball" title="Baseball" xmlUrl="http://example.com/baseball" htmlUrl="http://example.com/baseball"/>
+		</body>
+	</opml>
+	`)
+
+	req, err := http.NewRequest("POST", "http://localhost:9876/v1/import", bytes.NewBuffer(data))
+	s.Require().Nil(err)
+
+	req.Header.Set("Authorization", "Bearer "+s.token)
+	req.Header.Set("Content-Type", "application/xml")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	s.Require().Nil(err)
+	defer resp.Body.Close()
+
+	s.Equal(http.StatusNoContent, resp.StatusCode)
+
+	ctgs := s.db.Categories(&s.user)
+	s.Require().Len(ctgs, 2)
+
+	sportsCtg, ok := s.db.CategoryWithName("Sports", &s.user)
+	s.Require().True(ok)
+
+	sportsFeeds := s.db.FeedsFromCategory(sportsCtg.APIID, &s.user)
+	s.Require().Len(sportsFeeds, 1)
+	s.Equal("Basketball", sportsFeeds[0].Title)
+
+	unctgCtg, ok := s.db.CategoryWithName(models.Uncategorized, &s.user)
+	s.Require().True(ok)
+
+	unctgFeeds := s.db.FeedsFromCategory(unctgCtg.APIID, &s.user)
+	s.Require().Len(unctgFeeds, 1)
+	s.Equal("Baseball", unctgFeeds[0].Title)
+}
+
+func (s *ServerTestSuite) TestOPMLExport() {
+	ctg := s.db.NewCategory("Sports", &s.user)
+
+	bsktblFeed, err := s.db.NewFeedWithCategory("Basketball", "http://example.com/basketball", ctg.APIID, &s.user)
+	s.Require().Nil(err)
+
+	bsblFeed := s.db.NewFeed("Baseball", "http://example.com/baseball", &s.user)
+
+	req, err := http.NewRequest("GET", "http://localhost:9876/v1/export", nil)
+	s.Require().Nil(err)
+
+	req.Header.Set("Authorization", "Bearer "+s.token)
+	req.Header.Set("Accept", "application/xml")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	s.Require().Nil(err)
+	defer resp.Body.Close()
+
+	s.Equal(http.StatusOK, resp.StatusCode)
+
+	data, err := ioutil.ReadAll(resp.Body)
+	s.Require().Nil(err)
+
+	b := importer.OPML{}
+	err = xml.Unmarshal(data, &b)
+	s.Require().Nil(err)
+
+	s.Require().Len(b.Body.Items, 2)
+
+	passed := true
+	for _, item := range b.Body.Items {
+		if len(item.Items) == 1 {
+			if item.Title != "Sports" || len(item.Items) != 1 && item.Items[0].Title != bsktblFeed.Title {
+				passed = false
+				break
+			}
+		} else if item.Title != bsblFeed.Title {
+			passed = false
+			break
+		}
+	}
+
+	s.True(passed)
 }
 
 func (s *ServerTestSuite) startServer() {

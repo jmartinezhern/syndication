@@ -21,6 +21,7 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"net/http"
 	"path"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/importer"
 	"github.com/varddum/syndication/models"
 	"github.com/varddum/syndication/plugins"
 	"github.com/varddum/syndication/sync"
@@ -852,6 +854,91 @@ func (s *Server) GetStatsForEntries(c echo.Context) error {
 	return c.JSON(http.StatusOK, s.db.Stats(&user))
 }
 
+func (s *Server) Export(c echo.Context) error {
+	user := c.Get(echoSyndUserKey).(models.User)
+
+	contType := c.Request().Header.Get("Accept")
+
+	var data []byte
+	var err error
+	switch contType {
+	case "application/xml":
+		data, err = s.exportFeeds(importer.NewOPMLImporter(), &user)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError)
+		}
+
+		return c.XMLBlob(http.StatusOK, data)
+	}
+
+	return echo.NewHTTPError(http.StatusBadRequest, "Accept header must be set to a supported value")
+}
+
+func (s *Server) exportFeeds(exporter importer.FeedImporter, user *models.User) ([]byte, error) {
+	ctgs := s.db.Categories(user)
+
+	for idx, ctg := range ctgs {
+		ctg.Feeds = s.db.FeedsFromCategory(ctg.APIID, user)
+		ctgs[idx] = ctg
+	}
+
+	return exporter.Export(ctgs)
+}
+
+func (s *Server) Import(c echo.Context) error {
+	user := c.Get(echoSyndUserKey).(models.User)
+
+	contLength := c.Request().ContentLength
+	if contLength <= 0 {
+		return echo.NewHTTPError(http.StatusNoContent)
+	}
+
+	contType := c.Request().Header.Get("Content-Type")
+	data := make([]byte, contLength)
+	_, err := bufio.NewReader(c.Request().Body).Read(data)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not read request body")
+	}
+
+	if contType == "" && contLength > 0 {
+		contType = http.DetectContentType(data)
+	}
+
+	switch contType {
+	case "application/xml":
+		err = s.importFeeds(data, importer.NewOPMLImporter(), &user)
+	}
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError)
+	}
+
+	return echo.NewHTTPError(http.StatusNoContent)
+}
+
+func (s *Server) importFeeds(data []byte, reqImporter importer.FeedImporter, user *models.User) error {
+	feeds := reqImporter.Import(data)
+	for _, feed := range feeds {
+		if feed.Category.Name != "" {
+			dbCtg := models.Category{}
+			if ctg, ok := s.db.CategoryWithName(feed.Category.Name, user); ok {
+				dbCtg = ctg
+			} else {
+				dbCtg = s.db.NewCategory(feed.Category.Name, user)
+			}
+
+			_, err := s.db.NewFeedWithCategory(feed.Title, feed.Subscription, dbCtg.APIID, user)
+			if err != nil {
+				return err
+			}
+		} else {
+			s.db.NewFeed(feed.Title, feed.Subscription, user)
+		}
+	}
+
+	return nil
+}
+
 func (s *Server) registerMiddleware() {
 	s.handle.Use(middleware.CORS())
 
@@ -899,6 +986,9 @@ func (s *Server) registerHandlers() {
 	v1.POST("/register", s.Register)
 
 	unauthorizedPaths = append(unauthorizedPaths, "/v1/login", "/v1/register")
+
+	v1.POST("/import", s.Import)
+	v1.GET("/export", s.Export)
 
 	v1.POST("/feeds", s.NewFeed)
 	v1.GET("/feeds", s.GetFeeds)
