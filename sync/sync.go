@@ -18,6 +18,7 @@
 package sync
 
 import (
+	"crypto/md5"
 	"net/http"
 	"sync"
 	"time"
@@ -143,9 +144,27 @@ func (s *Sync) updatedFeed(feed *models.Feed) (gofeed.Feed, bool) {
 	return *fetchedFeed, true
 }
 
-func (s *Sync) getEntriesFromUpdatedFeed(feed *models.Feed, fetchedFeed gofeed.Feed) []models.Entry {
+func itemGUID(item *gofeed.Item) string {
+	if item.GUID != "" {
+		return item.GUID
+	}
+
+	itemHash := md5.Sum([]byte(item.Title + item.Link))
+	return string(itemHash[:md5.Size])
+}
+
+func (s *Sync) getEntriesFromUpdatedFeed(feed *models.Feed, fetchedFeed gofeed.Feed, user *models.User) []models.Entry {
 	var entries []models.Entry
 	for _, item := range fetchedFeed.Items {
+
+		s.dbLock.Lock()
+		userDB := s.db.NewUserDB(*user)
+		if found := userDB.EntryWithGUIDExists(itemGUID(item), feed.APIID); found {
+			s.dbLock.Unlock()
+			continue
+		}
+		s.dbLock.Unlock()
+
 		entries = append(entries, convertItemsToEntries(item))
 	}
 
@@ -161,7 +180,6 @@ func convertItemsToEntries(item *gofeed.Item) models.Entry {
 	entry := models.Entry{
 		Title: item.Title,
 		Link:  item.Link,
-		GUID:  item.GUID,
 		Mark:  models.Unread,
 	}
 
@@ -174,6 +192,8 @@ func convertItemsToEntries(item *gofeed.Item) models.Entry {
 	} else {
 		entry.Published = time.Now()
 	}
+
+	entry.GUID = itemGUID(item)
 
 	return entry
 }
@@ -222,24 +242,27 @@ func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
 		return nil
 	}
 
-	entries := s.getEntriesFromUpdatedFeed(feed, fetchedFeed)
+	entries := s.getEntriesFromUpdatedFeed(feed, fetchedFeed, user)
 
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
-	err := s.db.EditFeed(feed, user)
+	userDB := s.db.NewUserDB(*user)
+
+	err := userDB.EditFeed(feed)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.db.NewEntries(entries, feed.APIID, user)
+	_, err = userDB.NewEntries(entries, feed.APIID)
 	return err
 }
 
 // SyncUser sync's all feeds owned by user
 func (s *Sync) SyncUser(user *models.User) error {
 	s.dbLock.Lock()
-	feeds := s.db.Feeds(user)
+	userDB := s.db.NewUserDB(*user)
+	feeds := userDB.Feeds()
 	s.dbLock.Unlock()
 	for _, feed := range feeds {
 		if err := s.SyncFeed(&feed, user); err != nil {

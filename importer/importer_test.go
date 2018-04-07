@@ -75,8 +75,8 @@ func (s *ImporterTestSuite) TestOPMLExport() {
 	feeds := encoder.Import(data)
 	s.Require().Len(feeds, 2)
 
-	s.Equal(feeds[0].Category.Name, "Sports")
-	s.Equal(feeds[1].Category.Name, models.Uncategorized)
+	s.Equal("Sports", feeds[0].Category.Name)
+	s.Empty(feeds[1].Category.Name)
 }
 
 func TestImporterTestSuite(t *testing.T) {

@@ -21,16 +21,17 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo"
+	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 )
 
 // GetEntry with id
 func (s *Server) GetEntry(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	entryID := c.Param("entryID")
 
-	entry, found := s.db.EntryWithAPIID(entryID, &user)
+	entry, found := userDB.EntryWithAPIID(entryID)
 	if !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Entry does not exist",
@@ -42,7 +43,7 @@ func (s *Server) GetEntry(c echo.Context) error {
 
 // GetEntries returns a list of entries that belong to a user
 func (s *Server) GetEntries(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
@@ -54,9 +55,9 @@ func (s *Server) GetEntries(c echo.Context) error {
 		markedAs = models.Any
 	}
 
-	entries := s.db.Entries(convertOrderByParamToValue(params.OrderBy),
+	entries := userDB.Entries(convertOrderByParamToValue(params.OrderBy),
 		markedAs,
-		&user)
+	)
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
@@ -69,7 +70,7 @@ func (s *Server) GetEntries(c echo.Context) error {
 
 // MarkEntry applies a Marker to an Entry
 func (s *Server) MarkEntry(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	entryID := c.Param("entryID")
 
@@ -78,13 +79,13 @@ func (s *Server) MarkEntry(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
-	if _, found := s.db.EntryWithAPIID(entryID, &user); !found {
+	if _, found := userDB.EntryWithAPIID(entryID); !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Entry does not exist",
 		})
 	}
 
-	err := s.db.MarkEntry(entryID, marker, &user)
+	err := userDB.MarkEntry(entryID, marker)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResp{
 			Message: "Entry could not be marked",
@@ -96,7 +97,7 @@ func (s *Server) MarkEntry(c echo.Context) error {
 
 // GetStatsForEntries provides statistics related to Entries
 func (s *Server) GetStatsForEntries(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
-	return c.JSON(http.StatusOK, s.db.Stats(&user))
+	return c.JSON(http.StatusOK, userDB.Stats())
 }

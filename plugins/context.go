@@ -30,14 +30,13 @@ type (
 
 	// UserCtx allows access to a single user's data
 	UserCtx struct {
-		db   *database.DB
-		user *models.User
+		db database.UserDB
 	}
 )
 
 // NewUserCtx creates a new user from a database
-func NewUserCtx(db *database.DB, user *models.User) UserCtx {
-	return UserCtx{db, user}
+func NewUserCtx(db database.UserDB) UserCtx {
+	return UserCtx{db}
 }
 
 // HasUser checks if the API Ctx also has a UserCtx
@@ -47,135 +46,135 @@ func (c APICtx) HasUser() bool {
 
 // Entries retrives all entries from a user with an order and marker
 func (c UserCtx) Entries(orderByNewest bool, marker models.Marker) []models.Entry {
-	return c.db.Entries(orderByNewest, marker, c.user)
+	return c.db.Entries(orderByNewest, marker)
 }
 
 // EntriesFromCategory retrieves entries in a category from a user
 func (c UserCtx) EntriesFromCategory(categoryID string, orderByNewest bool, marker models.Marker) []models.Entry {
-	return c.db.EntriesFromCategory(categoryID, orderByNewest, marker, c.user)
+	return c.db.EntriesFromCategory(categoryID, orderByNewest, marker)
 }
 
 // EntriesFromFeed retrieves entries belonging to a feed owned by a user
 func (c UserCtx) EntriesFromFeed(feedID string, orderByNewest bool, marker models.Marker) []models.Entry {
-	return c.db.EntriesFromFeed(feedID, orderByNewest, marker, c.user)
+	return c.db.EntriesFromFeed(feedID, orderByNewest, marker)
 }
 
 // EntriesFromTag retrieves all entries related to the given tag which is owned by a user
 func (c UserCtx) EntriesFromTag(tagID string, orderByNewest bool, marker models.Marker) []models.Entry {
-	return c.db.EntriesFromTag(tagID, marker, orderByNewest, c.user)
+	return c.db.EntriesFromTag(tagID, marker, orderByNewest)
 }
 
 // EntriesFromMultipleTags retrieves all entries related to the given tags which are owned by a user
 func (c UserCtx) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marker models.Marker) []models.Entry {
-	return c.db.EntriesFromMultipleTags(tagIDs, orderByNewest, marker, c.user)
+	return c.db.EntriesFromMultipleTags(tagIDs, orderByNewest, marker)
 }
 
 // EntryWithAPIID retrieves a single entry
 func (c UserCtx) EntryWithAPIID(id string) (models.Entry, bool) {
-	return c.db.EntryWithAPIID(id, c.user)
+	return c.db.EntryWithAPIID(id)
 }
 
 // Feeds retrieves all feeds belonging to a user
 func (c UserCtx) Feeds() []models.Feed {
-	return c.db.Feeds(c.user)
+	return c.db.Feeds()
 }
 
 // FeedsFromCategory retrieves feeds contained in category that is owned by a user
 func (c UserCtx) FeedsFromCategory(categoryID string) []models.Feed {
-	return c.db.FeedsFromCategory(categoryID, c.user)
+	return c.db.FeedsFromCategory(categoryID)
 }
 
 // FeedWithAPIID retrieves a single feed with the given ID
 func (c UserCtx) FeedWithAPIID(id string) (models.Feed, bool) {
-	return c.db.FeedWithAPIID(id, c.user)
+	return c.db.FeedWithAPIID(id)
 }
 
 // DeleteFeed deletes a feed owned by a user
 func (c UserCtx) DeleteFeed(id string) error {
-	return c.db.DeleteFeed(id, c.user)
+	return c.db.DeleteFeed(id)
 }
 
 // EditFeed modifies writable proprieties of a feed owned by a user
 func (c UserCtx) EditFeed(feed *models.Feed) error {
-	return c.db.EditFeed(feed, c.user)
+	return c.db.EditFeed(feed)
 }
 
 // Categories retrieves all categories owned by a user
 func (c UserCtx) Categories() []models.Category {
-	return c.db.Categories(c.user)
+	return c.db.Categories()
 }
 
 // CategoryWithAPIID retrieves a single category with the given ID
 func (c UserCtx) CategoryWithAPIID(id string) (models.Category, bool) {
-	return c.db.CategoryWithAPIID(id, c.user)
+	return c.db.CategoryWithAPIID(id)
 }
 
 // EditCategory modifies writable properties of a category owned by a user
 func (c UserCtx) EditCategory(ctg *models.Category) error {
-	return c.db.EditCategory(ctg, c.user)
+	return c.db.EditCategory(ctg)
 }
 
 // DeleteCategory deletes a category owned by a user
 func (c UserCtx) DeleteCategory(id string) error {
-	return c.db.DeleteCategory(id, c.user)
+	return c.db.DeleteCategory(id)
 }
 
 // ChangeFeedCategory moves a feed from its current category to a different one.
 func (c UserCtx) ChangeFeedCategory(feedID, ctgID string) error {
-	return c.db.ChangeFeedCategory(feedID, ctgID, c.user)
+	return c.db.ChangeFeedCategory(feedID, ctgID)
 }
 
 // Tags retrieves all tags owned by a user
 func (c UserCtx) Tags() []models.Tag {
-	return c.db.Tags(c.user)
+	return c.db.Tags()
 }
 
 // TagWithAPIID returns a tag with the give ID
 func (c UserCtx) TagWithAPIID(id string) (models.Tag, bool) {
-	return c.db.TagWithAPIID(id, c.user)
+	return c.db.TagWithAPIID(id)
 }
 
 // EditTagName updates the name of a tag owned by a user
 func (c UserCtx) EditTagName(tagID, name string, user *models.User) error {
-	return c.db.EditTagName(tagID, name, c.user)
+	return c.db.EditTagName(tagID, name)
 }
 
 // DeleteTag deletes a tag owned by a user
 func (c UserCtx) DeleteTag(id string) error {
-	return c.db.DeleteTag(id, c.user)
+	return c.db.DeleteTag(id)
 }
 
 // TagEntries applies a tag to multiple entries
 func (c UserCtx) TagEntries(tagID string, entries []string) error {
-	return c.db.TagEntries(tagID, entries, c.user)
+	return c.db.TagEntries(tagID, entries)
 }
 
 // CategoryStats retrieves statistics related to a category
 func (c UserCtx) CategoryStats(id string) models.Stats {
-	return c.db.CategoryStats(id, c.user)
+	return c.db.CategoryStats(id)
 }
 
 // FeedStats retrieves statistics related to a feed.
 func (c UserCtx) FeedStats(id string) models.Stats {
-	return c.db.FeedStats(id, c.user)
+	return c.db.FeedStats(id)
 }
 
 // Stats retrieves stats about all resources owned by a user
 func (c UserCtx) Stats() models.Stats {
-	return c.db.Stats(c.user)
+	return c.db.Stats()
 }
 
 // MarkFeed applies a marker to a feed and its entries.
 func (c UserCtx) MarkFeed(id string, marker models.Marker) error {
-	return c.db.MarkFeed(id, marker, c.user)
+	return c.db.MarkFeed(id, marker)
 }
 
 // MarkCategory applies a marker to a category's feeds
 func (c UserCtx) MarkCategory(id string, marker models.Marker) error {
-	return c.db.MarkCategory(id, marker, c.user)
+	return c.db.MarkCategory(id, marker)
 }
 
 // MarkEntry applies a marker to an entry
 func (c UserCtx) MarkEntry(id string, marker models.Marker) error {
-	return c.db.MarkEntry(id, marker, c.user)
+	return c.db.MarkEntry(id, marker)
 }

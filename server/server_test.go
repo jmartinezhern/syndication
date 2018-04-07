@@ -48,7 +48,8 @@ type (
 	ServerTestSuite struct {
 		suite.Suite
 
-		db     *database.DB
+		gDB    *database.DB
+		db     database.UserDB
 		sync   *sync.Sync
 		server *Server
 		user   models.User
@@ -74,10 +75,12 @@ func RandStringRunes(n int) string {
 func (s *ServerTestSuite) SetupTest() {
 	randUserName := RandStringRunes(8)
 
-	user := s.db.NewUser(randUserName, "testtesttest")
+	user := s.gDB.NewUser(randUserName, "testtesttest")
+	s.db = s.gDB.NewUserDB(user)
+
 	s.Require().NotEmpty(user.APIID)
 
-	token, err := s.db.NewAPIKey(s.server.config.AuthSecret, &user)
+	token, err := s.db.NewAPIKey(s.server.config.AuthSecret, time.Hour*72)
 	s.Require().Nil(err)
 	s.Require().NotEmpty(token.Key)
 
@@ -86,7 +89,7 @@ func (s *ServerTestSuite) SetupTest() {
 }
 
 func (s *ServerTestSuite) TearDownTest() {
-	s.db.DeleteUser(s.user.APIID)
+	s.gDB.DeleteUser(s.user.APIID)
 }
 
 func (s *ServerTestSuite) TestPlugins() {
@@ -122,7 +125,7 @@ func (s *ServerTestSuite) TestNewFeed() {
 	s.Require().NotEmpty(respFeed.APIID)
 	s.NotEmpty(respFeed.Title)
 
-	dbFeed, found := s.db.FeedWithAPIID(respFeed.APIID, &s.user)
+	dbFeed, found := s.db.FeedWithAPIID(respFeed.APIID)
 	s.Require().True(found)
 	s.Equal(dbFeed.Title, respFeed.Title)
 }
@@ -143,7 +146,7 @@ func (s *ServerTestSuite) TestNewUnretrivableFeed() {
 
 func (s *ServerTestSuite) TestGetFeeds() {
 	for i := 0; i < 5; i++ {
-		feed := s.db.NewFeed("Feed "+strconv.Itoa(i+1), "http://example.com/feed", &s.user)
+		feed := s.db.NewFeed("Feed "+strconv.Itoa(i+1), "http://example.com/feed")
 		s.Require().NotEmpty(feed.APIID)
 	}
 
@@ -170,7 +173,7 @@ func (s *ServerTestSuite) TestGetFeeds() {
 }
 
 func (s *ServerTestSuite) TestGetFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL, &s.user)
+	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/feeds/"+feed.APIID, nil)
@@ -194,7 +197,7 @@ func (s *ServerTestSuite) TestGetFeed() {
 }
 
 func (s *ServerTestSuite) TestEditFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL, &s.user)
+	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
 	payload := []byte(`{"title": "EFF Updates"}`)
@@ -211,13 +214,13 @@ func (s *ServerTestSuite) TestEditFeed() {
 
 	s.Equal(204, resp.StatusCode)
 
-	respFeed, found := s.db.FeedWithAPIID(feed.APIID, &s.user)
+	respFeed, found := s.db.FeedWithAPIID(feed.APIID)
 	s.True(found)
 	s.Equal(respFeed.Title, "EFF Updates")
 }
 
 func (s *ServerTestSuite) TestDeleteFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL, &s.user)
+	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
 	req, err := http.NewRequest("DELETE", "http://localhost:9876/v1/feeds/"+feed.APIID, nil)
@@ -232,13 +235,13 @@ func (s *ServerTestSuite) TestDeleteFeed() {
 
 	s.Equal(204, resp.StatusCode)
 
-	_, found := s.db.FeedWithAPIID(feed.APIID, &s.user)
+	_, found := s.db.FeedWithAPIID(feed.APIID)
 	s.False(found)
 }
 
 func (s *ServerTestSuite) TestGetEntriesFromFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL, &s.user)
-	s.db.NewFeed(feed.Title, feed.Subscription, &s.user)
+	feed := s.db.NewFeed("World News", s.ts.URL)
+	s.db.NewFeed(feed.Title, feed.Subscription)
 	s.Require().NotEmpty(feed.APIID)
 
 	err := s.server.sync.SyncFeed(&feed, &s.user)
@@ -267,16 +270,16 @@ func (s *ServerTestSuite) TestGetEntriesFromFeed() {
 }
 
 func (s *ServerTestSuite) TestMarkFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL, &s.user)
+	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
 	err := s.server.sync.SyncFeed(&feed, &s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Unread, &s.user)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
 	s.Require().Len(entries, 5)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read, &s.user)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
 	s.Require().Len(entries, 0)
 
 	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/feeds/"+feed.APIID+"/mark?as=read", nil)
@@ -292,10 +295,10 @@ func (s *ServerTestSuite) TestMarkFeed() {
 
 	s.Equal(204, resp.StatusCode)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread, &s.user)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
 	s.Require().Len(entries, 0)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read, &s.user)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
 	s.Require().Len(entries, 5)
 }
 
@@ -320,7 +323,7 @@ func (s *ServerTestSuite) TestNewCategory() {
 	s.Require().NotEmpty(respCtg.APIID)
 	s.NotEmpty(respCtg.Name)
 
-	dbCtg, found := s.db.CategoryWithAPIID(respCtg.APIID, &s.user)
+	dbCtg, found := s.db.CategoryWithAPIID(respCtg.APIID)
 	s.True(found)
 	s.Equal(dbCtg.Name, respCtg.Name)
 }
@@ -346,14 +349,14 @@ func (s *ServerTestSuite) TestNewTag() {
 	s.Require().NotEmpty(respTag.APIID)
 	s.NotEmpty(respTag.Name)
 
-	dbTag, found := s.db.TagWithAPIID(respTag.APIID, &s.user)
+	dbTag, found := s.db.TagWithAPIID(respTag.APIID)
 	s.True(found)
 	s.Equal(dbTag.Name, respTag.Name)
 }
 
 func (s *ServerTestSuite) TestGetCategories() {
 	for i := 0; i < 5; i++ {
-		ctg := s.db.NewCategory("Category "+strconv.Itoa(i+1), &s.user)
+		ctg := s.db.NewCategory("Category " + strconv.Itoa(i+1))
 		s.Require().NotEmpty(ctg.APIID)
 	}
 
@@ -382,7 +385,7 @@ func (s *ServerTestSuite) TestGetCategories() {
 
 func (s *ServerTestSuite) TestGetTags() {
 	for i := 0; i < 5; i++ {
-		tag := s.db.NewTag("Tag "+strconv.Itoa(i+1), &s.user)
+		tag := s.db.NewTag("Tag " + strconv.Itoa(i+1))
 		s.Require().NotEmpty(tag.APIID)
 	}
 
@@ -410,7 +413,7 @@ func (s *ServerTestSuite) TestGetTags() {
 }
 
 func (s *ServerTestSuite) TestGetCategory() {
-	ctg := s.db.NewCategory("News", &s.user)
+	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/categories/"+ctg.APIID, nil)
@@ -434,7 +437,7 @@ func (s *ServerTestSuite) TestGetCategory() {
 }
 
 func (s *ServerTestSuite) TestGetTag() {
-	tag := s.db.NewTag("News", &s.user)
+	tag := s.db.NewTag("News")
 	s.Require().NotEmpty(tag.APIID)
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags/"+tag.APIID, nil)
@@ -458,7 +461,7 @@ func (s *ServerTestSuite) TestGetTag() {
 }
 
 func (s *ServerTestSuite) TestEditCategory() {
-	ctg := s.db.NewCategory("News", &s.user)
+	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
 
 	payload := []byte(`{"name": "World News"}`)
@@ -475,13 +478,13 @@ func (s *ServerTestSuite) TestEditCategory() {
 
 	s.Equal(204, resp.StatusCode)
 
-	editedCtg, found := s.db.CategoryWithAPIID(ctg.APIID, &s.user)
+	editedCtg, found := s.db.CategoryWithAPIID(ctg.APIID)
 	s.Require().True(found)
 	s.Equal(editedCtg.Name, "World News")
 }
 
 func (s *ServerTestSuite) TestEditTag() {
-	tag := s.db.NewTag("News", &s.user)
+	tag := s.db.NewTag("News")
 	s.Require().NotEmpty(tag.APIID)
 
 	payload := []byte(`{"name": "World News"}`)
@@ -498,13 +501,13 @@ func (s *ServerTestSuite) TestEditTag() {
 
 	s.Equal(204, resp.StatusCode)
 
-	editedTag, found := s.db.TagWithAPIID(tag.APIID, &s.user)
+	editedTag, found := s.db.TagWithAPIID(tag.APIID)
 	s.Require().True(found)
 	s.Equal(editedTag.Name, "World News")
 }
 
 func (s *ServerTestSuite) TestDeleteCategory() {
-	ctg := s.db.NewCategory("News", &s.user)
+	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
 
 	req, err := http.NewRequest("DELETE", "http://localhost:9876/v1/categories/"+ctg.APIID, nil)
@@ -519,12 +522,12 @@ func (s *ServerTestSuite) TestDeleteCategory() {
 
 	s.Equal(204, resp.StatusCode)
 
-	_, found := s.db.CategoryWithAPIID(ctg.APIID, &s.user)
+	_, found := s.db.CategoryWithAPIID(ctg.APIID)
 	s.False(found)
 }
 
 func (s *ServerTestSuite) TestDeleteTag() {
-	tag := s.db.NewTag("News", &s.user)
+	tag := s.db.NewTag("News")
 	s.Require().NotEmpty(tag.APIID)
 
 	req, err := http.NewRequest("DELETE", "http://localhost:9876/v1/tags/"+tag.APIID, nil)
@@ -539,15 +542,15 @@ func (s *ServerTestSuite) TestDeleteTag() {
 
 	s.Equal(204, resp.StatusCode)
 
-	_, found := s.db.CategoryWithAPIID(tag.APIID, &s.user)
+	_, found := s.db.CategoryWithAPIID(tag.APIID)
 	s.False(found)
 }
 
 func (s *ServerTestSuite) TestGetFeedsFromCategory() {
-	ctg := s.db.NewCategory("News", &s.user)
+	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
 
-	_, err := s.db.NewFeedWithCategory("Test feed", "http://localhost:9876", ctg.APIID, &s.user)
+	_, err := s.db.NewFeedWithCategory("Test feed", "http://localhost:9876", ctg.APIID)
 	s.Require().Nil(err)
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/categories/"+ctg.APIID+"/feeds", nil)
@@ -573,10 +576,10 @@ func (s *ServerTestSuite) TestGetFeedsFromCategory() {
 }
 
 func (s *ServerTestSuite) TestGetEntriesFromCategory() {
-	ctg := s.db.NewCategory("News", &s.user)
+	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
 
-	feed, err := s.db.NewFeedWithCategory("World News", s.ts.URL, ctg.APIID, &s.user)
+	feed, err := s.db.NewFeedWithCategory("World News", s.ts.URL, ctg.APIID)
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 
@@ -606,16 +609,16 @@ func (s *ServerTestSuite) TestGetEntriesFromCategory() {
 }
 
 func (s *ServerTestSuite) TestGetEntriesFromTag() {
-	tag := s.db.NewTag("News", &s.user)
+	tag := s.db.NewTag("News")
 	s.Require().NotEmpty(tag.APIID)
 
-	feed := s.db.NewFeed("World News", s.ts.URL, &s.user)
+	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
 	err := s.server.sync.SyncFeed(&feed, &s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 	s.Require().NotEmpty(entries)
 
 	entryAPIIDs := make([]string, len(entries))
@@ -623,7 +626,7 @@ func (s *ServerTestSuite) TestGetEntriesFromTag() {
 		entryAPIIDs[i] = entry.APIID
 	}
 
-	err = s.db.TagEntries(tag.APIID, entryAPIIDs, &s.user)
+	err = s.db.TagEntries(tag.APIID, entryAPIIDs)
 	s.Require().Nil(err)
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags/"+tag.APIID+"/entries", nil)
@@ -649,9 +652,9 @@ func (s *ServerTestSuite) TestGetEntriesFromTag() {
 }
 
 func (s *ServerTestSuite) TestTagEntries() {
-	tag := s.db.NewTag("News", &s.user)
+	tag := s.db.NewTag("News")
 
-	feed := s.db.NewFeed("Test site", "http://example.com", &s.user)
+	feed := s.db.NewFeed("Test site", "http://example.com")
 
 	type EntryIds struct {
 		Entries []string `json:"entries"`
@@ -670,10 +673,10 @@ func (s *ServerTestSuite) TestTagEntries() {
 		entries = append(entries, entry)
 	}
 
-	_, err := s.db.NewEntries(entries, feed.APIID, &s.user)
+	_, err := s.db.NewEntries(entries, feed.APIID)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 
 	entryAPIIDs := make([]string, len(entries))
 	for i, entry := range entries {
@@ -700,24 +703,24 @@ func (s *ServerTestSuite) TestTagEntries() {
 
 	s.Equal(http.StatusNoContent, resp.StatusCode)
 
-	taggedEntries := s.db.EntriesFromTag(tag.APIID, models.Any, true, &s.user)
+	taggedEntries := s.db.EntriesFromTag(tag.APIID, models.Any, true)
 	s.Len(taggedEntries, 5)
 }
 
 func (s *ServerTestSuite) TestMarkCategory() {
-	ctg := s.db.NewCategory("News", &s.user)
+	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
 
-	feed, err := s.db.NewFeedWithCategory("World News", s.ts.URL, ctg.APIID, &s.user)
+	feed, err := s.db.NewFeedWithCategory("World News", s.ts.URL, ctg.APIID)
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 
 	s.server.sync.SyncFeed(&feed, &s.user)
 
-	entries := s.db.EntriesFromCategory(ctg.APIID, true, models.Unread, &s.user)
+	entries := s.db.EntriesFromCategory(ctg.APIID, true, models.Unread)
 	s.Require().Len(entries, 5)
 
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Read, &s.user)
+	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Read)
 	s.Require().Len(entries, 0)
 
 	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/categories/"+ctg.APIID+"/mark?as=read", nil)
@@ -733,15 +736,15 @@ func (s *ServerTestSuite) TestMarkCategory() {
 
 	s.Equal(204, resp.StatusCode)
 
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Unread, &s.user)
+	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Unread)
 	s.Require().Len(entries, 0)
 
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Read, &s.user)
+	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Read)
 	s.Require().Len(entries, 5)
 }
 
 func (s *ServerTestSuite) TestGetEntries() {
-	feed := s.db.NewFeed("World News", s.ts.URL, &s.user)
+	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
 	err := s.server.sync.SyncFeed(&feed, &s.user)
@@ -770,7 +773,7 @@ func (s *ServerTestSuite) TestGetEntries() {
 }
 
 func (s *ServerTestSuite) TestGetEntry() {
-	feed := s.db.NewFeed("World News", s.ts.URL, &s.user)
+	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
 	entry := models.Entry{
@@ -778,7 +781,7 @@ func (s *ServerTestSuite) TestGetEntry() {
 		Link:  "http://localhost:9876/item_1",
 	}
 
-	entry, err := s.db.NewEntry(entry, feed.APIID, &s.user)
+	entry, err := s.db.NewEntry(entry, feed.APIID)
 	s.Require().Nil(err)
 	s.Require().NotEmpty(entry.APIID)
 
@@ -803,16 +806,16 @@ func (s *ServerTestSuite) TestGetEntry() {
 }
 
 func (s *ServerTestSuite) TestMarkEntry() {
-	feed := s.db.NewFeed("World News", s.ts.URL, &s.user)
+	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
 	err := s.server.sync.SyncFeed(&feed, &s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Read, &s.user)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Read)
 	s.Require().Len(entries, 0)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread, &s.user)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
 	s.Require().Len(entries, 5)
 
 	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/entries/"+entries[0].APIID+"/mark?as=read", nil)
@@ -828,15 +831,15 @@ func (s *ServerTestSuite) TestMarkEntry() {
 
 	s.Equal(204, resp.StatusCode)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread, &s.user)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
 	s.Require().Len(entries, 4)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read, &s.user)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
 	s.Require().Len(entries, 1)
 }
 
 func (s *ServerTestSuite) TestGetStatsForFeed() {
-	feed := s.db.NewFeed("News", "http://example.com", &s.user)
+	feed := s.db.NewFeed("News", "http://example.com")
 	s.Require().NotEmpty(feed.APIID)
 
 	for i := 0; i < 3; i++ {
@@ -847,7 +850,7 @@ func (s *ServerTestSuite) TestGetStatsForFeed() {
 			Saved: true,
 		}
 
-		s.db.NewEntry(entry, feed.APIID, &s.user)
+		s.db.NewEntry(entry, feed.APIID)
 	}
 
 	for i := 0; i < 7; i++ {
@@ -857,7 +860,7 @@ func (s *ServerTestSuite) TestGetStatsForFeed() {
 			Mark:  models.Unread,
 		}
 
-		s.db.NewEntry(entry, feed.APIID, &s.user)
+		s.db.NewEntry(entry, feed.APIID)
 	}
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/feeds/"+feed.APIID+"/stats", nil)
@@ -884,7 +887,7 @@ func (s *ServerTestSuite) TestGetStatsForFeed() {
 }
 
 func (s *ServerTestSuite) TestGetStats() {
-	feed := s.db.NewFeed("News", "http://example.com", &s.user)
+	feed := s.db.NewFeed("News", "http://example.com")
 	s.Require().NotEmpty(feed.APIID)
 
 	for i := 0; i < 3; i++ {
@@ -895,7 +898,7 @@ func (s *ServerTestSuite) TestGetStats() {
 			Saved: true,
 		}
 
-		s.db.NewEntry(entry, feed.APIID, &s.user)
+		s.db.NewEntry(entry, feed.APIID)
 	}
 
 	for i := 0; i < 7; i++ {
@@ -905,7 +908,7 @@ func (s *ServerTestSuite) TestGetStats() {
 			Mark:  models.Unread,
 		}
 
-		s.db.NewEntry(entry, feed.APIID, &s.user)
+		s.db.NewEntry(entry, feed.APIID)
 	}
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/entries/stats", nil)
@@ -932,10 +935,10 @@ func (s *ServerTestSuite) TestGetStats() {
 }
 
 func (s *ServerTestSuite) TestGetStatsForCategory() {
-	ctg := s.db.NewCategory("World", &s.user)
+	ctg := s.db.NewCategory("World")
 	s.Require().NotEmpty(ctg.APIID)
 
-	feed, err := s.db.NewFeedWithCategory("News", "http://example.com", ctg.APIID, &s.user)
+	feed, err := s.db.NewFeedWithCategory("News", "http://example.com", ctg.APIID)
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 
@@ -947,7 +950,7 @@ func (s *ServerTestSuite) TestGetStatsForCategory() {
 			Saved: true,
 		}
 
-		s.db.NewEntry(entry, feed.APIID, &s.user)
+		s.db.NewEntry(entry, feed.APIID)
 	}
 
 	for i := 0; i < 7; i++ {
@@ -957,7 +960,7 @@ func (s *ServerTestSuite) TestGetStatsForCategory() {
 			Mark:  models.Unread,
 		}
 
-		s.db.NewEntry(entry, feed.APIID, &s.user)
+		s.db.NewEntry(entry, feed.APIID)
 	}
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/categories/"+ctg.APIID+"/stats", nil)
@@ -984,9 +987,9 @@ func (s *ServerTestSuite) TestGetStatsForCategory() {
 }
 
 func (s *ServerTestSuite) TestAddFeedsToCategory() {
-	feed := s.db.NewFeed("Example Feed", "http://example.com/feed", &s.user)
+	feed := s.db.NewFeed("Example Feed", "http://example.com/feed")
 
-	ctg := s.db.NewCategory("Test", &s.user)
+	ctg := s.db.NewCategory("Test")
 
 	type FeedList struct {
 		Feeds []string `json:"feeds"`
@@ -1012,12 +1015,12 @@ func (s *ServerTestSuite) TestAddFeedsToCategory() {
 
 	s.Equal(http.StatusNoContent, resp.StatusCode)
 
-	feed, found := s.db.FeedWithAPIID(feed.APIID, &s.user)
+	feed, found := s.db.FeedWithAPIID(feed.APIID)
 	s.True(found)
 }
 
 func (s *ServerTestSuite) TestRegister() {
-	s.db.DeleteUser(s.user.APIID)
+	s.gDB.DeleteUser(s.user.APIID)
 
 	randUserName := RandStringRunes(8)
 	regResp, err := http.PostForm("http://localhost:9876/v1/register",
@@ -1026,7 +1029,7 @@ func (s *ServerTestSuite) TestRegister() {
 
 	s.Equal(204, regResp.StatusCode)
 
-	users := s.db.Users("username")
+	users := s.gDB.Users("username")
 	s.Len(users, 1)
 
 	s.Equal(randUserName, users[0].Username)
@@ -1035,7 +1038,7 @@ func (s *ServerTestSuite) TestRegister() {
 	err = regResp.Body.Close()
 	s.Nil(err)
 
-	s.db.DeleteUser(users[0].APIID)
+	s.gDB.DeleteUser(users[0].APIID)
 }
 
 func (s *ServerTestSuite) TestLogin() {
@@ -1064,13 +1067,13 @@ func (s *ServerTestSuite) TestLogin() {
 	s.Require().Nil(err)
 	s.NotEmpty(token.Token)
 
-	user, found := s.db.UserWithName(randUserName)
+	user, found := s.gDB.UserWithName(randUserName)
 	s.True(found)
 
 	err = loginResp.Body.Close()
 	s.Nil(err)
 
-	s.db.DeleteUser(user.APIID)
+	s.gDB.DeleteUser(user.APIID)
 }
 
 func (s *ServerTestSuite) TestLoginWithNonExistentUser() {
@@ -1090,9 +1093,9 @@ func (s *ServerTestSuite) TestLoginWithBadPassword() {
 		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
 	s.Require().Nil(err)
 
-	user, found := s.db.UserWithName(randUserName)
+	user, found := s.gDB.UserWithName(randUserName)
 	s.Require().True(found)
-	defer s.db.DeleteUser(user.APIID)
+	defer s.gDB.DeleteUser(user.APIID)
 
 	s.Equal(204, regResp.StatusCode)
 
@@ -1134,31 +1137,31 @@ func (s *ServerTestSuite) TestOPMLImport() {
 
 	s.Equal(http.StatusNoContent, resp.StatusCode)
 
-	ctgs := s.db.Categories(&s.user)
+	ctgs := s.db.Categories()
 	s.Require().Len(ctgs, 2)
 
-	sportsCtg, ok := s.db.CategoryWithName("Sports", &s.user)
+	sportsCtg, ok := s.db.CategoryWithName("Sports")
 	s.Require().True(ok)
 
-	sportsFeeds := s.db.FeedsFromCategory(sportsCtg.APIID, &s.user)
+	sportsFeeds := s.db.FeedsFromCategory(sportsCtg.APIID)
 	s.Require().Len(sportsFeeds, 1)
 	s.Equal("Basketball", sportsFeeds[0].Title)
 
-	unctgCtg, ok := s.db.CategoryWithName(models.Uncategorized, &s.user)
+	unctgCtg, ok := s.db.CategoryWithName(models.Uncategorized)
 	s.Require().True(ok)
 
-	unctgFeeds := s.db.FeedsFromCategory(unctgCtg.APIID, &s.user)
+	unctgFeeds := s.db.FeedsFromCategory(unctgCtg.APIID)
 	s.Require().Len(unctgFeeds, 1)
 	s.Equal("Baseball", unctgFeeds[0].Title)
 }
 
 func (s *ServerTestSuite) TestOPMLExport() {
-	ctg := s.db.NewCategory("Sports", &s.user)
+	ctg := s.db.NewCategory("Sports")
 
-	bsktblFeed, err := s.db.NewFeedWithCategory("Basketball", "http://example.com/basketball", ctg.APIID, &s.user)
+	bsktblFeed, err := s.db.NewFeedWithCategory("Basketball", "http://example.com/basketball", ctg.APIID)
 	s.Require().Nil(err)
 
-	bsblFeed := s.db.NewFeed("Baseball", "http://example.com/baseball", &s.user)
+	bsblFeed := s.db.NewFeed("Baseball", "http://example.com/baseball")
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/export", nil)
 	s.Require().Nil(err)
@@ -1205,7 +1208,7 @@ func (s *ServerTestSuite) startServer() {
 	conf.Server.EnableRequestLogs = false
 
 	var err error
-	s.db, err = database.NewDB(config.Database{
+	s.gDB, err = database.NewDB(config.Database{
 		Type:       "sqlite3",
 		Connection: TestDBPath,
 		APIKeyExpiration: config.Duration{
@@ -1214,7 +1217,7 @@ func (s *ServerTestSuite) startServer() {
 	})
 	s.Require().Nil(err)
 
-	s.sync = sync.NewSync(s.db, config.Sync{
+	s.sync = sync.NewSync(s.gDB, config.Sync{
 		SyncInterval: config.Duration{Duration: time.Second * 5},
 	})
 
@@ -1222,7 +1225,7 @@ func (s *ServerTestSuite) startServer() {
 		plgnPath := []string{os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/api.so"}
 		plgns := plugins.NewPlugins(plgnPath)
 
-		s.server = NewServer(s.db, s.sync, &plgns, conf.Server)
+		s.server = NewServer(s.gDB, s.sync, &plgns, conf.Server)
 		s.server.handle.HideBanner = true
 		go s.server.Start()
 	}

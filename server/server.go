@@ -42,7 +42,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-const echoSyndUserKey = "syndUser"
+const echoSyndUserDBKey = "syndUserDB"
 
 var unauthorizedPaths []string
 
@@ -138,18 +138,20 @@ func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
 			})
 		}
 
+		userDB := s.db.NewUserDB(user)
+
 		key := models.APIKey{
 			Key: userClaim.Raw,
 		}
 
-		found = s.db.KeyBelongsToUser(key, &user)
+		found = userDB.KeyBelongsToUser(key)
 		if !found {
 			return c.JSON(http.StatusUnauthorized, ErrorResp{
 				Message: "Credentials are invalid",
 			})
 		}
 
-		c.Set(echoSyndUserKey, user)
+		c.Set(echoSyndUserDBKey, userDB)
 
 		return next(c)
 	}
@@ -172,11 +174,11 @@ func (s *Server) OptionsHandler(c echo.Context) error {
 	return c.NoContent(200)
 }
 
-func (s *Server) exportFeeds(exporter importer.FeedImporter, user *models.User) ([]byte, error) {
-	ctgs := s.db.Categories(user)
+func (s *Server) exportFeeds(exporter importer.FeedImporter, userDB *database.UserDB) ([]byte, error) {
+	ctgs := userDB.Categories()
 
 	for idx, ctg := range ctgs {
-		ctg.Feeds = s.db.FeedsFromCategory(ctg.APIID, user)
+		ctg.Feeds = userDB.FeedsFromCategory(ctg.APIID)
 		ctgs[idx] = ctg
 	}
 
@@ -184,7 +186,7 @@ func (s *Server) exportFeeds(exporter importer.FeedImporter, user *models.User) 
 }
 
 func (s *Server) Export(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	contType := c.Request().Header.Get("Accept")
 
@@ -192,7 +194,7 @@ func (s *Server) Export(c echo.Context) error {
 	var err error
 	switch contType {
 	case "application/xml":
-		data, err = s.exportFeeds(importer.NewOPMLImporter(), &user)
+		data, err = s.exportFeeds(importer.NewOPMLImporter(), &userDB)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
@@ -204,7 +206,7 @@ func (s *Server) Export(c echo.Context) error {
 }
 
 func (s *Server) Import(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	contLength := c.Request().ContentLength
 	if contLength <= 0 {
@@ -224,7 +226,7 @@ func (s *Server) Import(c echo.Context) error {
 
 	switch contType {
 	case "application/xml":
-		err = s.importFeeds(data, importer.NewOPMLImporter(), &user)
+		err = s.importFeeds(data, importer.NewOPMLImporter(), &userDB)
 	}
 
 	if err != nil {
@@ -234,23 +236,23 @@ func (s *Server) Import(c echo.Context) error {
 	return echo.NewHTTPError(http.StatusNoContent)
 }
 
-func (s *Server) importFeeds(data []byte, reqImporter importer.FeedImporter, user *models.User) error {
+func (s *Server) importFeeds(data []byte, reqImporter importer.FeedImporter, userDB *database.UserDB) error {
 	feeds := reqImporter.Import(data)
 	for _, feed := range feeds {
 		if feed.Category.Name != "" {
 			dbCtg := models.Category{}
-			if ctg, ok := s.db.CategoryWithName(feed.Category.Name, user); ok {
+			if ctg, ok := userDB.CategoryWithName(feed.Category.Name); ok {
 				dbCtg = ctg
 			} else {
-				dbCtg = s.db.NewCategory(feed.Category.Name, user)
+				dbCtg = userDB.NewCategory(feed.Category.Name)
 			}
 
-			_, err := s.db.NewFeedWithCategory(feed.Title, feed.Subscription, dbCtg.APIID, user)
+			_, err := userDB.NewFeedWithCategory(feed.Title, feed.Subscription, dbCtg.APIID)
 			if err != nil {
 				return err
 			}
 		} else {
-			s.db.NewFeed(feed.Title, feed.Subscription, user)
+			userDB.NewFeed(feed.Title, feed.Subscription)
 		}
 	}
 
@@ -379,9 +381,9 @@ func (s *Server) registerEndpoint(endpoint plugins.Endpoint) {
 	handlerWrapper := func(c echo.Context) error {
 		var ctx plugins.APICtx
 		var userCtx plugins.UserCtx
-		user, ok := c.Get(echoSyndUserKey).(models.User)
+		userDB, ok := c.Get(echoSyndUserDBKey).(database.UserDB)
 		if endpoint.NeedsUser && ok {
-			userCtx = plugins.NewUserCtx(s.db, &user)
+			userCtx = plugins.NewUserCtx(userDB)
 			ctx = plugins.APICtx{User: &userCtx}
 		} else {
 			ctx = plugins.APICtx{}

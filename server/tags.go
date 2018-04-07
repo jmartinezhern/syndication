@@ -27,29 +27,29 @@ import (
 
 // NewTag creates a new Tag
 func (s *Server) NewTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	tag := models.Tag{}
 	if err := c.Bind(&tag); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	if _, found := s.db.TagWithName(tag.Name, &user); found {
+	if _, found := userDB.TagWithName(tag.Name); found {
 		return c.JSON(http.StatusConflict, ErrorResp{
 			Message: "Tag already exists",
 		})
 	}
 
-	tag = s.db.NewTag(tag.Name, &user)
+	tag = userDB.NewTag(tag.Name)
 
 	return c.JSON(http.StatusCreated, tag)
 }
 
 // GetTags returns a list of Tags owned by a user
 func (s *Server) GetTags(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
-	tags := s.db.Tags(&user)
+	tags := userDB.Tags()
 
 	type Tags struct {
 		Tags []models.Tag `json:"tags"`
@@ -62,17 +62,17 @@ func (s *Server) GetTags(c echo.Context) error {
 
 // DeleteTag with id
 func (s *Server) DeleteTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	tagID := c.Param("tagID")
 
-	if _, found := s.db.TagWithAPIID(tagID, &user); !found {
+	if _, found := userDB.TagWithAPIID(tagID); !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Tag does not exist",
 		})
 	}
 
-	err := s.db.DeleteTag(tagID, &user)
+	err := userDB.DeleteTag(tagID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResp{
 			Message: "Tag could no be deleted",
@@ -84,7 +84,7 @@ func (s *Server) DeleteTag(c echo.Context) error {
 
 // EditTag with id
 func (s *Server) EditTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	tag := models.Tag{}
 	tagID := c.Param("tagID")
@@ -93,7 +93,7 @@ func (s *Server) EditTag(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err := s.db.EditTagName(tagID, tag.Name, &user)
+	err := userDB.EditTagName(tagID, tag.Name)
 	if err == database.ErrModelNotFound {
 		return c.JSON(http.StatusNotFound, ErrorResp{
 			"Tag does not exist",
@@ -105,9 +105,9 @@ func (s *Server) EditTag(c echo.Context) error {
 
 // TagEntries adds a Tag with tagID to a list of entries
 func (s *Server) TagEntries(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
-	tag, found := s.db.TagWithAPIID(c.Param("tagID"), &user)
+	tag, found := userDB.TagWithAPIID(c.Param("tagID"))
 	if !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Tag does not exist",
@@ -123,13 +123,13 @@ func (s *Server) TagEntries(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	if _, found := s.db.TagWithAPIID(tag.APIID, &user); !found {
+	if _, found := userDB.TagWithAPIID(tag.APIID); !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Tag does not exist",
 		})
 	}
 
-	err := s.db.TagEntries(tag.APIID, entryIds.Entries, &user)
+	err := userDB.TagEntries(tag.APIID, entryIds.Entries)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResp{
 			Message: "Tag entries could no be fetched",
@@ -141,9 +141,9 @@ func (s *Server) TagEntries(c echo.Context) error {
 
 // GetTag with id
 func (s *Server) GetTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
-	tag, found := s.db.TagWithAPIID(c.Param("tagID"), &user)
+	tag, found := userDB.TagWithAPIID(c.Param("tagID"))
 	if !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Tag does not exist",
@@ -156,14 +156,14 @@ func (s *Server) GetTag(c echo.Context) error {
 // GetEntriesFromTag returns a list of Entries
 // that are tagged by a Tag with ID
 func (s *Server) GetEntriesFromTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	tag, found := s.db.TagWithAPIID(c.Param("tagID"), &user)
+	tag, found := userDB.TagWithAPIID(c.Param("tagID"))
 	if !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Tag does not exist",
@@ -175,7 +175,7 @@ func (s *Server) GetEntriesFromTag(c echo.Context) error {
 		withMarker = models.Any
 	}
 
-	entries := s.db.EntriesFromTag(tag.APIID, withMarker, true, &user)
+	entries := userDB.EntriesFromTag(tag.APIID, withMarker, true)
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`

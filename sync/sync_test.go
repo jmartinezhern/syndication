@@ -40,7 +40,8 @@ type (
 		suite.Suite
 
 		user   models.User
-		db     *database.DB
+		db     database.UserDB
+		gDB    *database.DB
 		sync   *Sync
 		server *http.Server
 	}
@@ -64,65 +65,66 @@ func (s *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *SyncTestSuite) SetupTest() {
 	randUserName := RandStringRunes(8)
-	s.user = s.db.NewUser(randUserName, "golang")
+	s.user = s.gDB.NewUser(randUserName, "golang")
+	s.db = s.gDB.NewUserDB(s.user)
 	s.Require().NotEmpty(s.user.APIID)
 }
 
 func (s *SyncTestSuite) TearDownTest() {
-	s.db.DeleteUser(s.user.APIID)
+	s.gDB.DeleteUser(s.user.APIID)
 }
 
 func (s *SyncTestSuite) TestFeedWithNonMatchingEtag() {
-	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml", &s.user)
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	err := s.sync.SyncFeed(&feed, &s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestFeedWithMatchingEtag() {
-	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml", &s.user)
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	feed.Etag = RSSFeedEtag
 
-	err := s.db.EditFeed(&feed, &s.user)
+	err := s.db.EditFeed(&feed)
 	s.Require().Nil(err)
 
 	err = s.sync.SyncFeed(&feed, &s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 	s.Len(entries, 0)
 }
 
 func (s *SyncTestSuite) TestFeedWithRecentLastUpdateDate() {
-	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml", &s.user)
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	feed.LastUpdated = time.Now()
 
-	err := s.db.EditFeed(&feed, &s.user)
+	err := s.db.EditFeed(&feed)
 	s.Require().Nil(err)
 
 	err = s.sync.SyncFeed(&feed, &s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 	s.Len(entries, 0)
 }
 
 func (s *SyncTestSuite) TestFeedWithNewEntriesWithGUIDs() {
-	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml", &s.user)
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	err := s.sync.SyncFeed(&feed, &s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 	s.Require().Nil(err)
 	s.Len(entries, 5)
 
@@ -131,62 +133,65 @@ func (s *SyncTestSuite) TestFeedWithNewEntriesWithGUIDs() {
 	err = s.sync.SyncFeed(&feed, &s.user)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 	s.Require().Nil(err)
 	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestFeedWithNewEntriesWithoutGUIDs() {
-	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss_minimal.xml", &s.user)
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss_minimal.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	err := s.sync.SyncFeed(&feed, &s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 	s.Require().Nil(err)
 	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestSyncUser() {
-	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss_minimal.xml", &s.user)
+	feed := s.db.NewFeed("Sync Test", "http://localhost:9090/rss_minimal.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	err := s.sync.SyncUser(&s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any, &s.user)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 	s.Require().Nil(err)
 	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestSyncUsers() {
 	for i := 0; i < 10; i++ {
-		user := s.db.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
+		user := s.gDB.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
 
-		_, found := s.db.UserWithName("test" + strconv.Itoa(i))
+		_, found := s.gDB.UserWithName("test" + strconv.Itoa(i))
 		s.Require().True(found)
 
-		s.db.NewFeed("Sync Test", "http://localhost:9090/rss_minimal.xml", &user)
+		userDB := s.gDB.NewUserDB(user)
+
+		userDB.NewFeed("Sync Test", "http://localhost:9090/rss_minimal.xml")
 	}
 
-	s.sync = NewSync(s.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 2}})
+	s.sync = NewSync(s.gDB, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 2}})
 
 	s.sync.SyncUsers()
 
 	s.sync.userWaitGroup.Wait()
 
-	users := s.db.Users()
+	users := s.gDB.Users()
 	users = users[1:]
 
 	for _, user := range users {
-		entries := s.db.Entries(true, models.Any, &user)
+		userDB := s.gDB.NewUserDB(user)
+		entries := userDB.Entries(true, models.Any)
 		s.Len(entries, 5)
 	}
 }
 
 func (s *SyncTestSuite) startServer() {
-	s.db, _ = database.NewDB(config.Database{
+	s.gDB, _ = database.NewDB(config.Database{
 		Type:       "sqlite3",
 		Connection: TestDatabasePath,
 	})
@@ -200,7 +205,7 @@ func (s *SyncTestSuite) startServer() {
 
 	time.Sleep(time.Second)
 
-	s.sync = NewSync(s.db, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
+	s.sync = NewSync(s.gDB, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 }
 
 func TestSyncTestSuite(t *testing.T) {
@@ -209,7 +214,7 @@ func TestSyncTestSuite(t *testing.T) {
 
 	suite.Run(t, &syncSuite)
 
-	syncSuite.db.Close()
+	syncSuite.gDB.Close()
 	syncSuite.server.Close()
 	os.Remove(TestDatabasePath)
 }

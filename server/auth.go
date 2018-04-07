@@ -19,6 +19,7 @@ package server
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo"
 )
@@ -35,7 +36,9 @@ func (s *Server) Login(c echo.Context) error {
 		})
 	}
 
-	key, err := s.db.NewAPIKey(s.config.AuthSecret, &user)
+	userDB := s.db.NewUserDB(user)
+
+	key, err := userDB.NewAPIKey(s.config.AuthSecret, time.Hour*72)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError)
 	}

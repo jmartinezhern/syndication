@@ -21,22 +21,23 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo"
+	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 )
 
 // NewFeed creates a new feed
 func (s *Server) NewFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	feed := models.Feed{}
 	if err := c.Bind(&feed); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feed = s.db.NewFeed(feed.Title, feed.Subscription, &user)
+	feed = userDB.NewFeed(feed.Title, feed.Subscription)
 
 	/* TODO
-	err := s.sync.SyncFeed(&feed, &user)
+	err := s.sync.SyncFeed(&feed)
 	if err != nil {
 		return newError(err, &c)
 	}*/
@@ -46,9 +47,9 @@ func (s *Server) NewFeed(c echo.Context) error {
 
 // GetFeeds returns a list of subscribed feeds
 func (s *Server) GetFeeds(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
-	feeds := s.db.Feeds(&user)
+	feeds := userDB.Feeds()
 
 	type Feeds struct {
 		Feeds []models.Feed `json:"feeds"`
@@ -61,9 +62,9 @@ func (s *Server) GetFeeds(c echo.Context) error {
 
 // GetFeed with id
 func (s *Server) GetFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
-	feed, found := s.db.FeedWithAPIID(c.Param("feedID"), &user)
+	feed, found := userDB.FeedWithAPIID(c.Param("feedID"))
 	if !found {
 		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Feed does not exist",
@@ -75,7 +76,7 @@ func (s *Server) GetFeed(c echo.Context) error {
 
 // EditFeed with id
 func (s *Server) EditFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	feed := models.Feed{}
 
@@ -85,13 +86,13 @@ func (s *Server) EditFeed(c echo.Context) error {
 
 	feed.APIID = c.Param("feedID")
 
-	if _, found := s.db.FeedWithAPIID(feed.APIID, &user); !found {
+	if _, found := userDB.FeedWithAPIID(feed.APIID); !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Feed does not exist",
 		})
 	}
 
-	err := s.db.EditFeed(&feed, &user)
+	err := userDB.EditFeed(&feed)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResp{
 			Message: "Feed could not be edited",
@@ -103,16 +104,16 @@ func (s *Server) EditFeed(c echo.Context) error {
 
 // DeleteFeed with id
 func (s *Server) DeleteFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	feedID := c.Param("feedID")
 
-	if _, found := s.db.FeedWithAPIID(feedID, &user); !found {
+	if _, found := userDB.FeedWithAPIID(feedID); !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Feed does not exist",
 		})
 	}
-	err := s.db.DeleteFeed(feedID, &user)
+	err := userDB.DeleteFeed(feedID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResp{
 			Message: "Feed could not be deleted",
@@ -124,7 +125,7 @@ func (s *Server) DeleteFeed(c echo.Context) error {
 
 // MarkFeed applies a Marker to a Feed
 func (s *Server) MarkFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	feedID := c.Param("feedID")
 
@@ -133,13 +134,13 @@ func (s *Server) MarkFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
-	if _, found := s.db.FeedWithAPIID(feedID, &user); !found {
+	if _, found := userDB.FeedWithAPIID(feedID); !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Feed does not exist",
 		})
 	}
 
-	err := s.db.MarkFeed(feedID, marker, &user)
+	err := userDB.MarkFeed(feedID, marker)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResp{
 			Message: "Feed could not be marked",
@@ -151,14 +152,14 @@ func (s *Server) MarkFeed(c echo.Context) error {
 
 // GetEntriesFromFeed returns a list of entries provided from a feed
 func (s *Server) GetEntriesFromFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feed, found := s.db.FeedWithAPIID(c.Param("feedID"), &user)
+	feed, found := userDB.FeedWithAPIID(c.Param("feedID"))
 	if !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Feed does not exist",
@@ -170,10 +171,10 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 		markedAs = models.Any
 	}
 
-	entries := s.db.EntriesFromFeed(feed.APIID,
+	entries := userDB.EntriesFromFeed(feed.APIID,
 		convertOrderByParamToValue(params.OrderBy),
 		markedAs,
-		&user)
+	)
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
@@ -186,16 +187,16 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 
 // GetStatsForFeed provides statistics related to a Feed
 func (s *Server) GetStatsForFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	feedID := c.Param("feedID")
 
-	if _, found := s.db.FeedWithAPIID(feedID, &user); !found {
+	if _, found := userDB.FeedWithAPIID(feedID); !found {
 		return c.JSON(http.StatusBadRequest, ErrorResp{
 			Message: "Feed does not exist",
 		})
 	}
 
 	return c.JSON(http.StatusOK,
-		s.db.FeedStats(feedID, &user))
+		userDB.FeedStats(feedID))
 }
