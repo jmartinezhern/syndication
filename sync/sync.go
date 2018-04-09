@@ -19,6 +19,7 @@ package sync
 
 import (
 	"crypto/md5"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -33,6 +34,10 @@ import (
 
 const maxThreads = 100
 
+var (
+	FeedParseErr = errors.New("Could not parse feed")
+)
+
 type userPool struct {
 	users []models.User
 	lock  sync.Mutex
@@ -45,35 +50,8 @@ const (
 
 type syncStatus = int
 
-//Error identifies error caused by database queries
-type Error interface {
-	String() string
-	Code() int
-	Error() string
-}
-
-type (
-	// BadRequest is a SyncError returned when a feed could not be fetched.
-	BadRequest struct {
-		msg string
-	}
-)
-
-func (e BadRequest) Error() string {
-	return e.msg
-}
-
-func (e BadRequest) String() string {
-	return "Bad Request"
-}
-
-// Code returns BadRequest's corresponding error code
-func (e BadRequest) Code() int {
-	return 400
-}
-
-// Sync represents a syncing worker.
-type Sync struct {
+// SyncService
+type SyncService struct {
 	ticker        *time.Ticker
 	db            *database.DB
 	userPool      userPool
@@ -103,80 +81,42 @@ func (p *userPool) put(user models.User) {
 	p.users = append(p.users, user)
 }
 
-func (s *Sync) updatedFeed(feed *models.Feed) (gofeed.Feed, bool) {
+func fetchFeed(url, etag string) (gofeed.Feed, error) {
 	client := &http.Client{
 		CheckRedirect: (func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse }),
 	}
 
-	req, err := http.NewRequest("GET", feed.Subscription, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Error(err)
-		return gofeed.Feed{}, false
+		return gofeed.Feed{}, err
 	}
 
-	req.Header.Add("If-None-Match", feed.Etag)
+	req.Header.Add("If-None-Match", etag)
 
 	resp, err := client.Do(req)
 	defer func() {
 		if err = resp.Body.Close(); err != nil {
-			log.Error(err)
+			log.Warn(err)
 		}
 	}()
 
 	if err != nil {
-		log.Error(err)
-		return gofeed.Feed{}, false
+		return gofeed.Feed{}, err
 	}
 
-	fp := gofeed.NewParser()
-	fetchedFeed, err := fp.Parse(resp.Body)
-
+	fetchedFeed, err := gofeed.NewParser().Parse(resp.Body)
 	if err != nil {
-		return gofeed.Feed{}, false
+		return gofeed.Feed{}, err
 	}
 
-	if fetchedFeed == nil ||
-		(fetchedFeed.UpdatedParsed != nil && !fetchedFeed.UpdatedParsed.After(feed.LastUpdated)) ||
-		fetchedFeed.Items == nil || len(fetchedFeed.Items) == 0 {
-		return gofeed.Feed{}, false
+	if fetchedFeed == nil {
+		return gofeed.Feed{}, FeedParseErr
 	}
 
-	return *fetchedFeed, true
+	return *fetchedFeed, nil
 }
 
-func itemGUID(item *gofeed.Item) string {
-	if item.GUID != "" {
-		return item.GUID
-	}
-
-	itemHash := md5.Sum([]byte(item.Title + item.Link))
-	return string(itemHash[:md5.Size])
-}
-
-func (s *Sync) getEntriesFromUpdatedFeed(feed *models.Feed, fetchedFeed gofeed.Feed, user *models.User) []models.Entry {
-	var entries []models.Entry
-	for _, item := range fetchedFeed.Items {
-
-		s.dbLock.Lock()
-		userDB := s.db.NewUserDB(*user)
-		if found := userDB.EntryWithGUIDExists(itemGUID(item), feed.APIID); found {
-			s.dbLock.Unlock()
-			continue
-		}
-		s.dbLock.Unlock()
-
-		entries = append(entries, convertItemsToEntries(item))
-	}
-
-	feed.Title = fetchedFeed.Title
-	feed.Description = fetchedFeed.Description
-	feed.Source = fetchedFeed.Link
-	feed.LastUpdated = time.Now()
-
-	return entries
-}
-
-func convertItemsToEntries(item *gofeed.Item) models.Entry {
+func convertItemToEntry(item *gofeed.Item) models.Entry {
 	entry := models.Entry{
 		Title: item.Title,
 		Link:  item.Link,
@@ -193,13 +133,18 @@ func convertItemsToEntries(item *gofeed.Item) models.Entry {
 		entry.Published = time.Now()
 	}
 
-	entry.GUID = itemGUID(item)
+	if item.GUID != "" {
+		entry.GUID = item.GUID
+	} else {
+		itemHash := md5.Sum([]byte(item.Title + item.Link))
+		entry.GUID = string(itemHash[:md5.Size])
+	}
 
 	return entry
 }
 
 // SyncUsers sync's all user's feeds.
-func (s *Sync) SyncUsers() {
+func (s *SyncService) SyncUsers() {
 	s.dbLock.Lock()
 	users := s.db.Users()
 	s.dbLock.Unlock()
@@ -231,41 +176,56 @@ func (s *Sync) SyncUsers() {
 	}
 }
 
-// SyncFeed owned by user
-func (s *Sync) SyncFeed(feed *models.Feed, user *models.User) error {
-	if !time.Now().After(feed.LastUpdated.Add(time.Minute)) {
-		return nil
+func UpdateFeed(feed *models.Feed) ([]models.Entry, error) {
+	fetchedFeed, err := fetchFeed(feed.Subscription, feed.Etag)
+	if err != nil {
+		return nil, err
 	}
 
-	fetchedFeed, ok := s.updatedFeed(feed)
-	if !ok {
-		return nil
+	feed.Title = fetchedFeed.Title
+	feed.Description = fetchedFeed.Description
+	feed.Source = fetchedFeed.Link
+	feed.LastUpdated = time.Now()
+
+	entries := make([]models.Entry, len(fetchedFeed.Items))
+	for idx, item := range fetchedFeed.Items {
+		entries[idx] = convertItemToEntry(item)
 	}
 
-	entries := s.getEntriesFromUpdatedFeed(feed, fetchedFeed, user)
+	return entries, nil
+}
 
+// SyncUser sync's all feeds owned by user
+func (s *SyncService) SyncUser(user *models.User) error {
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
 	userDB := s.db.NewUserDB(*user)
-
-	err := userDB.EditFeed(feed)
-	if err != nil {
-		return err
-	}
-
-	_, err = userDB.NewEntries(entries, feed.APIID)
-	return err
-}
-
-// SyncUser sync's all feeds owned by user
-func (s *Sync) SyncUser(user *models.User) error {
-	s.dbLock.Lock()
-	userDB := s.db.NewUserDB(*user)
 	feeds := userDB.Feeds()
-	s.dbLock.Unlock()
 	for _, feed := range feeds {
-		if err := s.SyncFeed(&feed, user); err != nil {
+		if !time.Now().After(feed.LastUpdated.Add(s.interval)) {
+			continue
+		}
+
+		fetchedEntries, err := UpdateFeed(&feed)
+		if err != nil {
+			log.Error(err)
+		}
+
+		err = userDB.EditFeed(&feed)
+		if err != nil {
+			log.Error(err)
+		}
+
+		entries := []models.Entry{}
+		for _, entry := range fetchedEntries {
+			if found := userDB.EntryWithGUIDExists(entry.GUID, feed.APIID); !found {
+				entries = append(entries, entry)
+			}
+		}
+
+		_, err = userDB.NewEntries(entries, feed.APIID)
+		if err != nil {
 			log.Error(err)
 		}
 	}
@@ -273,7 +233,7 @@ func (s *Sync) SyncUser(user *models.User) error {
 	return nil
 }
 
-func (s *Sync) scheduleTask() {
+func (s *SyncService) scheduleTask() {
 	go func() {
 		for {
 			select {
@@ -288,23 +248,23 @@ func (s *Sync) scheduleTask() {
 	}()
 }
 
-// Start a syncer
-func (s *Sync) Start() {
+// Start a SyncService
+func (s *SyncService) Start() {
 	s.ticker = time.NewTicker(s.interval)
 	s.scheduleTask()
 }
 
-// Stop a syncer
-func (s *Sync) Stop() {
+// Stop a SyncService
+func (s *SyncService) Stop() {
 	s.ticker.Stop()
 	s.status <- stopping
 	<-s.status
 	s.userWaitGroup.Wait()
 }
 
-// NewSync creates a new Sync object
-func NewSync(db *database.DB, config config.Sync) *Sync {
-	return &Sync{
+// NewSyncService creates a new SyncService object
+func NewSyncService(db *database.DB, config config.Sync) SyncService {
+	return SyncService{
 		db:       db,
 		status:   make(chan syncStatus),
 		interval: config.SyncInterval.Duration,

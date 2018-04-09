@@ -34,7 +34,6 @@ import (
 	"github.com/varddum/syndication/importer"
 	"github.com/varddum/syndication/models"
 	"github.com/varddum/syndication/plugins"
-	"github.com/varddum/syndication/sync"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
@@ -59,7 +58,6 @@ type (
 	Server struct {
 		handle  *echo.Echo
 		db      *database.DB
-		sync    *sync.Sync
 		plugins *plugins.Plugins
 		config  config.Server
 		groups  map[string]*echo.Group
@@ -72,11 +70,10 @@ type (
 )
 
 // NewServer creates a new server instance
-func NewServer(db *database.DB, sync *sync.Sync, plugins *plugins.Plugins, config config.Server) *Server {
+func NewServer(db *database.DB, plugins *plugins.Plugins, config config.Server) *Server {
 	server := Server{
 		handle:  echo.New(),
 		db:      db,
-		sync:    sync,
 		plugins: plugins,
 		config:  config,
 		groups:  map[string]*echo.Group{},

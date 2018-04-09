@@ -50,7 +50,6 @@ type (
 
 		gDB    *database.DB
 		db     database.UserDB
-		sync   *sync.Sync
 		server *Server
 		user   models.User
 		token  string
@@ -116,7 +115,7 @@ func (s *ServerTestSuite) TestNewFeed() {
 	s.Require().Nil(err)
 	defer resp.Body.Close()
 
-	s.Equal(201, resp.StatusCode)
+	s.Equal(http.StatusCreated, resp.StatusCode)
 
 	respFeed := new(models.Feed)
 	err = json.NewDecoder(resp.Body).Decode(respFeed)
@@ -128,6 +127,11 @@ func (s *ServerTestSuite) TestNewFeed() {
 	dbFeed, found := s.db.FeedWithAPIID(respFeed.APIID)
 	s.Require().True(found)
 	s.Equal(dbFeed.Title, respFeed.Title)
+
+	entries := s.db.EntriesFromFeed(respFeed.APIID, false, models.Any)
+	s.Require().Len(entries, 5)
+
+	s.Equal("Item 1", entries[0].Title)
 }
 
 func (s *ServerTestSuite) TestNewUnretrivableFeed() {
@@ -244,7 +248,10 @@ func (s *ServerTestSuite) TestGetEntriesFromFeed() {
 	s.db.NewFeed(feed.Title, feed.Subscription)
 	s.Require().NotEmpty(feed.APIID)
 
-	err := s.server.sync.SyncFeed(&feed, &s.user)
+	entries, err := sync.UpdateFeed(&feed)
+	s.Require().Nil(err)
+
+	_, err = s.db.NewEntries(entries, feed.APIID)
 	s.Require().Nil(err)
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/feeds/"+feed.APIID+"/entries", nil)
@@ -273,10 +280,14 @@ func (s *ServerTestSuite) TestMarkFeed() {
 	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
-	err := s.server.sync.SyncFeed(&feed, &s.user)
+	entries, err := sync.UpdateFeed(&feed)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	_, err = s.db.NewEntries(entries, feed.APIID)
+	s.Require().Nil(err)
+	s.Require().Nil(err)
+
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
 	s.Require().Len(entries, 5)
 
 	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
@@ -583,7 +594,10 @@ func (s *ServerTestSuite) TestGetEntriesFromCategory() {
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 
-	err = s.server.sync.SyncFeed(&feed, &s.user)
+	entries, err := sync.UpdateFeed(&feed)
+	s.Require().Nil(err)
+
+	_, err = s.db.NewEntries(entries, feed.APIID)
 	s.Require().Nil(err)
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/categories/"+ctg.APIID+"/entries", nil)
@@ -615,10 +629,13 @@ func (s *ServerTestSuite) TestGetEntriesFromTag() {
 	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
-	err := s.server.sync.SyncFeed(&feed, &s.user)
+	entries, err := sync.UpdateFeed(&feed)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any)
+	_, err = s.db.NewEntries(entries, feed.APIID)
+	s.Require().Nil(err)
+
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any)
 	s.Require().NotEmpty(entries)
 
 	entryAPIIDs := make([]string, len(entries))
@@ -715,9 +732,13 @@ func (s *ServerTestSuite) TestMarkCategory() {
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 
-	s.server.sync.SyncFeed(&feed, &s.user)
+	entries, err := sync.UpdateFeed(&feed)
+	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromCategory(ctg.APIID, true, models.Unread)
+	_, err = s.db.NewEntries(entries, feed.APIID)
+	s.Require().Nil(err)
+
+	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Unread)
 	s.Require().Len(entries, 5)
 
 	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Read)
@@ -747,7 +768,10 @@ func (s *ServerTestSuite) TestGetEntries() {
 	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
-	err := s.server.sync.SyncFeed(&feed, &s.user)
+	entries, err := sync.UpdateFeed(&feed)
+	s.Require().Nil(err)
+
+	_, err = s.db.NewEntries(entries, feed.APIID)
 	s.Require().Nil(err)
 
 	req, err := http.NewRequest("GET", "http://localhost:9876/v1/entries", nil)
@@ -809,10 +833,13 @@ func (s *ServerTestSuite) TestMarkEntry() {
 	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
-	err := s.server.sync.SyncFeed(&feed, &s.user)
+	entries, err := sync.UpdateFeed(&feed)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Read)
+	_, err = s.db.NewEntries(entries, feed.APIID)
+	s.Require().Nil(err)
+
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
 	s.Require().Len(entries, 0)
 
 	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
@@ -1217,15 +1244,11 @@ func (s *ServerTestSuite) startServer() {
 	})
 	s.Require().Nil(err)
 
-	s.sync = sync.NewSync(s.gDB, config.Sync{
-		SyncInterval: config.Duration{Duration: time.Second * 5},
-	})
-
 	if s.server == nil {
 		plgnPath := []string{os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/api.so"}
 		plgns := plugins.NewPlugins(plgnPath)
 
-		s.server = NewServer(s.gDB, s.sync, &plgns, conf.Server)
+		s.server = NewServer(s.gDB, &plgns, conf.Server)
 		s.server.handle.HideBanner = true
 		go s.server.Start()
 	}

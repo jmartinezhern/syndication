@@ -88,7 +88,7 @@ func startApp(c *cli.Context) error {
 		return err
 	}
 
-	sync := sync.NewSync(db, conf.Sync)
+	sync := sync.NewSyncService(db, conf.Sync)
 
 	admin, err := admin.NewAdmin(db, conf.Admin.SocketPath)
 	if err != nil {
@@ -104,7 +104,7 @@ func startApp(c *cli.Context) error {
 
 	listenForInterrupt()
 
-	server := server.NewServer(db, sync, &plugins, conf.Server)
+	server := server.NewServer(db, &plugins, conf.Server)
 	go func() {
 		for sig := range intSignal {
 			if sig == os.Interrupt || sig == os.Kill {

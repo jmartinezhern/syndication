@@ -23,6 +23,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
+	"github.com/varddum/syndication/sync"
 )
 
 // NewFeed creates a new feed
@@ -34,13 +35,19 @@ func (s *Server) NewFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
+	entries, err := sync.UpdateFeed(&feed)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest)
+	}
+
 	feed = userDB.NewFeed(feed.Title, feed.Subscription)
 
-	/* TODO
-	err := s.sync.SyncFeed(&feed)
+	entries, err = userDB.NewEntries(entries, feed.APIID)
 	if err != nil {
-		return newError(err, &c)
-	}*/
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error)
+	}
+
+	feed.Entries = entries
 
 	return c.JSON(http.StatusCreated, feed)
 }
