@@ -26,7 +26,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"strconv"
 	"testing"
@@ -155,99 +154,6 @@ func (s *ServerTestSuite) TestGetStats() {
 	s.Equal(3, respStats.Read)
 	s.Equal(3, respStats.Saved)
 	s.Equal(10, respStats.Total)
-}
-
-func (s *ServerTestSuite) TestRegister() {
-	s.gDB.DeleteUser(s.user.APIID)
-
-	randUserName := RandStringRunes(8)
-	regResp, err := http.PostForm("http://localhost:9876/v1/register",
-		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
-
-	s.Equal(204, regResp.StatusCode)
-
-	users := s.gDB.Users("username")
-	s.Len(users, 1)
-
-	s.Equal(randUserName, users[0].Username)
-	s.NotEmpty(users[0].APIID)
-
-	err = regResp.Body.Close()
-	s.Nil(err)
-
-	s.gDB.DeleteUser(users[0].APIID)
-}
-
-func (s *ServerTestSuite) TestLogin() {
-	randUserName := RandStringRunes(8)
-	regResp, err := http.PostForm("http://localhost:9876/v1/register",
-		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
-
-	s.Equal(204, regResp.StatusCode)
-
-	err = regResp.Body.Close()
-	s.Require().Nil(err)
-
-	loginResp, err := http.PostForm("http://localhost:9876/v1/login",
-		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
-
-	s.Equal(200, loginResp.StatusCode)
-
-	type Token struct {
-		Token string `json:"token"`
-	}
-
-	var token Token
-	err = json.NewDecoder(loginResp.Body).Decode(&token)
-	s.Require().Nil(err)
-	s.NotEmpty(token.Token)
-
-	user, found := s.gDB.UserWithName(randUserName)
-	s.True(found)
-
-	err = loginResp.Body.Close()
-	s.Nil(err)
-
-	s.gDB.DeleteUser(user.APIID)
-}
-
-func (s *ServerTestSuite) TestLoginWithNonExistentUser() {
-	loginResp, err := http.PostForm("http://localhost:9876/v1/login",
-		url.Values{"username": {"bogus"}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
-
-	s.Equal(401, loginResp.StatusCode)
-
-	err = loginResp.Body.Close()
-	s.Nil(err)
-}
-
-func (s *ServerTestSuite) TestLoginWithBadPassword() {
-	randUserName := RandStringRunes(8)
-	regResp, err := http.PostForm("http://localhost:9876/v1/register",
-		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
-
-	user, found := s.gDB.UserWithName(randUserName)
-	s.Require().True(found)
-	defer s.gDB.DeleteUser(user.APIID)
-
-	s.Equal(204, regResp.StatusCode)
-
-	err = regResp.Body.Close()
-	s.Require().Nil(err)
-
-	loginResp, err := http.PostForm("http://localhost:9876/v1/login",
-		url.Values{"username": {randUserName}, "password": {"bogus"}})
-	s.Require().Nil(err)
-
-	s.Equal(401, loginResp.StatusCode)
-
-	err = loginResp.Body.Close()
-	s.Nil(err)
 }
 
 func (s *ServerTestSuite) TestOPMLImport() {
