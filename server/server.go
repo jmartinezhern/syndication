@@ -31,7 +31,6 @@ import (
 
 	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/importer"
 	"github.com/varddum/syndication/models"
 	"github.com/varddum/syndication/plugins"
 
@@ -171,7 +170,7 @@ func (s *Server) OptionsHandler(c echo.Context) error {
 	return c.NoContent(200)
 }
 
-func (s *Server) exportFeeds(exporter importer.FeedImporter, userDB *database.UserDB) ([]byte, error) {
+func (s *Server) exportFeeds(exporter models.FeedExporter, userDB *database.UserDB) ([]byte, error) {
 	ctgs := userDB.Categories()
 
 	for idx, ctg := range ctgs {
@@ -182,6 +181,10 @@ func (s *Server) exportFeeds(exporter importer.FeedImporter, userDB *database.Us
 	return exporter.Export(ctgs)
 }
 
+// Export feeds and categories out of Syndication.
+// Accept header must be set to a supported MIME type.
+// The current supported formats are:
+//    - OPML (application/xml)
 func (s *Server) Export(c echo.Context) error {
 	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
@@ -191,7 +194,7 @@ func (s *Server) Export(c echo.Context) error {
 	var err error
 	switch contType {
 	case "application/xml":
-		data, err = s.exportFeeds(importer.NewOPMLImporter(), &userDB)
+		data, err = s.exportFeeds(models.NewOPMLExporter(), &userDB)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
@@ -202,6 +205,10 @@ func (s *Server) Export(c echo.Context) error {
 	return echo.NewHTTPError(http.StatusBadRequest, "Accept header must be set to a supported value")
 }
 
+// Import feeds and categories into Syndication.
+// Content-Type header must be set to a supported MIME type.
+// The current supported formats are:
+//    - OPML (application/xml)
 func (s *Server) Import(c echo.Context) error {
 	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
@@ -223,7 +230,7 @@ func (s *Server) Import(c echo.Context) error {
 
 	switch contType {
 	case "application/xml":
-		err = s.importFeeds(data, importer.NewOPMLImporter(), &userDB)
+		err = s.importFeeds(data, models.NewOPMLImporter(), &userDB)
 	}
 
 	if err != nil {
@@ -233,7 +240,7 @@ func (s *Server) Import(c echo.Context) error {
 	return echo.NewHTTPError(http.StatusNoContent)
 }
 
-func (s *Server) importFeeds(data []byte, reqImporter importer.FeedImporter, userDB *database.UserDB) error {
+func (s *Server) importFeeds(data []byte, reqImporter models.FeedImporter, userDB *database.UserDB) error {
 	feeds := reqImporter.Import(data)
 	for _, feed := range feeds {
 		if feed.Category.Name != "" {

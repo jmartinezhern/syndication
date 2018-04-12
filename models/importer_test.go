@@ -15,13 +15,11 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package importer
+package models
 
 import (
 	"io/ioutil"
 	"testing"
-
-	"github.com/varddum/syndication/models"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -44,35 +42,36 @@ func (s *ImporterTestSuite) TestOPMLImport() {
 }
 
 func (s *ImporterTestSuite) TestOPMLExport() {
-	encoder := NewOPMLImporter()
+	exporter := NewOPMLExporter()
 
-	ctgs := []models.Category{
-		models.Category{
+	ctgs := []Category{
+		{
 			Name: "Sports",
 		},
-		models.Category{
-			Name: models.Uncategorized,
+		{
+			Name: Uncategorized,
 		},
 	}
 
-	ctgs[0].Feeds = []models.Feed{
-		models.Feed{
+	ctgs[0].Feeds = []Feed{
+		{
 			Title:        "Baseball",
 			Subscription: "http://example.com/baseball",
 		},
 	}
 
-	ctgs[1].Feeds = []models.Feed{
-		models.Feed{
+	ctgs[1].Feeds = []Feed{
+		{
 			Title:        "Baskeball",
 			Subscription: "http://example.com/basketball",
 		},
 	}
 
-	data, err := encoder.Export(ctgs)
+	data, err := exporter.Export(ctgs)
 	s.Require().Nil(err)
 
-	feeds := encoder.Import(data)
+	importer := NewOPMLImporter()
+	feeds := importer.Import(data)
 	s.Require().Len(feeds, 2)
 
 	s.Equal("Sports", feeds[0].Category.Name)

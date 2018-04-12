@@ -35,7 +35,9 @@ import (
 const maxThreads = 100
 
 var (
-	FeedParseErr = errors.New("Could not parse feed")
+	// ErrParsingFeed Signals that a an error occurred while processing
+	// a RSS or Atom Feed
+	ErrParsingFeed = errors.New("Could not parse feed")
 )
 
 type userPool struct {
@@ -50,8 +52,9 @@ const (
 
 type syncStatus = int
 
-// SyncService
-type SyncService struct {
+// Service defines properties for running a Feed Sync Service.
+// Service will update all feeds for all users periodically.
+type Service struct {
 	ticker        *time.Ticker
 	db            *database.DB
 	userPool      userPool
@@ -110,7 +113,7 @@ func fetchFeed(url, etag string) (gofeed.Feed, error) {
 	}
 
 	if fetchedFeed == nil {
-		return gofeed.Feed{}, FeedParseErr
+		return gofeed.Feed{}, ErrParsingFeed
 	}
 
 	return *fetchedFeed, nil
@@ -144,7 +147,7 @@ func convertItemToEntry(item *gofeed.Item) models.Entry {
 }
 
 // SyncUsers sync's all user's feeds.
-func (s *SyncService) SyncUsers() {
+func (s *Service) SyncUsers() {
 	s.dbLock.Lock()
 	users := s.db.Users()
 	s.dbLock.Unlock()
@@ -176,7 +179,10 @@ func (s *SyncService) SyncUsers() {
 	}
 }
 
-func UpdateFeed(feed *models.Feed) ([]models.Entry, error) {
+// PullFeed and return all entries for that feed. If getting the
+// subscription source or parsing the response fails, this function
+// will error.
+func PullFeed(feed *models.Feed) ([]models.Entry, error) {
 	fetchedFeed, err := fetchFeed(feed.Subscription, feed.Etag)
 	if err != nil {
 		return nil, err
@@ -196,7 +202,7 @@ func UpdateFeed(feed *models.Feed) ([]models.Entry, error) {
 }
 
 // SyncUser sync's all feeds owned by user
-func (s *SyncService) SyncUser(user *models.User) error {
+func (s *Service) SyncUser(user *models.User) error {
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
@@ -207,7 +213,7 @@ func (s *SyncService) SyncUser(user *models.User) error {
 			continue
 		}
 
-		fetchedEntries, err := UpdateFeed(&feed)
+		fetchedEntries, err := PullFeed(&feed)
 		if err != nil {
 			log.Error(err)
 		}
@@ -233,7 +239,7 @@ func (s *SyncService) SyncUser(user *models.User) error {
 	return nil
 }
 
-func (s *SyncService) scheduleTask() {
+func (s *Service) scheduleTask() {
 	go func() {
 		for {
 			select {
@@ -249,13 +255,13 @@ func (s *SyncService) scheduleTask() {
 }
 
 // Start a SyncService
-func (s *SyncService) Start() {
+func (s *Service) Start() {
 	s.ticker = time.NewTicker(s.interval)
 	s.scheduleTask()
 }
 
 // Stop a SyncService
-func (s *SyncService) Stop() {
+func (s *Service) Stop() {
 	s.ticker.Stop()
 	s.status <- stopping
 	<-s.status
@@ -263,8 +269,8 @@ func (s *SyncService) Stop() {
 }
 
 // NewSyncService creates a new SyncService object
-func NewSyncService(db *database.DB, config config.Sync) SyncService {
-	return SyncService{
+func NewSyncService(db *database.DB, config config.Sync) Service {
+	return Service{
 		db:       db,
 		status:   make(chan syncStatus),
 		interval: config.SyncInterval.Duration,

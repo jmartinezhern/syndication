@@ -50,7 +50,7 @@ type (
 		user   models.User
 		db     database.UserDB
 		gDB    *database.DB
-		sync   SyncService
+		sync   Service
 		server *http.Server
 	}
 )

@@ -18,6 +18,7 @@
 package models
 
 import (
+	"encoding/xml"
 	"strings"
 	"time"
 )
@@ -31,6 +32,10 @@ const (
 	Read
 	Unread
 	Any
+)
+
+const (
+	rssType = "rss"
 )
 
 const (
@@ -183,5 +188,28 @@ type (
 
 		User   User `json:"-"`
 		UserID uint `json:"-"`
+	}
+
+	// An OPMLOutline represents an OPML Outline element.
+	OPMLOutline struct {
+		XMLName xml.Name      `xml:"outline"`
+		Type    string        `xml:"type,attr"`
+		Text    string        `xml:"text,attr"`
+		Title   string        `xml:"title,attr"`
+		HTMLUrl string        `xml:"htmlUrl,attr"`
+		XMLUrl  string        `xml:"xmlUrl,attr"`
+		Items   []OPMLOutline `xml:"outline"`
+	}
+
+	// An OPMLBody represents an OPML Body element.
+	OPMLBody struct {
+		XMLName xml.Name      `xml:"body"`
+		Items   []OPMLOutline `xml:"outline"`
+	}
+
+	// OPML collects all elements of an OPML file.
+	OPML struct {
+		XMLName xml.Name `xml:"opml"`
+		Body    OPMLBody `xml:"body"`
 	}
 )

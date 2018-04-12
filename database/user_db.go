@@ -26,6 +26,8 @@ import (
 )
 
 type (
+	// A UserDB represents access to a SQL database in the context
+	// of a specific user.
 	UserDB struct {
 		db   *gorm.DB
 		user models.User
@@ -56,6 +58,7 @@ func (udb *UserDB) tagPrimaryKey(apiID string) uint {
 	return tag.ID
 }
 
+// NewUserDB creates a new UserDB instance
 func (db *DB) NewUserDB(user models.User) UserDB {
 	return UserDB{
 		db:   db.db,

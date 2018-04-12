@@ -36,7 +36,6 @@ import (
 
 	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/importer"
 	"github.com/varddum/syndication/models"
 	"github.com/varddum/syndication/plugins"
 	"github.com/varddum/syndication/sync"
@@ -248,7 +247,7 @@ func (s *ServerTestSuite) TestGetEntriesFromFeed() {
 	s.db.NewFeed(feed.Title, feed.Subscription)
 	s.Require().NotEmpty(feed.APIID)
 
-	entries, err := sync.UpdateFeed(&feed)
+	entries, err := sync.PullFeed(&feed)
 	s.Require().Nil(err)
 
 	_, err = s.db.NewEntries(entries, feed.APIID)
@@ -280,7 +279,7 @@ func (s *ServerTestSuite) TestMarkFeed() {
 	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
-	entries, err := sync.UpdateFeed(&feed)
+	entries, err := sync.PullFeed(&feed)
 	s.Require().Nil(err)
 
 	_, err = s.db.NewEntries(entries, feed.APIID)
@@ -594,7 +593,7 @@ func (s *ServerTestSuite) TestGetEntriesFromCategory() {
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 
-	entries, err := sync.UpdateFeed(&feed)
+	entries, err := sync.PullFeed(&feed)
 	s.Require().Nil(err)
 
 	_, err = s.db.NewEntries(entries, feed.APIID)
@@ -629,7 +628,7 @@ func (s *ServerTestSuite) TestGetEntriesFromTag() {
 	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
-	entries, err := sync.UpdateFeed(&feed)
+	entries, err := sync.PullFeed(&feed)
 	s.Require().Nil(err)
 
 	_, err = s.db.NewEntries(entries, feed.APIID)
@@ -732,7 +731,7 @@ func (s *ServerTestSuite) TestMarkCategory() {
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 
-	entries, err := sync.UpdateFeed(&feed)
+	entries, err := sync.PullFeed(&feed)
 	s.Require().Nil(err)
 
 	_, err = s.db.NewEntries(entries, feed.APIID)
@@ -768,7 +767,7 @@ func (s *ServerTestSuite) TestGetEntries() {
 	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
-	entries, err := sync.UpdateFeed(&feed)
+	entries, err := sync.PullFeed(&feed)
 	s.Require().Nil(err)
 
 	_, err = s.db.NewEntries(entries, feed.APIID)
@@ -833,7 +832,7 @@ func (s *ServerTestSuite) TestMarkEntry() {
 	feed := s.db.NewFeed("World News", s.ts.URL)
 	s.Require().NotEmpty(feed.APIID)
 
-	entries, err := sync.UpdateFeed(&feed)
+	entries, err := sync.PullFeed(&feed)
 	s.Require().Nil(err)
 
 	_, err = s.db.NewEntries(entries, feed.APIID)
@@ -1206,7 +1205,7 @@ func (s *ServerTestSuite) TestOPMLExport() {
 	data, err := ioutil.ReadAll(resp.Body)
 	s.Require().Nil(err)
 
-	b := importer.OPML{}
+	b := models.OPML{}
 	err = xml.Unmarshal(data, &b)
 	s.Require().Nil(err)
 

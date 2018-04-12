@@ -35,7 +35,7 @@ func (s *Server) NewFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	entries, err := sync.UpdateFeed(&feed)
+	entries, err := sync.PullFeed(&feed)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
