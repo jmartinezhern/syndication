@@ -33,7 +33,7 @@ func (s *Server) GetEntry(c echo.Context) error {
 
 	entry, found := userDB.EntryWithAPIID(entryID)
 	if !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Entry does not exist",
 		})
 	}
@@ -80,7 +80,7 @@ func (s *Server) MarkEntry(c echo.Context) error {
 	}
 
 	if _, found := userDB.EntryWithAPIID(entryID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Entry does not exist",
 		})
 	}

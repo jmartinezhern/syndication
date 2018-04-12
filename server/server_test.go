@@ -38,7 +38,6 @@ import (
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 	"github.com/varddum/syndication/plugins"
-	"github.com/varddum/syndication/sync"
 )
 
 const (
@@ -108,107 +107,6 @@ func (s *ServerTestSuite) TestPlugins() {
 	defer resp.Body.Close()
 
 	s.Equal(200, resp.StatusCode)
-}
-
-func (s *ServerTestSuite) TestGetEntries() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
-	s.Require().NotEmpty(feed.APIID)
-
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
-
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
-
-	req, err := http.NewRequest("GET", "http://localhost:9876/v1/entries", nil)
-	s.Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(200, resp.StatusCode)
-
-	type Entries struct {
-		Entries []models.Entry `json:"entries"`
-	}
-
-	respEntries := new(Entries)
-	err = json.NewDecoder(resp.Body).Decode(respEntries)
-	s.Require().Nil(err)
-	s.Len(respEntries.Entries, 5)
-}
-
-func (s *ServerTestSuite) TestGetEntry() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
-	s.Require().NotEmpty(feed.APIID)
-
-	entry := models.Entry{
-		Title: "Item 1",
-		Link:  "http://localhost:9876/item_1",
-	}
-
-	entry, err := s.db.NewEntry(entry, feed.APIID)
-	s.Require().Nil(err)
-	s.Require().NotEmpty(entry.APIID)
-
-	req, err := http.NewRequest("GET", "http://localhost:9876/v1/entries/"+entry.APIID, nil)
-	s.Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(200, resp.StatusCode)
-
-	respEntry := new(models.Entry)
-	err = json.NewDecoder(resp.Body).Decode(respEntry)
-	s.Require().Nil(err)
-
-	s.Equal(entry.Title, respEntry.Title)
-	s.Equal(entry.APIID, respEntry.APIID)
-}
-
-func (s *ServerTestSuite) TestMarkEntry() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
-	s.Require().NotEmpty(feed.APIID)
-
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
-
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
-	s.Require().Len(entries, 0)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
-	s.Require().Len(entries, 5)
-
-	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/entries/"+entries[0].APIID+"/mark?as=read", nil)
-
-	s.Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(204, resp.StatusCode)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
-	s.Require().Len(entries, 4)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
-	s.Require().Len(entries, 1)
 }
 
 func (s *ServerTestSuite) TestGetStats() {
