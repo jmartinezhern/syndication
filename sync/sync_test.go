@@ -43,6 +43,14 @@ const (
 	rssMinimalURL = baseURL + feedPort + "/rss_minimal.xml"
 )
 
+var (
+	defaultTestConfig = config.Sync{
+		SyncInterval: config.Duration{
+			Duration: time.Second * 5,
+		},
+	}
+)
+
 type (
 	SyncTestSuite struct {
 		suite.Suite
@@ -50,7 +58,6 @@ type (
 		user   models.User
 		db     database.UserDB
 		gDB    *database.DB
-		sync   Service
 		server *http.Server
 	}
 )
@@ -79,14 +86,15 @@ func (s *SyncTestSuite) SetupTest() {
 }
 
 func (s *SyncTestSuite) TearDownTest() {
-	s.gDB.DeleteUser(s.user.APIID)
+	s.gDB.DeleteAll()
 }
 
 func (s *SyncTestSuite) TestSyncUser() {
 	feed := s.db.NewFeed("Sync Test", rssMinimalURL)
 	s.Require().NotEmpty(feed.APIID)
 
-	err := s.sync.SyncUser(&s.user)
+	serv := NewService(s.gDB, defaultTestConfig)
+	err := serv.SyncUser(&s.user)
 	s.Require().Nil(err)
 
 	entries := s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
@@ -106,11 +114,45 @@ func (s *SyncTestSuite) TestSyncUsers() {
 		userDB.NewFeed("Sync Test", rssMinimalURL)
 	}
 
-	s.sync = NewSyncService(s.gDB, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 2}})
+	serv := NewService(s.gDB, defaultTestConfig)
 
-	s.sync.SyncUsers()
+	serv.SyncUsers()
 
-	s.sync.userWaitGroup.Wait()
+	serv.userWaitGroup.Wait()
+
+	users := s.gDB.Users()
+	users = users[1:]
+
+	for _, user := range users {
+		userDB := s.gDB.NewUserDB(user)
+		entries := userDB.Entries(true, models.MarkerAny)
+		s.Len(entries, 5)
+	}
+}
+
+func (s *SyncTestSuite) TestSyncService() {
+	for i := 0; i < 10; i++ {
+		user := s.gDB.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
+
+		_, found := s.gDB.UserWithName("test" + strconv.Itoa(i))
+		s.Require().True(found)
+
+		userDB := s.gDB.NewUserDB(user)
+
+		userDB.NewFeed("Sync Test", rssMinimalURL)
+	}
+
+	serv := NewService(s.gDB, config.Sync{
+		SyncInterval: config.Duration{
+			Duration: time.Second,
+		},
+	})
+
+	serv.Start()
+
+	time.Sleep(time.Second * 2)
+
+	serv.Stop()
 
 	users := s.gDB.Users()
 	users = users[1:]
@@ -136,8 +178,6 @@ func (s *SyncTestSuite) startServer() {
 	go s.server.ListenAndServe()
 
 	time.Sleep(time.Second)
-
-	s.sync = NewSyncService(s.gDB, config.Sync{SyncInterval: config.Duration{Duration: time.Second * 5}})
 }
 
 func TestSyncTestSuite(t *testing.T) {

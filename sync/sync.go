@@ -268,8 +268,8 @@ func (s *Service) Stop() {
 	s.userWaitGroup.Wait()
 }
 
-// NewSyncService creates a new SyncService object
-func NewSyncService(db *database.DB, config config.Sync) Service {
+// NewService creates a new SyncService object
+func NewService(db *database.DB, config config.Sync) Service {
 	return Service{
 		db:       db,
 		status:   make(chan syncStatus),
