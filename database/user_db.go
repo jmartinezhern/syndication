@@ -317,12 +317,12 @@ func (udb *UserDB) EntryWithGUIDExists(guid string, feedID string) bool {
 // Entries returns a list of all entries owned by user
 func (udb *UserDB) Entries(orderByNewest bool, marker models.Marker) []models.Entry {
 	entries := []models.Entry{}
-	if marker == models.None {
+	if marker == models.MarkerNone {
 		return nil
 	}
 
 	query := udb.db.Model(&udb.user)
-	if marker != models.Any {
+	if marker != models.MarkerAny {
 		query = query.Where("mark = ?", marker)
 	}
 
@@ -339,7 +339,7 @@ func (udb *UserDB) Entries(orderByNewest bool, marker models.Marker) []models.En
 
 // EntriesFromFeed returns all Entries that belong to a feed with feedID
 func (udb *UserDB) EntriesFromFeed(feedID string, orderByNewest bool, marker models.Marker) []models.Entry {
-	if marker == models.None {
+	if marker == models.MarkerNone {
 		return nil
 	}
 
@@ -351,7 +351,7 @@ func (udb *UserDB) EntriesFromFeed(feedID string, orderByNewest bool, marker mod
 	entries := []models.Entry{}
 
 	query := udb.db.Model(&udb.user)
-	if marker != models.Any {
+	if marker != models.MarkerAny {
 		query = query.Where("mark = ?", marker)
 	}
 
@@ -368,7 +368,7 @@ func (udb *UserDB) EntriesFromFeed(feedID string, orderByNewest bool, marker mod
 
 // EntriesFromCategory returns all Entries that are related to a Category with categoryID by the entries' owning Feed
 func (udb *UserDB) EntriesFromCategory(categoryID string, orderByNewest bool, marker models.Marker) []models.Entry {
-	if marker == models.None {
+	if marker == models.MarkerNone {
 		return nil
 	}
 
@@ -383,7 +383,7 @@ func (udb *UserDB) EntriesFromCategory(categoryID string, orderByNewest bool, ma
 	udb.db.Model(category).Related(&feeds)
 
 	query := udb.db.Model(&udb.user)
-	if marker != models.Any {
+	if marker != models.MarkerAny {
 		query = query.Where("mark = ?", marker)
 	}
 
@@ -455,7 +455,7 @@ func (udb *UserDB) EntriesFromTag(tagID string, marker models.Marker, orderByNew
 	}
 
 	query := udb.db.Model(tag)
-	if marker != models.Any {
+	if marker != models.MarkerAny {
 		query = query.Where("mark = ?", marker)
 	}
 
@@ -481,7 +481,7 @@ func (udb *UserDB) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, 
 		order = order.Order("created_at ASC")
 	}
 
-	if marker != models.Any {
+	if marker != models.MarkerAny {
 		order = order.Where("mark = ?", marker)
 	}
 
@@ -539,8 +539,8 @@ func (udb *UserDB) CategoryStats(id string) models.Stats {
 
 	stats := models.Stats{}
 
-	stats.Unread = query.Where("mark = ?", models.Unread).Association("Entries").Count()
-	stats.Read = query.Where("mark = ?", models.Read).Association("Entries").Count()
+	stats.Unread = query.Where("mark = ?", models.MarkerUnread).Association("Entries").Count()
+	stats.Read = query.Where("mark = ?", models.MarkerRead).Association("Entries").Count()
 	stats.Saved = query.Where("saved = ?", true).Association("Entries").Count()
 	stats.Total = query.Association("Entries").Count()
 
@@ -556,8 +556,8 @@ func (udb *UserDB) FeedStats(id string) models.Stats {
 
 	stats := models.Stats{}
 
-	stats.Unread = udb.db.Model(&udb.user).Where("feed_id = ? AND mark = ?", feed.ID, models.Unread).Association("Entries").Count()
-	stats.Read = udb.db.Model(&udb.user).Where("feed_id = ? AND mark = ?", feed.ID, models.Read).Association("Entries").Count()
+	stats.Unread = udb.db.Model(&udb.user).Where("feed_id = ? AND mark = ?", feed.ID, models.MarkerUnread).Association("Entries").Count()
+	stats.Read = udb.db.Model(&udb.user).Where("feed_id = ? AND mark = ?", feed.ID, models.MarkerRead).Association("Entries").Count()
 	stats.Saved = udb.db.Model(&udb.user).Where("feed_id = ? AND saved = ?", feed.ID, true).Association("Entries").Count()
 	stats.Total = udb.db.Model(&udb.user).Where("feed_id = ?", feed.ID).Association("Entries").Count()
 
@@ -568,8 +568,8 @@ func (udb *UserDB) FeedStats(id string) models.Stats {
 func (udb *UserDB) Stats() models.Stats {
 	stats := models.Stats{}
 
-	stats.Unread = udb.db.Model(&udb.user).Where("mark = ?", models.Unread).Association("Entries").Count()
-	stats.Read = udb.db.Model(&udb.user).Where("mark = ?", models.Read).Association("Entries").Count()
+	stats.Unread = udb.db.Model(&udb.user).Where("mark = ?", models.MarkerUnread).Association("Entries").Count()
+	stats.Read = udb.db.Model(&udb.user).Where("mark = ?", models.MarkerRead).Association("Entries").Count()
 	stats.Saved = udb.db.Model(&udb.user).Where("saved = ?", true).Association("Entries").Count()
 	stats.Total = udb.db.Model(&udb.user).Association("Entries").Count()
 

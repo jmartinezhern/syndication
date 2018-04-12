@@ -309,7 +309,7 @@ func (s *UserDBTestSuite) TestTagEntries() {
 			Title:  "Test Entry",
 			Author: "varddum",
 			Link:   "http://example.com",
-			Mark:   models.Unread,
+			Mark:   models.MarkerUnread,
 		}
 
 		entries = append(entries, entry)
@@ -319,7 +319,7 @@ func (s *UserDBTestSuite) TestTagEntries() {
 	s.Require().NotEmpty(entries)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
 
 	entryAPIIDs := make([]string, len(entries))
 	for i, entry := range entries {
@@ -339,7 +339,7 @@ func (s *UserDBTestSuite) TestTagEntries() {
 	err = s.db.TagEntries(tag.APIID, entryAPIIDs)
 	s.Nil(err)
 
-	taggedEntries := s.db.EntriesFromTag(tag.APIID, models.Any, true)
+	taggedEntries := s.db.EntriesFromTag(tag.APIID, models.MarkerAny, true)
 	s.Nil(err)
 	s.Len(taggedEntries, 5)
 }
@@ -353,7 +353,7 @@ func (s *UserDBTestSuite) TestTagMultipleEntries() {
 			Title:  "Test Entry " + strconv.Itoa(i),
 			Author: "varddum",
 			Link:   "http://example.com",
-			Mark:   models.Unread,
+			Mark:   models.MarkerUnread,
 		}
 
 		entries = append(entries, entry)
@@ -374,7 +374,7 @@ func (s *UserDBTestSuite) TestTagMultipleEntries() {
 
 	s.Require().NotEqual(firstTag.APIID, secondTag.APIID)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
 	s.Require().Nil(err)
 
 	entryAPIIDs := make([]string, len(entries))
@@ -388,10 +388,10 @@ func (s *UserDBTestSuite) TestTagMultipleEntries() {
 	err = s.db.TagEntries(secondTag.APIID, entryAPIIDs)
 	s.Nil(err)
 
-	taggedEntries := s.db.EntriesFromTag(firstTag.APIID, models.Any, true)
+	taggedEntries := s.db.EntriesFromTag(firstTag.APIID, models.MarkerAny, true)
 	s.Len(taggedEntries, 5)
 
-	taggedEntries = s.db.EntriesFromTag(secondTag.APIID, models.Any, true)
+	taggedEntries = s.db.EntriesFromTag(secondTag.APIID, models.MarkerAny, true)
 	s.Len(taggedEntries, 5)
 }
 
@@ -404,7 +404,7 @@ func (s *UserDBTestSuite) TestEntriesFromMultipleTags() {
 			Title:  "Test Entry " + strconv.Itoa(i),
 			Author: "varddum",
 			Link:   "http://example.com",
-			Mark:   models.Unread,
+			Mark:   models.MarkerUnread,
 		}
 
 		entries = append(entries, entry)
@@ -434,7 +434,7 @@ func (s *UserDBTestSuite) TestEntriesFromMultipleTags() {
 
 	s.Require().NotEqual(firstTag.APIID, secondTag.APIID)
 
-	taggedEntries := s.db.EntriesFromMultipleTags([]string{firstTag.APIID, secondTag.APIID}, true, models.Any)
+	taggedEntries := s.db.EntriesFromMultipleTags([]string{firstTag.APIID, secondTag.APIID}, true, models.MarkerAny)
 	s.Len(taggedEntries, 10)
 }
 
@@ -477,7 +477,7 @@ func (s *UserDBTestSuite) TestNewEntry() {
 		Title:     "Test Entry",
 		Author:    "varddum",
 		Link:      "http://example.com",
-		Mark:      models.Unread,
+		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
@@ -489,14 +489,14 @@ func (s *UserDBTestSuite) TestNewEntry() {
 	s.True(found)
 	s.NotZero(query.FeedID)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
 	s.NotEmpty(entries)
 	s.Len(entries, 1)
 	s.Equal(entries[0].Title, entry.Title)
 }
 
 func (s *UserDBTestSuite) TestEntriesFromFeedWithNonExistenFeed() {
-	entries := s.db.EntriesFromFeed(createAPIID(), true, models.Unread)
+	entries := s.db.EntriesFromFeed(createAPIID(), true, models.MarkerUnread)
 	s.Empty(entries)
 }
 
@@ -505,7 +505,7 @@ func (s *UserDBTestSuite) TestNewEntryWithEmptyFeed() {
 		Title:     "Test Entry",
 		Link:      "http://example.com",
 		Author:    "varddum",
-		Mark:      models.Unread,
+		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
@@ -524,7 +524,7 @@ func (s *UserDBTestSuite) TestNewEntryWithBadFeed() {
 	entry := models.Entry{
 		Title:     "Test Entry",
 		Author:    "varddum",
-		Mark:      models.Unread,
+		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
@@ -549,7 +549,7 @@ func (s *UserDBTestSuite) TestNewEntries() {
 			Title:     "Test Entry",
 			Author:    "varddum",
 			Link:      "http://example.com",
-			Mark:      models.Unread,
+			Mark:      models.MarkerUnread,
 			Published: time.Now(),
 		}
 
@@ -560,7 +560,7 @@ func (s *UserDBTestSuite) TestNewEntries() {
 	s.Require().Len(entries, 5)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
 	s.Len(entries, 5)
 	for _, entry := range entries {
 		s.NotZero(entry.ID)
@@ -584,20 +584,20 @@ func (s *UserDBTestSuite) TestEntries() {
 		Title:     "Test Entry",
 		Author:    "varddum",
 		Link:      "http://example.com",
-		Mark:      models.Unread,
+		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
 	entry, err := s.db.NewEntry(entry, feed.APIID)
 	s.Require().Nil(err)
 
-	entries := s.db.Entries(true, models.Unread)
+	entries := s.db.Entries(true, models.MarkerUnread)
 	s.NotEmpty(entries)
 	s.Equal(entries[0].Title, entry.Title)
 }
 
 func (s *UserDBTestSuite) TestEntriesWithNoneMarker() {
-	entries := s.db.Entries(true, models.None)
+	entries := s.db.Entries(true, models.MarkerNone)
 	s.Empty(entries)
 }
 
@@ -609,23 +609,23 @@ func (s *UserDBTestSuite) TestEntriesFromFeed() {
 		Title:     "Test Entry",
 		Author:    "varddum",
 		Link:      "http://example.com",
-		Mark:      models.Unread,
+		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
 	entry, err := s.db.NewEntry(entry, feed.APIID)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
 	s.Require().NotEmpty(entries)
 	s.Equal(entries[0].Title, entry.Title)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
 	s.Empty(entries)
 }
 
 func (s *UserDBTestSuite) TestEntriesFromFeedWithNoneMarker() {
-	entries := s.db.EntriesFromFeed("bogus", true, models.None)
+	entries := s.db.EntriesFromFeed("bogus", true, models.MarkerNone)
 	s.Empty(entries)
 }
 
@@ -679,7 +679,7 @@ func (s *UserDBTestSuite) TestEntriesFromCategory() {
 				Title:     "First Feed Test Entry " + strconv.Itoa(i),
 				Author:    "varddum",
 				Link:      "http://example.com",
-				Mark:      models.Unread,
+				Mark:      models.MarkerUnread,
 				Published: time.Now(),
 			}
 
@@ -690,7 +690,7 @@ func (s *UserDBTestSuite) TestEntriesFromCategory() {
 				Title:     "Second Feed Test Entry " + strconv.Itoa(i),
 				Author:    "varddum",
 				Link:      "http://example.com",
-				Mark:      models.Unread,
+				Mark:      models.MarkerUnread,
 				Published: time.Now(),
 			}
 
@@ -701,7 +701,7 @@ func (s *UserDBTestSuite) TestEntriesFromCategory() {
 				Title:     "Third Feed Test Entry " + strconv.Itoa(i),
 				Author:    "varddum",
 				Link:      "http://example.com",
-				Mark:      models.Unread,
+				Mark:      models.MarkerUnread,
 				Published: time.Now(),
 			}
 
@@ -711,12 +711,12 @@ func (s *UserDBTestSuite) TestEntriesFromCategory() {
 
 	}
 
-	entries := s.db.EntriesFromCategory(firstCtg.APIID, false, models.Unread)
+	entries := s.db.EntriesFromCategory(firstCtg.APIID, false, models.MarkerUnread)
 	s.NotEmpty(entries)
 	s.Len(entries, 5)
 	s.Equal(entries[0].Title, "First Feed Test Entry 0")
 
-	entries = s.db.EntriesFromCategory(secondCtg.APIID, true, models.Unread)
+	entries = s.db.EntriesFromCategory(secondCtg.APIID, true, models.MarkerUnread)
 	s.NotEmpty(entries)
 	s.Len(entries, 5)
 	s.Equal(entries[0].Title, "Third Feed Test Entry 9")
@@ -724,12 +724,12 @@ func (s *UserDBTestSuite) TestEntriesFromCategory() {
 }
 
 func (s *UserDBTestSuite) TestEntriesFromCategoryWithtNoneMarker() {
-	entries := s.db.EntriesFromCategory("bogus", true, models.None)
+	entries := s.db.EntriesFromCategory("bogus", true, models.MarkerNone)
 	s.Empty(entries)
 }
 
 func (s *UserDBTestSuite) TestEntriesFromNonExistingCategory() {
-	entries := s.db.EntriesFromCategory(createAPIID(), true, models.Unread)
+	entries := s.db.EntriesFromCategory(createAPIID(), true, models.MarkerUnread)
 	s.Empty(entries)
 }
 
@@ -755,7 +755,7 @@ func (s *UserDBTestSuite) TestMarkCategory() {
 				Title:     "First Feed Test Entry " + strconv.Itoa(i),
 				Author:    "varddum",
 				Link:      "http://example.com",
-				Mark:      models.Unread,
+				Mark:      models.MarkerUnread,
 				Published: time.Now(),
 			}
 
@@ -766,7 +766,7 @@ func (s *UserDBTestSuite) TestMarkCategory() {
 				Title:     "Second Feed Test Entry " + strconv.Itoa(i),
 				Author:    "varddum",
 				Link:      "http://example.com",
-				Mark:      models.Read,
+				Mark:      models.MarkerRead,
 				Published: time.Now(),
 			}
 
@@ -777,31 +777,31 @@ func (s *UserDBTestSuite) TestMarkCategory() {
 	}
 
 	s.Require().Equal(s.db.db.Model(&s.db.user).Association("Entries").Count(), 10)
-	s.Require().Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.Read).Association("Entries").Count(), 5)
-	s.Require().Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.Unread).Association("Entries").Count(), 5)
+	s.Require().Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.MarkerRead).Association("Entries").Count(), 5)
+	s.Require().Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.MarkerUnread).Association("Entries").Count(), 5)
 
-	err = s.db.MarkCategory(firstCtg.APIID, models.Read)
+	err = s.db.MarkCategory(firstCtg.APIID, models.MarkerRead)
 	s.Nil(err)
 
-	entries := s.db.EntriesFromCategory(firstCtg.APIID, true, models.Any)
+	entries := s.db.EntriesFromCategory(firstCtg.APIID, true, models.MarkerAny)
 	s.Len(entries, 5)
 
-	s.Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.Read).Association("Entries").Count(), 10)
+	s.Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.MarkerRead).Association("Entries").Count(), 10)
 
 	for _, entry := range entries {
-		s.EqualValues(entry.Mark, models.Read)
+		s.EqualValues(entry.Mark, models.MarkerRead)
 	}
 
-	err = s.db.MarkCategory(secondCtg.APIID, models.Unread)
+	err = s.db.MarkCategory(secondCtg.APIID, models.MarkerUnread)
 	s.Nil(err)
 
-	s.Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.Unread).Association("Entries").Count(), 5)
+	s.Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.MarkerUnread).Association("Entries").Count(), 5)
 
-	entries = s.db.EntriesFromCategory(secondCtg.APIID, true, models.Any)
+	entries = s.db.EntriesFromCategory(secondCtg.APIID, true, models.MarkerAny)
 	s.Len(entries, 5)
 
 	for _, entry := range entries {
-		s.EqualValues(entry.Mark, models.Unread)
+		s.EqualValues(entry.Mark, models.MarkerUnread)
 	}
 }
 
@@ -819,7 +819,7 @@ func (s *UserDBTestSuite) TestMarkFeed() {
 				Title:     "First Feed Test Entry " + strconv.Itoa(i),
 				Author:    "varddum",
 				Link:      "http://example.com",
-				Mark:      models.Unread,
+				Mark:      models.MarkerUnread,
 				Published: time.Now(),
 			}
 
@@ -830,7 +830,7 @@ func (s *UserDBTestSuite) TestMarkFeed() {
 				Title:     "Second Feed Test Entry " + strconv.Itoa(i),
 				Author:    "varddum",
 				Link:      "http://example.com",
-				Mark:      models.Read,
+				Mark:      models.MarkerRead,
 				Published: time.Now(),
 			}
 
@@ -841,32 +841,32 @@ func (s *UserDBTestSuite) TestMarkFeed() {
 	}
 
 	s.Require().Equal(s.db.db.Model(&s.db.user).Association("Entries").Count(), 10)
-	s.Require().Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.Read).Association("Entries").Count(), 5)
-	s.Require().Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.Unread).Association("Entries").Count(), 5)
+	s.Require().Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.MarkerRead).Association("Entries").Count(), 5)
+	s.Require().Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.MarkerUnread).Association("Entries").Count(), 5)
 
-	err := s.db.MarkFeed(firstFeed.APIID, models.Read)
+	err := s.db.MarkFeed(firstFeed.APIID, models.MarkerRead)
 	s.Nil(err)
 
-	entries := s.db.EntriesFromFeed(firstFeed.APIID, true, models.Read)
+	entries := s.db.EntriesFromFeed(firstFeed.APIID, true, models.MarkerRead)
 	s.Len(entries, 5)
 
-	s.Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.Read).Association("Entries").Count(), 10)
+	s.Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.MarkerRead).Association("Entries").Count(), 10)
 
 	for _, entry := range entries {
-		s.EqualValues(entry.Mark, models.Read)
+		s.EqualValues(entry.Mark, models.MarkerRead)
 	}
 
-	err = s.db.MarkFeed(secondFeed.APIID, models.Unread)
+	err = s.db.MarkFeed(secondFeed.APIID, models.MarkerUnread)
 	s.Nil(err)
 
-	s.Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.Unread).Association("Entries").Count(), 5)
+	s.Equal(s.db.db.Model(&s.db.user).Where("mark = ?", models.MarkerUnread).Association("Entries").Count(), 5)
 
-	entries = s.db.EntriesFromFeed(secondFeed.APIID, true, models.Unread)
+	entries = s.db.EntriesFromFeed(secondFeed.APIID, true, models.MarkerUnread)
 	s.Nil(err)
 	s.Len(entries, 5)
 
 	for _, entry := range entries {
-		s.EqualValues(entry.Mark, models.Unread)
+		s.EqualValues(entry.Mark, models.MarkerUnread)
 	}
 }
 
@@ -875,23 +875,23 @@ func (s *UserDBTestSuite) TestMarkEntry() {
 
 	entry := models.Entry{
 		Title:     "Article",
-		Mark:      models.Unread,
+		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
 	entry, err := s.db.NewEntry(entry, feed.APIID)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
 	s.Require().Len(entries, 1)
 
-	err = s.db.MarkEntry(entry.APIID, models.Read)
+	err = s.db.MarkEntry(entry.APIID, models.MarkerRead)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
 	s.Require().Len(entries, 0)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
 	s.Require().Len(entries, 1)
 }
 
@@ -903,7 +903,7 @@ func (s *UserDBTestSuite) TestStats() {
 		entry := models.Entry{
 			Title:     "Item",
 			Link:      "http://example.com",
-			Mark:      models.Read,
+			Mark:      models.MarkerRead,
 			Saved:     true,
 			Published: time.Now(),
 		}
@@ -916,7 +916,7 @@ func (s *UserDBTestSuite) TestStats() {
 		entry := models.Entry{
 			Title:     "Item",
 			Link:      "http://example.com",
-			Mark:      models.Unread,
+			Mark:      models.MarkerUnread,
 			Published: time.Now(),
 		}
 
@@ -939,7 +939,7 @@ func (s *UserDBTestSuite) TestFeedStats() {
 		entry := models.Entry{
 			Title:     "Item",
 			Link:      "http://example.com",
-			Mark:      models.Read,
+			Mark:      models.MarkerRead,
 			Saved:     true,
 			Published: time.Now(),
 		}
@@ -952,7 +952,7 @@ func (s *UserDBTestSuite) TestFeedStats() {
 		entry := models.Entry{
 			Title:     "Item",
 			Link:      "http://example.com",
-			Mark:      models.Unread,
+			Mark:      models.MarkerUnread,
 			Published: time.Now(),
 		}
 
@@ -979,7 +979,7 @@ func (s *UserDBTestSuite) TestCategoryStats() {
 		entry := models.Entry{
 			Title:     "Item",
 			Link:      "http://example.com",
-			Mark:      models.Read,
+			Mark:      models.MarkerRead,
 			Saved:     true,
 			Published: time.Now(),
 		}
@@ -992,7 +992,7 @@ func (s *UserDBTestSuite) TestCategoryStats() {
 		entry := models.Entry{
 			Title:     "Item",
 			Link:      "http://example.com",
-			Mark:      models.Unread,
+			Mark:      models.MarkerUnread,
 			Published: time.Now(),
 		}
 

@@ -184,7 +184,7 @@ func (s *Server) MarkCategory(c echo.Context) error {
 	ctgID := c.Param("categoryID")
 
 	marker := models.MarkerFromString(c.FormValue("as"))
-	if marker == models.None {
+	if marker == models.MarkerNone {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
@@ -222,8 +222,8 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 	}
 
 	markedAs := models.MarkerFromString(params.Marker)
-	if markedAs == models.None {
-		markedAs = models.Any
+	if markedAs == models.MarkerNone {
+		markedAs = models.MarkerAny
 	}
 
 	entries := userDB.EntriesFromCategory(ctg.APIID,

@@ -28,10 +28,10 @@ type Marker int
 
 // Markers identify the visibility status of entities
 const (
-	None = iota
-	Read
-	Unread
-	Any
+	MarkerNone = iota
+	MarkerRead
+	MarkerUnread
+	MarkerAny
 )
 
 const (
@@ -51,17 +51,17 @@ const (
 // MarkerFromString converts a string to a Marker type
 func MarkerFromString(marker string) Marker {
 	if len(marker) == 0 {
-		return None
+		return MarkerNone
 	}
 
 	value := strings.ToLower(marker)
 	if value == "unread" {
-		return Unread
+		return MarkerUnread
 	} else if value == "read" {
-		return Read
+		return MarkerRead
 	}
 
-	return None
+	return MarkerNone
 }
 
 type (

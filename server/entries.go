@@ -51,8 +51,8 @@ func (s *Server) GetEntries(c echo.Context) error {
 	}
 
 	markedAs := models.MarkerFromString(params.Marker)
-	if markedAs == models.None {
-		markedAs = models.Any
+	if markedAs == models.MarkerNone {
+		markedAs = models.MarkerAny
 	}
 
 	entries := userDB.Entries(convertOrderByParamToValue(params.OrderBy),
@@ -75,7 +75,7 @@ func (s *Server) MarkEntry(c echo.Context) error {
 	entryID := c.Param("entryID")
 
 	marker := models.MarkerFromString(c.FormValue("as"))
-	if marker == models.None {
+	if marker == models.MarkerNone {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 

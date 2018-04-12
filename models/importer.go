@@ -22,9 +22,9 @@ import (
 )
 
 type (
-	// FeedImporter is an interface that wraps the basic
+	// Importer is an interface that wraps the basic
 	// import functions.
-	FeedImporter interface {
+	Importer interface {
 		Import([]byte) []Feed
 	}
 

@@ -22,9 +22,9 @@ import (
 )
 
 type (
-	// FeedExporter is an interface that wraps the basic
+	// Exporter is an interface that wraps the basic
 	// export functions.
-	FeedExporter interface {
+	Exporter interface {
 		Export([]Category) ([]byte, error)
 	}
 

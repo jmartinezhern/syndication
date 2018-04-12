@@ -21,7 +21,7 @@ func helloWorldHandler(c plugins.APICtx, w http.ResponseWriter, r *http.Request)
 
 func entriesHandler(c plugins.APICtx, w http.ResponseWriter, r *http.Request) {
 	if c.HasUser() {
-		entries := c.User.Entries(true, models.Any)
+		entries := c.User.Entries(true, models.MarkerAny)
 		if len(entries) == 0 {
 			fmt.Fprintf(w, "Nothing new!\n")
 			return

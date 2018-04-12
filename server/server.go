@@ -170,7 +170,7 @@ func (s *Server) OptionsHandler(c echo.Context) error {
 	return c.NoContent(200)
 }
 
-func (s *Server) exportFeeds(exporter models.FeedExporter, userDB *database.UserDB) ([]byte, error) {
+func (s *Server) exportFeeds(exporter models.Exporter, userDB *database.UserDB) ([]byte, error) {
 	ctgs := userDB.Categories()
 
 	for idx, ctg := range ctgs {
@@ -240,7 +240,7 @@ func (s *Server) Import(c echo.Context) error {
 	return echo.NewHTTPError(http.StatusNoContent)
 }
 
-func (s *Server) importFeeds(data []byte, reqImporter models.FeedImporter, userDB *database.UserDB) error {
+func (s *Server) importFeeds(data []byte, reqImporter models.Importer, userDB *database.UserDB) error {
 	feeds := reqImporter.Import(data)
 	for _, feed := range feeds {
 		if feed.Category.Name != "" {

@@ -137,7 +137,7 @@ func (s *Server) MarkFeed(c echo.Context) error {
 	feedID := c.Param("feedID")
 
 	marker := models.MarkerFromString(c.FormValue("as"))
-	if marker == models.None {
+	if marker == models.MarkerNone {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
@@ -174,8 +174,8 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 	}
 
 	markedAs := models.MarkerFromString(params.Marker)
-	if markedAs == models.None {
-		markedAs = models.Any
+	if markedAs == models.MarkerNone {
+		markedAs = models.MarkerAny
 	}
 
 	entries := userDB.EntriesFromFeed(feed.APIID,

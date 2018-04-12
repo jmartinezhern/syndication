@@ -89,7 +89,7 @@ func (s *SyncTestSuite) TestSyncUser() {
 	err := s.sync.SyncUser(&s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.Any)
+	entries := s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
 	s.Require().Nil(err)
 	s.Len(entries, 5)
 }
@@ -117,7 +117,7 @@ func (s *SyncTestSuite) TestSyncUsers() {
 
 	for _, user := range users {
 		userDB := s.gDB.NewUserDB(user)
-		entries := userDB.Entries(true, models.Any)
+		entries := userDB.Entries(true, models.MarkerAny)
 		s.Len(entries, 5)
 	}
 }

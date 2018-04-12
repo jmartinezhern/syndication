@@ -123,7 +123,7 @@ func convertItemToEntry(item *gofeed.Item) models.Entry {
 	entry := models.Entry{
 		Title: item.Title,
 		Link:  item.Link,
-		Mark:  models.Unread,
+		Mark:  models.MarkerUnread,
 	}
 
 	if item.Author != nil {

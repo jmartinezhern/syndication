@@ -127,7 +127,7 @@ func (s *ServerTestSuite) TestNewFeed() {
 	s.Require().True(found)
 	s.Equal(dbFeed.Title, respFeed.Title)
 
-	entries := s.db.EntriesFromFeed(respFeed.APIID, false, models.Any)
+	entries := s.db.EntriesFromFeed(respFeed.APIID, false, models.MarkerAny)
 	s.Require().Len(entries, 5)
 
 	s.Equal("Item 1", entries[0].Title)
@@ -286,10 +286,10 @@ func (s *ServerTestSuite) TestMarkFeed() {
 	s.Require().Nil(err)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
 	s.Require().Len(entries, 5)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
 	s.Require().Len(entries, 0)
 
 	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/feeds/"+feed.APIID+"/mark?as=read", nil)
@@ -305,10 +305,10 @@ func (s *ServerTestSuite) TestMarkFeed() {
 
 	s.Equal(204, resp.StatusCode)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
 	s.Require().Len(entries, 0)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
 	s.Require().Len(entries, 5)
 }
 
@@ -634,7 +634,7 @@ func (s *ServerTestSuite) TestGetEntriesFromTag() {
 	_, err = s.db.NewEntries(entries, feed.APIID)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
 	s.Require().NotEmpty(entries)
 
 	entryAPIIDs := make([]string, len(entries))
@@ -682,7 +682,7 @@ func (s *ServerTestSuite) TestTagEntries() {
 			Title:  "Test Entry",
 			Author: "varddum",
 			Link:   "http://example.com",
-			Mark:   models.Unread,
+			Mark:   models.MarkerUnread,
 			Feed:   feed,
 		}
 
@@ -692,7 +692,7 @@ func (s *ServerTestSuite) TestTagEntries() {
 	_, err := s.db.NewEntries(entries, feed.APIID)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Any)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
 
 	entryAPIIDs := make([]string, len(entries))
 	for i, entry := range entries {
@@ -719,7 +719,7 @@ func (s *ServerTestSuite) TestTagEntries() {
 
 	s.Equal(http.StatusNoContent, resp.StatusCode)
 
-	taggedEntries := s.db.EntriesFromTag(tag.APIID, models.Any, true)
+	taggedEntries := s.db.EntriesFromTag(tag.APIID, models.MarkerAny, true)
 	s.Len(taggedEntries, 5)
 }
 
@@ -737,10 +737,10 @@ func (s *ServerTestSuite) TestMarkCategory() {
 	_, err = s.db.NewEntries(entries, feed.APIID)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Unread)
+	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.MarkerUnread)
 	s.Require().Len(entries, 5)
 
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Read)
+	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.MarkerRead)
 	s.Require().Len(entries, 0)
 
 	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/categories/"+ctg.APIID+"/mark?as=read", nil)
@@ -756,10 +756,10 @@ func (s *ServerTestSuite) TestMarkCategory() {
 
 	s.Equal(204, resp.StatusCode)
 
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Unread)
+	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.MarkerUnread)
 	s.Require().Len(entries, 0)
 
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.Read)
+	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.MarkerRead)
 	s.Require().Len(entries, 5)
 }
 
@@ -838,10 +838,10 @@ func (s *ServerTestSuite) TestMarkEntry() {
 	_, err = s.db.NewEntries(entries, feed.APIID)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
 	s.Require().Len(entries, 0)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
 	s.Require().Len(entries, 5)
 
 	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/entries/"+entries[0].APIID+"/mark?as=read", nil)
@@ -857,10 +857,10 @@ func (s *ServerTestSuite) TestMarkEntry() {
 
 	s.Equal(204, resp.StatusCode)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Unread)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
 	s.Require().Len(entries, 4)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.Read)
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
 	s.Require().Len(entries, 1)
 }
 
@@ -872,7 +872,7 @@ func (s *ServerTestSuite) TestGetStatsForFeed() {
 		entry := models.Entry{
 			Title: "Item",
 			Link:  "http://example.com",
-			Mark:  models.Read,
+			Mark:  models.MarkerRead,
 			Saved: true,
 		}
 
@@ -883,7 +883,7 @@ func (s *ServerTestSuite) TestGetStatsForFeed() {
 		entry := models.Entry{
 			Title: "Item",
 			Link:  "http://example.com",
-			Mark:  models.Unread,
+			Mark:  models.MarkerUnread,
 		}
 
 		s.db.NewEntry(entry, feed.APIID)
@@ -920,7 +920,7 @@ func (s *ServerTestSuite) TestGetStats() {
 		entry := models.Entry{
 			Title: "Item",
 			Link:  "http://example.com",
-			Mark:  models.Read,
+			Mark:  models.MarkerRead,
 			Saved: true,
 		}
 
@@ -931,7 +931,7 @@ func (s *ServerTestSuite) TestGetStats() {
 		entry := models.Entry{
 			Title: "Item",
 			Link:  "http://example.com",
-			Mark:  models.Unread,
+			Mark:  models.MarkerUnread,
 		}
 
 		s.db.NewEntry(entry, feed.APIID)
@@ -972,7 +972,7 @@ func (s *ServerTestSuite) TestGetStatsForCategory() {
 		entry := models.Entry{
 			Title: "Item",
 			Link:  "http://example.com",
-			Mark:  models.Read,
+			Mark:  models.MarkerRead,
 			Saved: true,
 		}
 
@@ -983,7 +983,7 @@ func (s *ServerTestSuite) TestGetStatsForCategory() {
 		entry := models.Entry{
 			Title: "Item",
 			Link:  "http://example.com",
-			Mark:  models.Unread,
+			Mark:  models.MarkerUnread,
 		}
 
 		s.db.NewEntry(entry, feed.APIID)

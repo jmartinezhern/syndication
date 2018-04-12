@@ -171,8 +171,8 @@ func (s *Server) GetEntriesFromTag(c echo.Context) error {
 	}
 
 	withMarker := models.MarkerFromString(params.Marker)
-	if withMarker == models.None {
-		withMarker = models.Any
+	if withMarker == models.MarkerNone {
+		withMarker = models.MarkerAny
 	}
 
 	entries := userDB.EntriesFromTag(tag.APIID, withMarker, true)
