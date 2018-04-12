@@ -94,7 +94,7 @@ func (s *Server) EditFeed(c echo.Context) error {
 	feed.APIID = c.Param("feedID")
 
 	if _, found := userDB.FeedWithAPIID(feed.APIID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Feed does not exist",
 		})
 	}
@@ -116,7 +116,7 @@ func (s *Server) DeleteFeed(c echo.Context) error {
 	feedID := c.Param("feedID")
 
 	if _, found := userDB.FeedWithAPIID(feedID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Feed does not exist",
 		})
 	}
@@ -142,7 +142,7 @@ func (s *Server) MarkFeed(c echo.Context) error {
 	}
 
 	if _, found := userDB.FeedWithAPIID(feedID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Feed does not exist",
 		})
 	}
@@ -168,7 +168,7 @@ func (s *Server) GetEntriesFromFeed(c echo.Context) error {
 
 	feed, found := userDB.FeedWithAPIID(c.Param("feedID"))
 	if !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Feed does not exist",
 		})
 	}
@@ -199,7 +199,7 @@ func (s *Server) GetStatsForFeed(c echo.Context) error {
 	feedID := c.Param("feedID")
 
 	if _, found := userDB.FeedWithAPIID(feedID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Feed does not exist",
 		})
 	}
