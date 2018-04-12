@@ -26,13 +26,33 @@ import (
 	"github.com/varddum/syndication/models"
 )
 
+// NewCategory creates a new Category
+func (s *Server) NewCategory(c echo.Context) error {
+	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
+
+	ctg := models.Category{}
+	if err := c.Bind(&ctg); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest)
+	}
+
+	if _, found := userDB.CategoryWithName(ctg.Name); found {
+		return c.JSON(http.StatusConflict, ErrorResp{
+			Message: "Category already exists",
+		})
+	}
+
+	ctg = userDB.NewCategory(ctg.Name)
+
+	return c.JSON(http.StatusCreated, ctg)
+}
+
 // GetCategory with id
 func (s *Server) GetCategory(c echo.Context) error {
 	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
 
 	ctg, found := userDB.CategoryWithAPIID(c.Param("categoryID"))
 	if !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Category does not exist",
 		})
 	}
@@ -61,7 +81,7 @@ func (s *Server) GetFeedsFromCategory(c echo.Context) error {
 
 	ctg, found := userDB.CategoryWithAPIID(c.Param("categoryID"))
 	if !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Category does not exist",
 		})
 	}
@@ -77,26 +97,6 @@ func (s *Server) GetFeedsFromCategory(c echo.Context) error {
 	})
 }
 
-// NewCategory creates a new Category
-func (s *Server) NewCategory(c echo.Context) error {
-	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
-
-	ctg := models.Category{}
-	if err := c.Bind(&ctg); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest)
-	}
-
-	if _, found := userDB.CategoryWithName(ctg.Name); found {
-		return c.JSON(http.StatusConflict, ErrorResp{
-			Message: "Category already exists",
-		})
-	}
-
-	ctg = userDB.NewCategory(ctg.Name)
-
-	return c.JSON(http.StatusCreated, ctg)
-}
-
 // EditCategory with id
 func (s *Server) EditCategory(c echo.Context) error {
 	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
@@ -109,7 +109,7 @@ func (s *Server) EditCategory(c echo.Context) error {
 	}
 
 	if _, found := userDB.CategoryWithAPIID(ctg.APIID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Category does not exist",
 		})
 	}
@@ -140,7 +140,7 @@ func (s *Server) AddFeedsToCategory(c echo.Context) error {
 	}
 
 	if _, found := userDB.CategoryWithAPIID(ctgID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Category does not exist",
 		})
 	}
@@ -162,7 +162,7 @@ func (s *Server) DeleteCategory(c echo.Context) error {
 	ctgID := c.Param("categoryID")
 
 	if _, found := userDB.CategoryWithAPIID(ctgID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Category does not exist",
 		})
 	}
@@ -189,7 +189,7 @@ func (s *Server) MarkCategory(c echo.Context) error {
 	}
 
 	if _, found := userDB.CategoryWithAPIID(ctgID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Category does not exist",
 		})
 	}
@@ -216,7 +216,7 @@ func (s *Server) GetEntriesFromCategory(c echo.Context) error {
 
 	ctg, found := userDB.CategoryWithAPIID(c.Param("categoryID"))
 	if !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Category does not exist",
 		})
 	}
