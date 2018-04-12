@@ -67,7 +67,7 @@ func (s *Server) DeleteTag(c echo.Context) error {
 	tagID := c.Param("tagID")
 
 	if _, found := userDB.TagWithAPIID(tagID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Tag does not exist",
 		})
 	}
@@ -109,7 +109,7 @@ func (s *Server) TagEntries(c echo.Context) error {
 
 	tag, found := userDB.TagWithAPIID(c.Param("tagID"))
 	if !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Tag does not exist",
 		})
 	}
@@ -121,12 +121,6 @@ func (s *Server) TagEntries(c echo.Context) error {
 	entryIds := new(EntryIds)
 	if err := c.Bind(entryIds); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
-	}
-
-	if _, found := userDB.TagWithAPIID(tag.APIID); !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
-			Message: "Tag does not exist",
-		})
 	}
 
 	err := userDB.TagEntries(tag.APIID, entryIds.Entries)
@@ -145,7 +139,7 @@ func (s *Server) GetTag(c echo.Context) error {
 
 	tag, found := userDB.TagWithAPIID(c.Param("tagID"))
 	if !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Tag does not exist",
 		})
 	}
@@ -165,7 +159,7 @@ func (s *Server) GetEntriesFromTag(c echo.Context) error {
 
 	tag, found := userDB.TagWithAPIID(c.Param("tagID"))
 	if !found {
-		return c.JSON(http.StatusBadRequest, ErrorResp{
+		return c.JSON(http.StatusNotFound, ErrorResp{
 			Message: "Tag does not exist",
 		})
 	}

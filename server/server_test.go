@@ -41,7 +41,15 @@ import (
 	"github.com/varddum/syndication/sync"
 )
 
-const TestDBPath = "/tmp/syndication-test-server.db"
+const (
+	TestDBPath = "/tmp/syndication-test-server.db"
+
+	testHTTPPort = 9876
+)
+
+var (
+	testBaseURL = "http://localhost:" + strconv.Itoa(testHTTPPort)
+)
 
 type (
 	ServerTestSuite struct {
@@ -338,32 +346,6 @@ func (s *ServerTestSuite) TestNewCategory() {
 	s.Equal(dbCtg.Name, respCtg.Name)
 }
 
-func (s *ServerTestSuite) TestNewTag() {
-	payload := []byte(`{"name": "` + RandStringRunes(8) + `"}`)
-	req, err := http.NewRequest("POST", "http://localhost:9876/v1/tags", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(201, resp.StatusCode)
-
-	respTag := new(models.Tag)
-	err = json.NewDecoder(resp.Body).Decode(respTag)
-	s.Require().Nil(err)
-
-	s.Require().NotEmpty(respTag.APIID)
-	s.NotEmpty(respTag.Name)
-
-	dbTag, found := s.db.TagWithAPIID(respTag.APIID)
-	s.True(found)
-	s.Equal(dbTag.Name, respTag.Name)
-}
-
 func (s *ServerTestSuite) TestGetCategories() {
 	for i := 0; i < 5; i++ {
 		ctg := s.db.NewCategory("Category " + strconv.Itoa(i+1))
@@ -393,35 +375,6 @@ func (s *ServerTestSuite) TestGetCategories() {
 	s.Len(respCtgs.Categories, 6)
 }
 
-func (s *ServerTestSuite) TestGetTags() {
-	for i := 0; i < 5; i++ {
-		tag := s.db.NewTag("Tag " + strconv.Itoa(i+1))
-		s.Require().NotEmpty(tag.APIID)
-	}
-
-	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(200, resp.StatusCode)
-
-	type Tags struct {
-		Tags []models.Tag `json:"tags"`
-	}
-
-	respTags := new(Tags)
-	err = json.NewDecoder(resp.Body).Decode(respTags)
-	s.Require().Nil(err)
-
-	s.Len(respTags.Tags, 5)
-}
-
 func (s *ServerTestSuite) TestGetCategory() {
 	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
@@ -444,30 +397,6 @@ func (s *ServerTestSuite) TestGetCategory() {
 
 	s.Equal(respCtg.Name, ctg.Name)
 	s.Equal(respCtg.APIID, ctg.APIID)
-}
-
-func (s *ServerTestSuite) TestGetTag() {
-	tag := s.db.NewTag("News")
-	s.Require().NotEmpty(tag.APIID)
-
-	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags/"+tag.APIID, nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(200, resp.StatusCode)
-
-	respTag := new(models.Tag)
-	err = json.NewDecoder(resp.Body).Decode(respTag)
-	s.Require().Nil(err)
-
-	s.Equal(respTag.Name, tag.Name)
-	s.Equal(respTag.APIID, tag.APIID)
 }
 
 func (s *ServerTestSuite) TestEditCategory() {
@@ -493,29 +422,6 @@ func (s *ServerTestSuite) TestEditCategory() {
 	s.Equal(editedCtg.Name, "World News")
 }
 
-func (s *ServerTestSuite) TestEditTag() {
-	tag := s.db.NewTag("News")
-	s.Require().NotEmpty(tag.APIID)
-
-	payload := []byte(`{"name": "World News"}`)
-	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/tags/"+tag.APIID, bytes.NewBuffer(payload))
-	s.Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(204, resp.StatusCode)
-
-	editedTag, found := s.db.TagWithAPIID(tag.APIID)
-	s.Require().True(found)
-	s.Equal(editedTag.Name, "World News")
-}
-
 func (s *ServerTestSuite) TestDeleteCategory() {
 	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
@@ -533,26 +439,6 @@ func (s *ServerTestSuite) TestDeleteCategory() {
 	s.Equal(204, resp.StatusCode)
 
 	_, found := s.db.CategoryWithAPIID(ctg.APIID)
-	s.False(found)
-}
-
-func (s *ServerTestSuite) TestDeleteTag() {
-	tag := s.db.NewTag("News")
-	s.Require().NotEmpty(tag.APIID)
-
-	req, err := http.NewRequest("DELETE", "http://localhost:9876/v1/tags/"+tag.APIID, nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(204, resp.StatusCode)
-
-	_, found := s.db.CategoryWithAPIID(tag.APIID)
 	s.False(found)
 }
 
@@ -619,108 +505,6 @@ func (s *ServerTestSuite) TestGetEntriesFromCategory() {
 	err = json.NewDecoder(resp.Body).Decode(respEntries)
 	s.Require().Nil(err)
 	s.Len(respEntries.Entries, 5)
-}
-
-func (s *ServerTestSuite) TestGetEntriesFromTag() {
-	tag := s.db.NewTag("News")
-	s.Require().NotEmpty(tag.APIID)
-
-	feed := s.db.NewFeed("World News", s.ts.URL)
-	s.Require().NotEmpty(feed.APIID)
-
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
-
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
-	s.Require().NotEmpty(entries)
-
-	entryAPIIDs := make([]string, len(entries))
-	for i, entry := range entries {
-		entryAPIIDs[i] = entry.APIID
-	}
-
-	err = s.db.TagEntries(tag.APIID, entryAPIIDs)
-	s.Require().Nil(err)
-
-	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags/"+tag.APIID+"/entries", nil)
-	s.Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(200, resp.StatusCode)
-
-	type Entries struct {
-		Entries []models.Entry `json:"entries"`
-	}
-
-	respEntries := new(Entries)
-	err = json.NewDecoder(resp.Body).Decode(respEntries)
-	s.Require().Nil(err)
-	s.Len(respEntries.Entries, 5)
-}
-
-func (s *ServerTestSuite) TestTagEntries() {
-	tag := s.db.NewTag("News")
-
-	feed := s.db.NewFeed("Test site", "http://example.com")
-
-	type EntryIds struct {
-		Entries []string `json:"entries"`
-	}
-
-	var entries []models.Entry
-	for i := 0; i < 5; i++ {
-		entry := models.Entry{
-			Title:  "Test Entry",
-			Author: "varddum",
-			Link:   "http://example.com",
-			Mark:   models.MarkerUnread,
-			Feed:   feed,
-		}
-
-		entries = append(entries, entry)
-	}
-
-	_, err := s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
-
-	entryAPIIDs := make([]string, len(entries))
-	for i, entry := range entries {
-		entryAPIIDs[i] = entry.APIID
-	}
-
-	list := EntryIds{
-		Entries: entryAPIIDs,
-	}
-
-	b, err := json.Marshal(list)
-	s.Require().Nil(err)
-
-	req, err := http.NewRequest("PUT", "http://localhost:9876/v1/tags/"+tag.APIID+"/entries", bytes.NewBuffer(b))
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	taggedEntries := s.db.EntriesFromTag(tag.APIID, models.MarkerAny, true)
-	s.Len(taggedEntries, 5)
 }
 
 func (s *ServerTestSuite) TestMarkCategory() {
@@ -1229,7 +1013,7 @@ func (s *ServerTestSuite) TestOPMLExport() {
 
 func (s *ServerTestSuite) startServer() {
 	conf := config.DefaultConfig
-	conf.Server.HTTPPort = 9876
+	conf.Server.HTTPPort = testHTTPPort
 	conf.Server.AuthSecret = "secret"
 	conf.Server.EnableRequestLogs = false
 
