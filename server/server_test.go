@@ -93,7 +93,7 @@ func (s *ServerTestSuite) SetupTest() {
 }
 
 func (s *ServerTestSuite) TearDownTest() {
-	s.gDB.DeleteUser(s.user.APIID)
+	s.gDB.DeleteAll()
 }
 
 func (s *ServerTestSuite) TestPlugins() {
