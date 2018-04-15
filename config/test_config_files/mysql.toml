@@ -1,6 +1,0 @@
-[server]
-auth_secret = "secret"
-
-[database.mysql]
-enable = true
-connection = "synd:test@/syndication?parseTime=True"

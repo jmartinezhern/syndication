@@ -33,7 +33,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 	"github.com/varddum/syndication/plugins"
@@ -84,7 +83,7 @@ func (s *ServerTestSuite) SetupTest() {
 
 	s.Require().NotEmpty(user.APIID)
 
-	token, err := s.db.NewAPIKey(s.server.config.AuthSecret, time.Hour*72)
+	token, err := s.db.NewAPIKey(s.server.authSecret, time.Hour*72)
 	s.Require().Nil(err)
 	s.Require().NotEmpty(token.Key)
 
@@ -246,28 +245,17 @@ func (s *ServerTestSuite) TestOPMLExport() {
 }
 
 func (s *ServerTestSuite) startServer() {
-	conf := config.DefaultConfig
-	conf.Server.HTTPPort = testHTTPPort
-	conf.Server.AuthSecret = "secret"
-	conf.Server.EnableRequestLogs = false
-
 	var err error
-	s.gDB, err = database.NewDB(config.Database{
-		Type:       "sqlite3",
-		Connection: TestDBPath,
-		APIKeyExpiration: config.Duration{
-			Duration: time.Hour * 72,
-		},
-	})
+	s.gDB, err = database.NewDB("sqlite3", TestDBPath)
 	s.Require().Nil(err)
 
 	if s.server == nil {
 		plgnPath := []string{os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/api.so"}
 		plgns := plugins.NewPlugins(plgnPath)
 
-		s.server = NewServer(s.gDB, &plgns, conf.Server)
+		s.server = NewServer(s.gDB, &plgns)
 		s.server.handle.HideBanner = true
-		go s.server.Start()
+		go s.server.Start("localhost", 9876)
 	}
 
 	time.Sleep(time.Second)

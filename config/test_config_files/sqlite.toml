@@ -1,6 +1,0 @@
-[server]
-auth_secret = "secret_cat"
-
-[database.sqlite]
-enable = true
-connection = "/tmp/syndication.db"

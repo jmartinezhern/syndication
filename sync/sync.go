@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 
@@ -269,10 +268,10 @@ func (s *Service) Stop() {
 }
 
 // NewService creates a new SyncService object
-func NewService(db *database.DB, config config.Sync) Service {
+func NewService(db *database.DB, syncInterval time.Duration) Service {
 	return Service{
 		db:       db,
 		status:   make(chan syncStatus),
-		interval: config.SyncInterval.Duration,
+		interval: syncInterval,
 	}
 }

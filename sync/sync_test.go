@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 )
@@ -41,14 +40,8 @@ const (
 	baseURL = "http://localhost"
 
 	rssMinimalURL = baseURL + feedPort + "/rss_minimal.xml"
-)
 
-var (
-	defaultTestConfig = config.Sync{
-		SyncInterval: config.Duration{
-			Duration: time.Second * 5,
-		},
-	}
+	testSyncInterval = time.Second * 5
 )
 
 type (
@@ -93,7 +86,7 @@ func (s *SyncTestSuite) TestSyncUser() {
 	feed := s.db.NewFeed("Sync Test", rssMinimalURL)
 	s.Require().NotEmpty(feed.APIID)
 
-	serv := NewService(s.gDB, defaultTestConfig)
+	serv := NewService(s.gDB, testSyncInterval)
 	err := serv.SyncUser(&s.user)
 	s.Require().Nil(err)
 
@@ -114,7 +107,7 @@ func (s *SyncTestSuite) TestSyncUsers() {
 		userDB.NewFeed("Sync Test", rssMinimalURL)
 	}
 
-	serv := NewService(s.gDB, defaultTestConfig)
+	serv := NewService(s.gDB, testSyncInterval)
 
 	serv.SyncUsers()
 
@@ -142,11 +135,7 @@ func (s *SyncTestSuite) TestSyncService() {
 		userDB.NewFeed("Sync Test", rssMinimalURL)
 	}
 
-	serv := NewService(s.gDB, config.Sync{
-		SyncInterval: config.Duration{
-			Duration: time.Second,
-		},
-	})
+	serv := NewService(s.gDB, time.Second)
 
 	serv.Start()
 
@@ -165,10 +154,7 @@ func (s *SyncTestSuite) TestSyncService() {
 }
 
 func (s *SyncTestSuite) startServer() {
-	s.gDB, _ = database.NewDB(config.Database{
-		Type:       "sqlite3",
-		Connection: testDatabasePath,
-	})
+	s.gDB, _ = database.NewDB("sqlite3", testDatabasePath)
 
 	s.server = &http.Server{
 		Addr:    feedPort,

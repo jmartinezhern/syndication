@@ -38,7 +38,7 @@ func (s *Server) Login(c echo.Context) error {
 
 	userDB := s.db.NewUserDB(user)
 
-	key, err := userDB.NewAPIKey(s.config.AuthSecret, time.Hour*72)
+	key, err := userDB.NewAPIKey(s.authSecret, time.Hour*72)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError)
 	}

@@ -38,7 +38,6 @@ import (
 	"golang.org/x/crypto/scrypt"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/varddum/syndication/config"
 )
 
 // Password salt and Hash byte sizes
@@ -50,8 +49,7 @@ const (
 type (
 	// DB represents a connectin to a SQL database
 	DB struct {
-		db     *gorm.DB
-		config config.Database
+		db *gorm.DB
 	}
 )
 
@@ -62,14 +60,10 @@ var (
 )
 
 // NewDB creates a new DB instance
-func NewDB(conf config.Database) (*DB, error) {
-	gormDB, err := gorm.Open(conf.Type, conf.Connection)
+func NewDB(dbType, connection string) (*DB, error) {
+	gormDB, err := gorm.Open(dbType, connection)
 	if err != nil {
 		return nil, err
-	}
-
-	db := &DB{
-		config: conf,
 	}
 
 	gormDB.AutoMigrate(&models.Feed{})
@@ -79,7 +73,9 @@ func NewDB(conf config.Database) (*DB, error) {
 	gormDB.AutoMigrate(&models.Tag{})
 	gormDB.AutoMigrate(&models.APIKey{})
 
-	db.db = gormDB
+	db := &DB{
+		db: gormDB,
+	}
 
 	return db, nil
 }

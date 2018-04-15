@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/models"
 )
 
@@ -42,10 +41,7 @@ const TestUserDBPath = "/tmp/syndication-test-db.db"
 
 func (s *UserDBTestSuite) SetupTest() {
 	var err error
-	s.gDB, err = NewDB(config.Database{
-		Connection: TestUserDBPath,
-		Type:       "sqlite3",
-	})
+	s.gDB, err = NewDB("sqlite3", TestUserDBPath)
 	s.Require().NotNil(s.gDB)
 	s.Require().Nil(err)
 
@@ -58,7 +54,7 @@ func (s *UserDBTestSuite) SetupTest() {
 func (s *UserDBTestSuite) TearDownTest() {
 	err := s.gDB.Close()
 	s.Nil(err)
-	err = os.Remove(s.gDB.config.Connection)
+	err = os.Remove(TestUserDBPath)
 	s.Nil(err)
 }
 

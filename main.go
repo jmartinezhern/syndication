@@ -21,119 +21,77 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/fatih/color"
-	"github.com/urfave/cli"
-
 	"github.com/varddum/syndication/admin"
-	"github.com/varddum/syndication/config"
+	"github.com/varddum/syndication/cmd"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/plugins"
 	"github.com/varddum/syndication/server"
 	"github.com/varddum/syndication/sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var intSignal chan os.Signal
 
-const appName = "syndication"
-const appUsage = "An flexible RSS server"
+func main() {
+	if err := cmd.Execute(); err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
 
-var appFlags = []cli.Flag{
-	cli.StringFlag{
-		Name:  "config",
-		Usage: "Path to a configuration file",
-	},
-	cli.StringFlag{
-		Name:  "socket",
-		Usage: "Path to admin socket",
-	},
-	cli.BoolFlag{
-		Name:  "admin",
-		Usage: "Enable/Disable admin",
-	},
-	cli.BoolFlag{
-		Name:  "sync",
-		Usage: "Enable/Disable sync",
-	},
-}
+	config := cmd.EffectiveConfig
 
-func listenForInterrupt() {
-	intSignal = make(chan os.Signal, 1)
-	signal.Notify(intSignal, os.Interrupt)
-}
+	db, err := database.NewDB(
+		config.Database.Type,
+		config.Database.Connection)
+	if err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
 
-func readConfig(c *cli.Context) (config.Config, error) {
-	if c.String("config") == "" {
-		conf, err := config.ReadUserConfig()
+	sync := sync.NewService(db, config.SyncInterval)
+
+	if config.Admin.Enable {
+		admin, err := admin.NewAdmin(db, config.Admin.SocketPath)
 		if err != nil {
-			color.Yellow(err.Error())
-			color.Yellow("Trying system configuration")
-			return config.ReadSystemConfig()
+			log.Error(err)
+			os.Exit(1)
 		}
+		admin.Start()
 
-		return conf, err
+		defer admin.Stop(true)
 	}
-
-	return config.NewConfig(c.String("config"))
-}
-
-func startApp(c *cli.Context) error {
-	conf, err := readConfig(c)
-	if err != nil {
-		color.Red("Failed to find a configuration file.")
-		return err
-	}
-
-	db, err := database.NewDB(conf.Database)
-	if err != nil {
-		return err
-	}
-
-	sync := sync.NewService(db, conf.Sync)
-
-	admin, err := admin.NewAdmin(db, conf.Admin.SocketPath)
-	if err != nil {
-		return err
-	}
-	admin.Start()
-
-	defer admin.Stop(true)
 
 	sync.Start()
 
-	plugins := plugins.NewPlugins(conf.Plugins)
+	plugins := plugins.Plugins{}
 
 	listenForInterrupt()
 
-	server := server.NewServer(db, &plugins, conf.Server)
+	server := server.NewServer(db, &plugins)
 	go func() {
 		for sig := range intSignal {
 			if sig == os.Interrupt || sig == os.Kill {
 				err := server.Stop()
 				if err != nil {
-					color.Red(err.Error())
+					log.Error(err)
+					os.Exit(1)
 				}
 			}
 		}
 	}()
 
-	if err := server.Start(); err != nil {
-		color.Red(err.Error())
-	}
+	err = server.Start(
+		config.Host.Address,
+		config.Host.Port)
 
-	return nil
+	if err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
 }
 
-func main() {
-	app := cli.NewApp()
-
-	app.Name = appName
-	app.Usage = appUsage
-	app.Flags = appFlags
-
-	app.Action = startApp
-
-	err := app.Run(os.Args)
-	if err != nil {
-		color.Red(err.Error())
-	}
+func listenForInterrupt() {
+	intSignal = make(chan os.Signal, 1)
+	signal.Notify(intSignal, os.Interrupt)
 }

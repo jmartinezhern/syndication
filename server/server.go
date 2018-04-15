@@ -23,13 +23,17 @@ package server
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"os/user"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/varddum/syndication/config"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 	"github.com/varddum/syndication/plugins"
@@ -40,9 +44,16 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-const echoSyndUserDBKey = "syndUserDB"
+const (
+	generatedSecretLength    = 128
+	echoSyndUserDBKey        = "syndUserDB"
+	syndicationDirPathSuffix = "/.config/syndication"
+	authSecretPathSuffix     = "/.config/syndication/auth_secret"
+)
 
 var unauthorizedPaths []string
+
+var serverShutdownTimeout = time.Second * 5
 
 type (
 	// EntryQueryParams maps query parameters used when GETting entries resources
@@ -58,8 +69,11 @@ type (
 		handle  *echo.Echo
 		db      *database.DB
 		plugins *plugins.Plugins
-		config  config.Server
 		groups  map[string]*echo.Group
+
+		isTLSEnabled bool
+		port         string
+		authSecret   string
 	}
 
 	// ErrorResp represents a common format for error responses returned by a Server
@@ -69,12 +83,11 @@ type (
 )
 
 // NewServer creates a new server instance
-func NewServer(db *database.DB, plugins *plugins.Plugins, config config.Server) *Server {
+func NewServer(db *database.DB, plugins *plugins.Plugins) *Server {
 	server := Server{
 		handle:  echo.New(),
 		db:      db,
 		plugins: plugins,
-		config:  config,
 		groups:  map[string]*echo.Group{},
 	}
 
@@ -88,10 +101,22 @@ func NewServer(db *database.DB, plugins *plugins.Plugins, config config.Server) 
 		}
 	}
 
-	if config.EnableTLS {
-		server.handle.AutoTLSManager.HostPolicy = autocert.HostWhitelist(config.Domain)
-		server.handle.AutoTLSManager.Cache = autocert.DirCache(config.CertCacheDir)
+	secret, err := getSecretFromFilesystem()
+	if err != nil {
+		secret, err = generateSecret()
+		if err != nil {
+			panic(err)
+		}
+
+		err = saveSecretToFilesystem(secret)
+		if err != nil {
+			panic(err)
+		}
 	}
+
+	server.authSecret = secret
+
+	server.handle.HideBanner = true
 
 	server.registerHandlers()
 	server.registerPluginHandlers()
@@ -100,23 +125,48 @@ func NewServer(db *database.DB, plugins *plugins.Plugins, config config.Server) 
 	return &server
 }
 
+// EnableTLS for the server instance
+func (s *Server) EnableTLS(certCacheDir, domain string) {
+	s.handle.AutoTLSManager.HostPolicy = autocert.HostWhitelist(domain)
+	s.handle.AutoTLSManager.Cache = autocert.DirCache(certCacheDir)
+
+	s.isTLSEnabled = true
+}
+
 // Start the server
-func (s *Server) Start() error {
-	var port string
-	if s.config.EnableTLS {
-		port = strconv.Itoa(s.config.TLSPort)
-	} else {
-		port = strconv.Itoa(s.config.HTTPPort)
+func (s *Server) Start(address string, port int) error {
+	conn := address + ":" + strconv.Itoa(port)
+	if s.isTLSEnabled {
+		return s.handle.StartAutoTLS(conn)
 	}
 
-	var err error
-	if s.config.EnableTLS {
-		err = s.handle.StartAutoTLS(":" + port)
-	} else {
-		err = s.handle.Start(":" + port)
+	return s.handle.Start(conn)
+}
+
+func getSecretFromFilesystem() (string, error) {
+	currUser, err := user.Current()
+	if err != nil {
+		return "", err
 	}
 
-	return err
+	b, err := ioutil.ReadFile(currUser.HomeDir + authSecretPathSuffix)
+
+	return string(b), err
+}
+
+func saveSecretToFilesystem(secret string) error {
+	currUser, err := user.Current()
+	if err != nil {
+		return err
+	}
+
+	dir := currUser.HomeDir + syndicationDirPathSuffix
+	err = os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(currUser.HomeDir+authSecretPathSuffix, []byte(secret), 0600)
 }
 
 func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
@@ -160,7 +210,7 @@ func (s *Server) Stop() error {
 		plugin.Shutdown()
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout.Duration*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 	defer cancel()
 	return s.handle.Shutdown(ctx)
 }
@@ -263,34 +313,41 @@ func (s *Server) importFeeds(data []byte, reqImporter models.Importer, userDB *d
 	return nil
 }
 
+func generateSecret() (string, error) {
+	b := make([]byte, generatedSecretLength)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(b)[0:generatedSecretLength], nil
+}
+
 func (s *Server) registerMiddleware() {
 	s.handle.Use(middleware.CORS())
 
 	s.handle.Use(middleware.SecureWithConfig(middleware.SecureConfig{
-		XSSProtection:      "",
-		XFrameOptions:      "",
-		ContentTypeNosniff: "nosniff", HSTSMaxAge: 3600,
+		XSSProtection:         "",
+		XFrameOptions:         "",
+		ContentTypeNosniff:    "nosniff",
+		HSTSMaxAge:            3600,
 		ContentSecurityPolicy: "default-src 'self'",
 	}))
 
 	s.handle.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
 		StackSize:         1 << 10, // 1 KB
-		DisablePrintStack: s.config.EnablePanicPrintStack,
+		DisablePrintStack: false,
 	}))
 
 	s.handle.Use(middleware.JWTWithConfig(middleware.JWTConfig{
 		Skipper: func(c echo.Context) bool {
 			return c.Request().Method == "OPTIONS" || isPathUnauthorized(c.Path())
 		},
-		SigningKey:    []byte(s.config.AuthSecret),
+		SigningKey:    []byte(s.authSecret),
 		SigningMethod: "HS256",
 	}))
 
 	s.handle.Use(s.checkAuth)
-
-	if s.config.EnableRequestLogs {
-		s.handle.Use(middleware.Logger())
-	}
 }
 
 func isPathUnauthorized(path string) bool {

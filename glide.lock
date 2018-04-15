@@ -1,5 +1,5 @@
-hash: f2f24d6f9dada60a57686533584452cbbf2f37314c2fa3c851fd948262b0a672
-updated: 2018-03-12T20:31:41.295565415-05:00
+hash: 3e25583b68d0ee18f9d6b42da117a7c78c83da776621afd00bdaa978430ce517
+updated: 2018-04-18T15:54:28.059494967-05:00
 imports:
 - name: github.com/andybalholm/cascadia
   version: 349dd0209470eabd9514242c688c403c0926d266
@@ -9,8 +9,24 @@ imports:
   version: d2709f9f1f31ebcda9651b03077758c1f3a0018c
 - name: github.com/fatih/color
   version: 570b54cabe6b8eb0bc2dfce68d964677d63b5260
+- name: github.com/fsnotify/fsnotify
+  version: c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9
 - name: github.com/go-sql-driver/mysql
   version: 26471af196a17ee75a22e6481b5a5897fb16b081
+- name: github.com/hashicorp/hcl
+  version: ef8a98b0bbce4a65b5aa4c368430a80ddc533168
+  subpackages:
+  - hcl/ast
+  - hcl/parser
+  - hcl/printer
+  - hcl/scanner
+  - hcl/strconv
+  - hcl/token
+  - json/parser
+  - json/scanner
+  - json/token
+- name: github.com/inconshreveable/mousetrap
+  version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/jinzhu/gorm
   version: 5174cc5c242a728b435ea2be8a2f7f998e15429b
   subpackages:
@@ -35,14 +51,16 @@ imports:
   subpackages:
   - hstore
   - oid
+- name: github.com/magiconair/properties
+  version: 2c9e9502788518c97fe44e8955cd069417ee89df
 - name: github.com/mattn/go-colorable
   version: 5411d3eea5978e6cdc258b30de592b60df6aba96
-  repo: https://github.com/mattn/go-colorable
 - name: github.com/mattn/go-isatty
   version: 57fdcb988a5c543893cc61bce354a6e24ab70022
-  repo: https://github.com/mattn/go-isatty
 - name: github.com/mattn/go-sqlite3
   version: 144deb6596cd6dbb49158b3d6f6a0e742715f9a5
+- name: github.com/mitchellh/mapstructure
+  version: 00c29f56e2386353d58c599509e8dc3801b0d716
 - name: github.com/mmcdole/gofeed
   version: 42010a154d249f5f753dfe03a6390b59671e403e
   subpackages:
@@ -52,10 +70,26 @@ imports:
   - rss
 - name: github.com/mmcdole/goxpp
   version: 77e4a51a73ed99ee3f33c1474dc166866304acbd
+- name: github.com/pelletier/go-toml
+  version: 66540cf1fcd2c3aee6f6787dfa32a6ae9a870f12
 - name: github.com/PuerkitoBio/goquery
   version: ce645ea5e67a713599b7415f21f0786451fa9554
 - name: github.com/sirupsen/logrus
   version: c155da19408a8799da419ed3eeb0cb5db0ad5dbc
+- name: github.com/spf13/afero
+  version: 63644898a8da0bc22138abf860edaf5277b6102e
+  subpackages:
+  - mem
+- name: github.com/spf13/cast
+  version: 8965335b8c7107321228e3e3702cab9832751bac
+- name: github.com/spf13/cobra
+  version: a1f051bc3eba734da4772d60e2d677f47cf93ef4
+- name: github.com/spf13/jwalterweatherman
+  version: 7c0cea34c8ece3fbeb2b27ab9b59511d360fb394
+- name: github.com/spf13/pflag
+  version: 583c0c0531f06d5278b7d917446061adc344b5cd
+- name: github.com/spf13/viper
+  version: b5e8006cbee93ec955a89ab31e0e3ce3204f3736
 - name: github.com/urfave/cli
   version: cfb38830724cc34fedffe9a2a29fb54fa9169cd1
 - name: github.com/valyala/bytebufferpool
@@ -78,8 +112,7 @@ imports:
   - html/atom
   - html/charset
 - name: golang.org/x/sys
-  version: e24f485414aeafb646f6fca458b0bf869c0880a1
-  repo: https://go.googlesource.com/sys
+  version: 9b006099084093fa764af5878f937ff7dafc6051
   subpackages:
   - unix
   - windows
@@ -101,6 +134,9 @@ imports:
   - language
   - runes
   - transform
+  - unicode/norm
+- name: gopkg.in/yaml.v2
+  version: 5420a8b6744d3b0345ab293f6fcba19c978f1183
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
