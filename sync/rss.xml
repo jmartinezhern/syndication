@@ -2,6 +2,7 @@
   <channel>
     <title>RSS Test</title>
     <link>http://localhost:8090</link>
+    <author>webmaster@example.com</author>
     <description>Testing rss feeds</description>
     <language>en</language>
     <lastBuildDate></lastBuildDate>
@@ -11,7 +12,7 @@
       <description>Single test item</description>
       <author>varddum</author>
       <guid>item1@test</guid>
-      <pubDate></pubDate>
+      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
       <source>http://localhost:8090/rss.xml</source>
     </item>
     <item>
@@ -20,7 +21,7 @@
       <description>Single test item</description>
       <author>varddum</author>
       <guid>item2@test</guid>
-      <pubDate></pubDate>
+      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
       <source>http://localhost:8090/rss.xml</source>
     </item>
     <item>
@@ -29,7 +30,7 @@
       <description>Single test item</description>
       <author>varddum</author>
       <guid>item3@test</guid>
-      <pubDate></pubDate>
+      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
       <source>http://localhost:8090/rss.xml</source>
     </item>
     <item>
@@ -38,7 +39,7 @@
       <description>Single test item</description>
       <author>varddum</author>
       <guid>item4@test</guid>
-      <pubDate></pubDate>
+      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
       <source>http://localhost:8090/rss.xml</source>
     </item>
     <item>
@@ -47,7 +48,7 @@
       <description>Single test item</description>
       <author>varddum</author>
       <guid>item5@test</guid>
-      <pubDate></pubDate>
+      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
       <source>http://localhost:8090/rss.xml</source>
     </item>
   </channel>

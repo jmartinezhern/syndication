@@ -96,23 +96,19 @@ func fetchFeed(url, etag string) (gofeed.Feed, error) {
 	req.Header.Add("If-None-Match", etag)
 
 	resp, err := client.Do(req)
+	if err != nil {
+		return gofeed.Feed{}, err
+	}
+
 	defer func() {
 		if err = resp.Body.Close(); err != nil {
 			log.Warn(err)
 		}
 	}()
 
-	if err != nil {
-		return gofeed.Feed{}, err
-	}
-
 	fetchedFeed, err := gofeed.NewParser().Parse(resp.Body)
 	if err != nil {
 		return gofeed.Feed{}, err
-	}
-
-	if fetchedFeed == nil {
-		return gofeed.Feed{}, ErrParsingFeed
 	}
 
 	return *fetchedFeed, nil

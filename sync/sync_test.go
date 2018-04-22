@@ -41,6 +41,8 @@ const (
 
 	rssMinimalURL = baseURL + feedPort + "/rss_minimal.xml"
 
+	rssURL = baseURL + feedPort + "/rss.xml"
+
 	testSyncInterval = time.Second * 5
 )
 
@@ -80,6 +82,46 @@ func (s *SyncTestSuite) SetupTest() {
 
 func (s *SyncTestSuite) TearDownTest() {
 	s.gDB.DeleteAll()
+}
+
+func (s *SyncTestSuite) TestPullUnreachableFeed() {
+	feed := models.Feed{
+		Title:        "Sync Test",
+		Subscription: baseURL + feedPort + "/bogus.xml",
+	}
+
+	_, err := PullFeed(&feed)
+	s.NotNil(err)
+}
+
+func (s *SyncTestSuite) TestPullFeedWithBadSubscription() {
+	feed := models.Feed{
+		Title:        "Sync Test",
+		Subscription: "bogus",
+	}
+
+	_, err := PullFeed(&feed)
+	s.NotNil(err)
+}
+
+func (s *SyncTestSuite) TestSyncWithEtags() {
+	feed := s.db.NewFeed("Sync Test", rssURL)
+	s.Require().NotEmpty(feed.APIID)
+
+	entries, err := PullFeed(&feed)
+	s.Require().Nil(err)
+	s.Require().Len(entries, 5)
+
+	_, err = s.db.NewEntries(entries, feed.APIID)
+	s.Require().Nil(err)
+
+	serv := NewService(s.gDB, testSyncInterval)
+	err = serv.SyncUser(&s.user)
+	s.Require().Nil(err)
+
+	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
+	s.Require().Nil(err)
+	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestSyncUser() {
