@@ -78,6 +78,13 @@ func (s *ImporterTestSuite) TestOPMLExport() {
 	s.Empty(feeds[1].Category.Name)
 }
 
+func (s *ImporterTestSuite) TestMarkerFromString() {
+	s.EqualValues(MarkerUnread, MarkerFromString("unread"))
+	s.EqualValues(MarkerRead, MarkerFromString("read"))
+	s.EqualValues(MarkerNone, MarkerFromString(""))
+	s.EqualValues(MarkerNone, MarkerFromString("bogus"))
+}
+
 func TestImporterTestSuite(t *testing.T) {
 	suite.Run(t, new(ImporterTestSuite))
 }
