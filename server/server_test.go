@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
-	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -35,7 +34,6 @@ import (
 
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
-	"github.com/varddum/syndication/plugins"
 )
 
 const (
@@ -48,6 +46,8 @@ var (
 	testBaseURL = "http://localhost:" + strconv.Itoa(testHTTPPort)
 )
 
+var mockRSSServer *httptest.Server
+
 type (
 	ServerTestSuite struct {
 		suite.Suite
@@ -57,7 +57,6 @@ type (
 		server *Server
 		user   models.User
 		token  string
-		ts     *httptest.Server
 	}
 )
 
@@ -76,6 +75,14 @@ func RandStringRunes(n int) string {
 }
 
 func (s *ServerTestSuite) SetupTest() {
+	var err error
+	s.gDB, err = database.NewDB("sqlite3", TestDBPath)
+	s.Require().Nil(err)
+
+	s.server = NewServer(s.gDB)
+	s.server.handle.HideBanner = true
+	go s.server.Start("localhost", 9876)
+
 	randUserName := RandStringRunes(8)
 
 	user := s.gDB.NewUser(randUserName, "testtesttest")
@@ -92,19 +99,9 @@ func (s *ServerTestSuite) SetupTest() {
 }
 
 func (s *ServerTestSuite) TearDownTest() {
-	s.gDB.DeleteAll()
-}
+	os.Remove(TestDBPath)
 
-func (s *ServerTestSuite) TestPlugins() {
-	req, err := http.NewRequest("GET", "http://localhost:9876/api_test/hello_world", nil)
-	s.Require().Nil(err)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(200, resp.StatusCode)
+	s.server.Stop()
 }
 
 func (s *ServerTestSuite) TestGetStats() {
@@ -244,87 +241,10 @@ func (s *ServerTestSuite) TestOPMLExport() {
 	s.True(passed)
 }
 
-func (s *ServerTestSuite) startServer() {
-	var err error
-	s.gDB, err = database.NewDB("sqlite3", TestDBPath)
-	s.Require().Nil(err)
-
-	if s.server == nil {
-		plgnPath := []string{os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/api.so"}
-		plgns := plugins.NewPlugins(plgnPath)
-
-		s.server = NewServer(s.gDB, &plgns)
-		s.server.handle.HideBanner = true
-		go s.server.Start("localhost", 9876)
-	}
-
-	time.Sleep(time.Second)
-
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `<rss>
-		<channel>
-    <title>RSS Test</title>
-    <link>http://localhost:9876</link>
-    <description>Testing rss feeds</description>
-    <language>en</language>
-    <lastBuildDate></lastBuildDate>
-    <item>
-      <title>Item 1</title>
-      <link>http://localhost:9876/item_1</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item1@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:9876/rss.xml</source>
-    </item>
-    <item>
-      <title>Item 2</title>
-      <link>http://localhost:9876/item_2</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item2@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:9876/rss.xml</source>
-    </item>
-    <item>
-      <title>Item 3</title>
-      <link>http://localhost:9876/item_3</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item3@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:9876/rss.xml</source>
-    </item>
-    <item>
-      <title>Item 4</title>
-      <link>http://localhost:9876/item_4</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item4@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:9876/rss.xml</source>
-    </item>
-    <item>
-      <title>Item 5</title>
-      <link>http://localhost:9876/item_5</link>
-      <description>Single test item</description>
-      <author>varddum</author>
-      <guid>item5@test</guid>
-      <pubDate></pubDate>
-      <source>http://localhost:9876/rss.xml</source>
-    </item>
-		</channel>
-		</rss>`)
-	}
-
-	s.ts = httptest.NewServer(http.HandlerFunc(handler))
-}
-
 func TestServerTestSuite(t *testing.T) {
-	serverSuite := new(ServerTestSuite)
-	serverSuite.startServer()
-	suite.Run(t, serverSuite)
-	serverSuite.server.Stop()
-	os.Remove(TestDBPath)
-	serverSuite.ts.Close()
+	dir := http.Dir(os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/server/")
+	mockRSSServer = httptest.NewServer(http.FileServer(dir))
+	defer mockRSSServer.Close()
+
+	suite.Run(t, new(ServerTestSuite))
 }

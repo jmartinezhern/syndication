@@ -24,7 +24,6 @@ import (
 	"github.com/varddum/syndication/admin"
 	"github.com/varddum/syndication/cmd"
 	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/plugins"
 	"github.com/varddum/syndication/server"
 	"github.com/varddum/syndication/sync"
 
@@ -64,11 +63,9 @@ func main() {
 
 	sync.Start()
 
-	plugins := plugins.Plugins{}
-
 	listenForInterrupt()
 
-	server := server.NewServer(db, &plugins)
+	server := server.NewServer(db)
 	go func() {
 		for sig := range intSignal {
 			if sig == os.Interrupt || sig == os.Kill {

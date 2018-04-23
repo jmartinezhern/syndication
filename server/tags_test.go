@@ -288,7 +288,7 @@ func (s *ServerTestSuite) TestGetEntriesFromTag() {
 	tag := s.db.NewTag("News")
 	s.Require().NotEmpty(tag.APIID)
 
-	feed := s.db.NewFeed("World News", s.ts.URL)
+	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	entries, err := sync.PullFeed(&feed)

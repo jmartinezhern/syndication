@@ -10,8 +10,6 @@ test -z "$(gometalinter -j 4 --disable-all \
   --vendor \
   --deadline=10m ./... 2>&1 | egrep -v 'testdata/' | tee /dev/stderr)"
 
-go build -buildmode=plugin -race ./plugins/examples/api.go
-
 echo "" > coverage.txt
 
 for d in $(go list ./... | grep -v vendor); do

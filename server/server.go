@@ -29,14 +29,12 @@ import (
 	"net/http"
 	"os"
 	"os/user"
-	"path"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
-	"github.com/varddum/syndication/plugins"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
@@ -66,10 +64,9 @@ type (
 	// Server represents a echo server instance and holds references to other components
 	// needed for the REST API handlers.
 	Server struct {
-		handle  *echo.Echo
-		db      *database.DB
-		plugins *plugins.Plugins
-		groups  map[string]*echo.Group
+		handle *echo.Echo
+		db     *database.DB
+		groups map[string]*echo.Group
 
 		isTLSEnabled bool
 		port         string
@@ -83,23 +80,14 @@ type (
 )
 
 // NewServer creates a new server instance
-func NewServer(db *database.DB, plugins *plugins.Plugins) *Server {
+func NewServer(db *database.DB) *Server {
 	server := Server{
-		handle:  echo.New(),
-		db:      db,
-		plugins: plugins,
-		groups:  map[string]*echo.Group{},
+		handle: echo.New(),
+		db:     db,
+		groups: map[string]*echo.Group{},
 	}
 
 	server.groups["v1"] = server.handle.Group("v1")
-	apiPlugins := plugins.APIPlugins()
-	for _, plugin := range apiPlugins {
-		for _, endpnt := range plugin.Endpoints() {
-			if endpnt.Group != "" {
-				server.groups[endpnt.Group] = server.handle.Group(endpnt.Group)
-			}
-		}
-	}
 
 	secret, err := getSecretFromFilesystem()
 	if err != nil {
@@ -119,7 +107,6 @@ func NewServer(db *database.DB, plugins *plugins.Plugins) *Server {
 	server.handle.HideBanner = true
 
 	server.registerHandlers()
-	server.registerPluginHandlers()
 	server.registerMiddleware()
 
 	return &server
@@ -205,11 +192,6 @@ func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
 
 // Stop the server gracefully
 func (s *Server) Stop() error {
-	apiPlugins := s.plugins.APIPlugins()
-	for _, plugin := range apiPlugins {
-		plugin.Shutdown()
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 	defer cancel()
 	return s.handle.Shutdown(ctx)
@@ -425,50 +407,6 @@ func (s *Server) registerHandlers() {
 	v1.OPTIONS("/entries/stats", s.OptionsHandler)
 	v1.OPTIONS("/entries/:entryID", s.OptionsHandler)
 	v1.OPTIONS("/entries/:entryID/mark", s.OptionsHandler)
-}
-
-func (s *Server) registerPluginHandlers() {
-	apiPlugins := s.plugins.APIPlugins()
-	for _, plugin := range apiPlugins {
-		endpoints := plugin.Endpoints()
-		for _, endpoint := range endpoints {
-			s.registerEndpoint(endpoint)
-		}
-	}
-}
-
-func (s *Server) registerEndpoint(endpoint plugins.Endpoint) {
-	var fullPath string
-	handlerWrapper := func(c echo.Context) error {
-		var ctx plugins.APICtx
-		var userCtx plugins.UserCtx
-		userDB, ok := c.Get(echoSyndUserDBKey).(database.UserDB)
-		if endpoint.NeedsUser && ok {
-			userCtx = plugins.NewUserCtx(userDB)
-			ctx = plugins.APICtx{User: &userCtx}
-		} else {
-			ctx = plugins.APICtx{}
-		}
-
-		endpoint.Handler(ctx, c.Response().Writer, c.Request())
-		return nil
-	}
-
-	if endpoint.Group != "" {
-		grp := s.handle.Group(endpoint.Group)
-		s.groups[endpoint.Group] = grp
-		grp.Add(endpoint.Method, endpoint.Path, handlerWrapper)
-
-		fullPath = path.Join("/", endpoint.Group, "/", endpoint.Path)
-	} else {
-		s.handle.Add(endpoint.Method, endpoint.Path, handlerWrapper)
-
-		fullPath = path.Join("/", endpoint.Path)
-	}
-
-	if !endpoint.NeedsUser {
-		unauthorizedPaths = append(unauthorizedPaths, fullPath)
-	}
 }
 
 func convertOrderByParamToValue(param string) bool {

@@ -234,13 +234,3 @@ func (db *DB) UserWithAPIID(apiID string) (user models.User, found bool) {
 	found = !db.db.First(&user, "api_id = ?", apiID).RecordNotFound()
 	return
 }
-
-// DeleteAll records in the database
-func (db *DB) DeleteAll() {
-	db.db.Delete(&models.Feed{})
-	db.db.Delete(&models.Category{})
-	db.db.Delete(&models.User{})
-	db.db.Delete(&models.Entry{})
-	db.db.Delete(&models.Tag{})
-	db.db.Delete(&models.APIKey{})
-}

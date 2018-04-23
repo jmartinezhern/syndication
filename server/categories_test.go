@@ -258,7 +258,7 @@ func (s *ServerTestSuite) TestGetEntriesFromCategory() {
 	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
 
-	feed, err := s.db.NewFeedWithCategory("World News", s.ts.URL, ctg.APIID)
+	feed, err := s.db.NewFeedWithCategory("World News", mockRSSServer.URL+"/rss.xml", ctg.APIID)
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 
@@ -308,7 +308,7 @@ func (s *ServerTestSuite) TestMarkCategory() {
 	ctg := s.db.NewCategory("News")
 	s.Require().NotEmpty(ctg.APIID)
 
-	feed, err := s.db.NewFeedWithCategory("World News", s.ts.URL, ctg.APIID)
+	feed, err := s.db.NewFeedWithCategory("World News", mockRSSServer.URL+"/rss.xml", ctg.APIID)
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 

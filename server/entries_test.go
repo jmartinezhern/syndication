@@ -26,7 +26,7 @@ import (
 )
 
 func (s *ServerTestSuite) TestGetEntries() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
+	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	entries, err := sync.PullFeed(&feed)
@@ -58,7 +58,7 @@ func (s *ServerTestSuite) TestGetEntries() {
 }
 
 func (s *ServerTestSuite) TestGetEntry() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
+	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	entry := models.Entry{
@@ -105,7 +105,7 @@ func (s *ServerTestSuite) TestGetNonExistentEntry() {
 }
 
 func (s *ServerTestSuite) TestMarkEntry() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
+	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	entries, err := sync.PullFeed(&feed)

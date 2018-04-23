@@ -28,7 +28,7 @@ import (
 )
 
 func (s *ServerTestSuite) TestNewFeed() {
-	payload := []byte(`{"title":"RSS Test", "subscription": "` + s.ts.URL + `"}`)
+	payload := []byte(`{"title":"RSS Test", "subscription": "` + mockRSSServer.URL + `/rss.xml"}`)
 	req, err := http.NewRequest("POST", testBaseURL+"/v1/feeds", bytes.NewBuffer(payload))
 	s.Require().Nil(err)
 	req.Header.Set("Authorization", "Bearer "+s.token)
@@ -101,7 +101,7 @@ func (s *ServerTestSuite) TestGetFeeds() {
 }
 
 func (s *ServerTestSuite) TestGetFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
+	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	req, err := http.NewRequest("GET", testBaseURL+"/v1/feeds/"+feed.APIID, nil)
@@ -139,7 +139,7 @@ func (s *ServerTestSuite) TestGetNonExistentFeed() {
 }
 
 func (s *ServerTestSuite) TestEditFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
+	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	payload := []byte(`{"title": "EFF Updates"}`)
@@ -178,7 +178,7 @@ func (s *ServerTestSuite) TestEditNonExistentFeed() {
 }
 
 func (s *ServerTestSuite) TestDeleteFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
+	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	req, err := http.NewRequest("DELETE", testBaseURL+"/v1/feeds/"+feed.APIID, nil)
@@ -212,7 +212,7 @@ func (s *ServerTestSuite) TestDeleteNonExistentFeed() {
 }
 
 func (s *ServerTestSuite) TestGetEntriesFromFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
+	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
 	s.db.NewFeed(feed.Title, feed.Subscription)
 	s.Require().NotEmpty(feed.APIID)
 
@@ -259,7 +259,7 @@ func (s *ServerTestSuite) TestGetEntriesFromNonExistentFeed() {
 }
 
 func (s *ServerTestSuite) TestMarkFeed() {
-	feed := s.db.NewFeed("World News", s.ts.URL)
+	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
 	s.Require().NotEmpty(feed.APIID)
 
 	entries, err := sync.PullFeed(&feed)

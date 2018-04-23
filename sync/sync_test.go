@@ -74,6 +74,8 @@ func (s *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SyncTestSuite) SetupTest() {
+	s.gDB, _ = database.NewDB("sqlite3", testDatabasePath)
+
 	randUserName := RandStringRunes(8)
 	s.user = s.gDB.NewUser(randUserName, "golang")
 	s.db = s.gDB.NewUserDB(s.user)
@@ -81,7 +83,7 @@ func (s *SyncTestSuite) SetupTest() {
 }
 
 func (s *SyncTestSuite) TearDownTest() {
-	s.gDB.DeleteAll()
+	os.Remove(testDatabasePath)
 }
 
 func (s *SyncTestSuite) TestPullUnreachableFeed() {
@@ -196,8 +198,6 @@ func (s *SyncTestSuite) TestSyncService() {
 }
 
 func (s *SyncTestSuite) startServer() {
-	s.gDB, _ = database.NewDB("sqlite3", testDatabasePath)
-
 	s.server = &http.Server{
 		Addr:    feedPort,
 		Handler: s,
