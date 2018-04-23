@@ -37,13 +37,15 @@ import (
 )
 
 const (
-	TestDBPath = "/tmp/syndication-test-server.db"
+	testDBPath = "/tmp/syndication-test-server.db"
+
+	testHost = "localhost"
 
 	testHTTPPort = 9876
 )
 
 var (
-	testBaseURL = "http://localhost:" + strconv.Itoa(testHTTPPort)
+	testBaseURL = "http://" + testHost + ":" + strconv.Itoa(testHTTPPort)
 )
 
 var mockRSSServer *httptest.Server
@@ -76,12 +78,12 @@ func RandStringRunes(n int) string {
 
 func (s *ServerTestSuite) SetupTest() {
 	var err error
-	s.gDB, err = database.NewDB("sqlite3", TestDBPath)
+	s.gDB, err = database.NewDB("sqlite3", testDBPath)
 	s.Require().Nil(err)
 
 	s.server = NewServer(s.gDB)
 	s.server.handle.HideBanner = true
-	go s.server.Start("localhost", 9876)
+	go s.server.Start(testHost, testHTTPPort)
 
 	randUserName := RandStringRunes(8)
 
@@ -99,7 +101,7 @@ func (s *ServerTestSuite) SetupTest() {
 }
 
 func (s *ServerTestSuite) TearDownTest() {
-	os.Remove(TestDBPath)
+	os.Remove(testDBPath)
 
 	s.server.Stop()
 }
@@ -129,7 +131,7 @@ func (s *ServerTestSuite) TestGetStats() {
 		s.db.NewEntry(entry, feed.APIID)
 	}
 
-	req, err := http.NewRequest("GET", "http://localhost:9876/v1/entries/stats", nil)
+	req, err := http.NewRequest("GET", testBaseURL+"/v1/entries/stats", nil)
 
 	s.Nil(err)
 
@@ -164,7 +166,7 @@ func (s *ServerTestSuite) TestOPMLImport() {
 	</opml>
 	`)
 
-	req, err := http.NewRequest("POST", "http://localhost:9876/v1/import", bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", testBaseURL+"/v1/import", bytes.NewBuffer(data))
 	s.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+s.token)
@@ -203,7 +205,7 @@ func (s *ServerTestSuite) TestOPMLExport() {
 
 	bsblFeed := s.db.NewFeed("Baseball", "http://example.com/baseball")
 
-	req, err := http.NewRequest("GET", "http://localhost:9876/v1/export", nil)
+	req, err := http.NewRequest("GET", testBaseURL+"/v1/export", nil)
 	s.Require().Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+s.token)

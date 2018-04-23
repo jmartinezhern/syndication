@@ -308,7 +308,7 @@ func (s *ServerTestSuite) TestGetEntriesFromTag() {
 	err = s.db.TagEntries(tag.APIID, entryAPIIDs)
 	s.Require().Nil(err)
 
-	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags/"+tag.APIID+"/entries", nil)
+	req, err := http.NewRequest("GET", testBaseURL+"/v1/tags/"+tag.APIID+"/entries", nil)
 	s.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+s.token)
@@ -331,7 +331,7 @@ func (s *ServerTestSuite) TestGetEntriesFromTag() {
 }
 
 func (s *ServerTestSuite) TestGetEntriesFromNonExistingTag() {
-	req, err := http.NewRequest("GET", "http://localhost:9876/v1/tags/123456/entries", nil)
+	req, err := http.NewRequest("GET", testBaseURL+"/v1/tags/123456/entries", nil)
 	s.Nil(err)
 
 	req.Header.Set("Authorization", "Bearer "+s.token)
