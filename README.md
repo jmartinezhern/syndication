@@ -2,17 +2,13 @@
 [![codecov](https://codecov.io/gh/varddum/syndication/branch/master/graph/badge.svg)](https://codecov.io/gh/varddum/syndication)
 [![Waffle.io - Columns and their card count](https://badge.waffle.io/varddum/syndication.svg?columns=all)](http://waffle.io/varddum/syndication)
 
-# Syndication - An extendable news aggregation server
+# Syndication - A simple news aggregation server
 
 ## Features
 * JSON REST API
 * Unix socket based Administration API
 * Let's Encrypt through Echo framework (not fully tested)
 * Support for SQLite, MySQL and Postgres
-
-## Planned Features
-- [X] Plugins
-- [X] Tags
 
 ## Building
 
@@ -22,7 +18,3 @@ $ git clone https://github.com/varddum/syndication $GOPATH/src/github.com/varddu
 $ cd syndication/src/github.com/varddum/syndication
 $ make
 ```
-
-## Contributing
-
-Testing, submitting issues, and pull requests are the best ways to contribute.
