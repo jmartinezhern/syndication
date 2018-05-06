@@ -51,14 +51,14 @@ func main() {
 	sync := sync.NewService(db, config.SyncInterval)
 
 	if config.Admin.Enable {
-		admin, err := admin.NewAdmin(db, config.Admin.SocketPath)
+		adminServ, err := admin.NewService(db, config.Admin.SocketPath)
 		if err != nil {
 			log.Error(err)
 			os.Exit(1)
 		}
-		admin.Start()
+		adminServ.Start()
 
-		defer admin.Stop(true)
+		defer adminServ.Stop()
 	}
 
 	sync.Start()

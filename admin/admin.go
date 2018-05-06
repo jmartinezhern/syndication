@@ -17,408 +17,161 @@
 
 package admin
 
-//TODO: Consider SO_PEERCRED with Unix Sockets
-
 import (
-	"encoding/json"
-	"fmt"
-	"io"
+	"errors"
 	"net"
+	"net/rpc"
 	"os"
-	"reflect"
-	"sync"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/varddum/syndication/database"
 )
 
 type (
-	// Admin contains all necessary resources for an administration
-	// api. This includes unix connection resources and command handler
-	// information.
+	// NewUserArgs collects arguments for the
+	// NewUser routine
+	NewUserArgs struct {
+		Username, Password string
+	}
+
+	// ChangeUserNameArgs collects arguments for the
+	// ChangeUserName routine
+	ChangeUserNameArgs struct {
+		UserID, NewName string
+	}
+
+	// ChangeUserPasswordArgs collects arguments for the
+	// ChangeUserPassword routine
+	ChangeUserPasswordArgs struct {
+		UserID, NewPassword string
+	}
+
+	// User collects user information that can be exported by
+	// the rpc service
+	User struct {
+		Name, ID string
+	}
+
+	// Service represents a rpc service administration
+	// routines
+	Service struct {
+		ln         *net.UnixListener
+		socketPath string
+		state      chan bool
+		server     *rpc.Server
+	}
+
+	// Admin represents adminstration routines available over rpc
 	Admin struct {
-		ln          *net.UnixListener
-		socketPath  string
-		State       chan state
-		db          *database.DB
-		lock        sync.Mutex
-		cmdHandlers map[string]reflect.Value
-		connections []*net.UnixConn
+		db *database.DB
 	}
-
-	// Request represents a request made to the Admin API
-	Request struct {
-		Command   string `json:"command"`
-		Arguments args   `json:"arguments"`
-	}
-
-	// Response represents a response given as a result
-	// of a request to the Admin API.
-	Response struct {
-		Status StatusCode  `json:"status"`
-		Error  string      `json:"error,omitempty"`
-		Result interface{} `json:"result,optional"`
-	}
-)
-
-// StatusCode represents the status of a request.
-type StatusCode int
-
-const (
-	// OK signals that the command was successful.
-	OK StatusCode = iota
-
-	// NotImplemented signals that the command requested
-	// is not implemented by the service.
-	NotImplemented
-
-	// UnknownCommand signals that the requested command
-	// could not be identified.
-	UnknownCommand
-
-	// BadRequest signals that the request is invalid.
-	BadRequest
-
-	// BadArgument signals that the some or all of the
-	// given arguments are invalid.
-	BadArgument
-
-	// DatabaseError signals that the command failed due to
-	// a database error.
-	DatabaseError
-
-	// InternalError signals that the command failed due to
-	// other errors.
-	InternalError
-)
-
-type args map[string]interface{}
-
-type state int
-
-const (
-	listening state = iota
-	stopping
-	stopped
 )
 
 const defaultSocketPath = "/var/run/syndication/admin"
-const userDoesNotExistErrStr = "User does not exist"
-const internalErrStr = "Internal Error"
 
-func badArgumentErrorStr(argNum int) string {
-	return fmt.Sprintf("Arg %d is invalid", argNum)
-}
-
-// NewUser creates a user
-func (a *Admin) NewUser(args args, r *Response) error {
-	var username string
-	var password string
-
-	r.Status = BadArgument
-
-	aVal := reflect.ValueOf(args["username"])
-	if aVal.Kind() != reflect.String {
-		r.Error = "Bad first argument"
-		return nil
+// NewUser creates a new user
+func (a *Admin) NewUser(args NewUserArgs, msg *string) error {
+	if _, found := a.db.UserWithName(args.Username); found {
+		*msg = "User already exists"
+		return errors.New("User already exists")
 	}
 
-	bVal := reflect.ValueOf(args["password"])
-	if bVal.Kind() != reflect.String {
-		r.Error = "Bad second argument"
-		return nil
-	}
+	a.db.NewUser(args.Username, args.Password)
 
-	username = aVal.String()
-	password = bVal.String()
-
-	user := a.db.NewUser(username, password)
-
-	if user.ID == 0 {
-		r.Status = DatabaseError
-		r.Error = "Failed to create user"
-		return nil
-	}
-
-	r.Status = OK
-	r.Error = "OK"
 	return nil
 }
 
-// DeleteUser deletes a user
-func (a *Admin) DeleteUser(args args, r *Response) error {
-	r.Status = BadArgument
-	r.Error = badArgumentErrorStr(1)
+// DeleteUser deletes a user with userID
+func (a *Admin) DeleteUser(userID string, msg *string) error {
+	return a.db.DeleteUser(userID)
+}
 
-	aVal := reflect.ValueOf(args["userID"])
-	if aVal.Kind() != reflect.String {
+// GetUserID retrieves the user id for a user with username
+func (a *Admin) GetUserID(username string, userID *string) error {
+	if user, found := a.db.UserWithName(username); found {
+		*userID = user.APIID
 		return nil
 	}
 
-	userID := aVal.String()
+	return errors.New("User does not exist")
+}
 
-	if err := a.db.DeleteUser(userID); err != nil {
-		r.Status = DatabaseError
-		r.Error = err.Error()
-	} else {
-		r.Status = OK
-		r.Error = "OK"
+// GetUsers will return all existing usernames with their associated IDs
+func (a *Admin) GetUsers(outLen int, users *[]User) error {
+	dbUsers := a.db.Users("username,id")
+	*users = make([]User, outLen)
+	for idx, user := range dbUsers {
+		if idx >= outLen {
+			break
+		}
+
+		(*users)[idx] = User{user.Username, user.APIID}
 	}
 
 	return nil
 }
 
-// ChangeUserName changes a user's name
-func (a *Admin) ChangeUserName(args args, r *Response) error {
-	r.Status = BadArgument
-
-	aVal := reflect.ValueOf(args["userID"])
-	if aVal.Kind() != reflect.String {
-		r.Error = badArgumentErrorStr(1)
-		return nil
-	}
-
-	bVal := reflect.ValueOf(args["newName"])
-	if bVal.Kind() != reflect.String {
-		r.Error = badArgumentErrorStr(2)
-		return nil
-	}
-
-	userID := aVal.String()
-	newName := bVal.String()
-
-	if err := a.db.ChangeUserName(userID, newName); err != nil {
-		r.Status = DatabaseError
-		r.Error = err.Error()
-		return nil
-	}
-
-	r.Status = OK
-	r.Error = "OK"
-
-	return nil
+// ChangeUserName modifies the username for a user with userID
+func (a *Admin) ChangeUserName(args ChangeUserNameArgs, msg *string) error {
+	return a.db.ChangeUserName(args.UserID, args.NewName)
 }
 
-// ChangeUserPassword changes a user's password.
-func (a *Admin) ChangeUserPassword(args args, r *Response) error {
-	r.Status = BadArgument
-
-	aVal := reflect.ValueOf(args["userID"])
-	if aVal.Kind() != reflect.String {
-		r.Error = badArgumentErrorStr(1)
-		return nil
-	}
-
-	bVal := reflect.ValueOf(args["newPassword"])
-	if bVal.Kind() != reflect.String {
-		r.Error = badArgumentErrorStr(2)
-		return nil
-	}
-
-	userID := aVal.String()
-	newPassword := bVal.String()
-
-	if _, ok := a.db.UserWithAPIID(userID); !ok {
-		r.Status = BadRequest
-		r.Error = userDoesNotExistErrStr
-		return nil
-	}
-
-	err := a.db.ChangeUserPassword(userID, newPassword)
-	if err != nil {
-		r.Status = InternalError
-		r.Error = internalErrStr
-		return nil
-	}
-
-	r.Status = OK
-	r.Error = "OK"
-
-	return nil
+// ChangeUserPassword modifies the password for a user with userID
+func (a *Admin) ChangeUserPassword(args ChangeUserPasswordArgs, msg *string) error {
+	return a.db.ChangeUserPassword(args.UserID, args.NewPassword)
 }
 
-// GetUsers returns a list of all existing users.
-func (a *Admin) GetUsers(_ args, r *Response) error {
-	r.Status = OK
-	r.Error = "OK"
+// Start a admin rpc service
+func (s *Service) Start() {
+	go func() {
+		s.server.Accept(s.ln)
+		s.state <- true
+	}()
 
-	r.Result = a.db.Users("id,created_at,updated_at,api_id,email,username")
-
-	return nil
 }
 
-// GetUser returns all information on a user.
-func (a *Admin) GetUser(args args, r *Response) error {
-	r.Status = BadArgument
-
-	aVal := reflect.ValueOf(args["userID"])
-	if aVal.Kind() != reflect.String {
-		r.Error = "Bad first argument"
-		return nil
+// Stop an admin rpc service
+func (s *Service) Stop() {
+	if err := s.ln.Close(); err != nil {
+		log.Error(err)
 	}
-
-	userID := aVal.String()
-
-	user, found := a.db.UserWithAPIID(userID)
-	if !found {
-		r.Status = BadRequest
-		r.Error = userDoesNotExistErrStr
-	} else {
-		r.Result = user
-		r.Status = OK
-		r.Error = "OK"
-	}
-
-	return nil
+	<-s.state
 }
 
-// NewAdmin creates a new Admin socket and initializes administration handlers
-func NewAdmin(db *database.DB, socketPath string) (*Admin, error) {
-	a := &Admin{
-		db:    db,
-		State: make(chan state),
+// NewService creates a new admin rpc service
+func NewService(db *database.DB, socketPath string) (*Service, error) {
+	s := &Service{
+		server: rpc.NewServer(),
+		state:  make(chan bool),
 	}
 
 	if socketPath != "" {
-		a.socketPath = socketPath
+		s.socketPath = socketPath
 	} else {
-		a.socketPath = defaultSocketPath
+		s.socketPath = defaultSocketPath
 	}
 
-	_, err := os.Stat(a.socketPath)
+	_, err := os.Stat(s.socketPath)
 	if err == nil {
-		err = os.Remove(a.socketPath)
+		err = os.Remove(s.socketPath)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	a.ln, err = net.ListenUnix("unixpacket", &net.UnixAddr{
-		Name: a.socketPath,
+	s.ln, err = net.ListenUnix("unixpacket", &net.UnixAddr{
+		Name: s.socketPath,
 		Net:  "unixpacket"})
 
 	if err != nil {
 		return nil, err
 	}
 
-	aVal := reflect.ValueOf(a)
-	a.cmdHandlers = map[string]reflect.Value{
-		"NewUser":            aVal.MethodByName("NewUser"),
-		"DeleteUser":         aVal.MethodByName("DeleteUser"),
-		"GetUsers":           aVal.MethodByName("GetUsers"),
-		"GetUser":            aVal.MethodByName("GetUser"),
-		"ChangeUserName":     aVal.MethodByName("ChangeUserName"),
-		"ChangeUserPassword": aVal.MethodByName("ChangeUserPassword"),
+	a := &Admin{
+		db: db,
 	}
 
-	return a, nil
-}
+	err = s.server.Register(a)
 
-// Start listening at the administration socket
-func (a *Admin) Start() {
-	go a.listen()
-	a.State <- listening
-}
-
-// Stop listening at the administration socket
-// and optionally wait for a full stop.
-func (a *Admin) Stop(wait bool) {
-	err := a.ln.Close()
-	if err != nil {
-		log.Error(err)
-	}
-	a.State <- stopping
-
-	if wait {
-		<-a.State
-	}
-
-	if _, err := os.Stat(a.socketPath); err == nil {
-		err = os.Remove(a.socketPath)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-}
-
-func (a *Admin) listen() {
-	shouldStop := false
-	for !shouldStop {
-		switch <-a.State {
-		case listening:
-			conn, err := a.ln.AcceptUnix()
-			if err == nil {
-				go a.handleConnection(conn)
-			}
-		case stopping:
-			for _, conn := range a.connections {
-				err := conn.Close()
-				if err != nil {
-					log.Error(err)
-				}
-			}
-
-			shouldStop = true
-		}
-	}
-
-	a.State <- stopped
-}
-
-func (a *Admin) handleConnection(conn *net.UnixConn) {
-	if conn == nil {
-		log.Warn("Connection could not be accepted")
-		return
-	}
-
-	a.connections = append(a.connections, conn)
-
-	a.State <- listening
-
-	for {
-		req := &Request{}
-		resp := &Response{}
-		err := json.NewDecoder(conn).Decode(req)
-
-		// DB blocks on an operation on it but we should not rely on it.
-		if err == nil {
-			a.lock.Lock()
-
-			err = a.processRequest(*req, resp)
-			if err != nil {
-				resp.Status = InternalError
-				resp.Error = "Failed to process request"
-				log.Error(err)
-			}
-
-			a.lock.Unlock()
-		} else if err == io.EOF {
-			return
-		} else {
-			resp.Status = BadRequest
-			resp.Error = "Request is not valid JSON"
-		}
-
-		err = json.NewEncoder(conn).Encode(resp)
-		if err != nil {
-			log.Error(err)
-		}
-	}
-}
-
-func (a *Admin) processRequest(req Request, resp *Response) error {
-	method := a.cmdHandlers[req.Command]
-	if !method.IsValid() {
-		resp.Status = NotImplemented
-		resp.Error = req.Command + " is not implemented."
-		return nil
-	}
-
-	args := []reflect.Value{reflect.ValueOf(req.Arguments), reflect.ValueOf(resp)}
-	rtVals := method.Call(args)
-	if !rtVals[0].IsNil() {
-		return rtVals[0].Interface().(error)
-	}
-
-	return nil
+	return s, err
 }
