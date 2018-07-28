@@ -19,109 +19,78 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/varddum/syndication/models"
 	"net/http"
-	"net/url"
+	"net/http/httptest"
+	"strings"
+
+	"github.com/varddum/syndication/database"
+
+	"github.com/labstack/echo"
 )
 
-func (s *ServerTestSuite) TestRegister() {
-	s.gDB.DeleteUser(s.user.APIID)
+func (t *ServerTestSuite) TestRegister() {
+	username := "test"
+	password := "testtesttest"
 
-	randUserName := RandStringRunes(8)
-	regResp, err := http.PostForm(testBaseURL+"/v1/register",
-		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
+	req := httptest.NewRequest(
+		echo.POST,
+		fmt.Sprintf("/?username=%s&password=%s", username, password),
+		nil,
+	)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	s.Equal(http.StatusNoContent, regResp.StatusCode)
+	c := t.e.NewContext(req, t.rec)
 
-	users := s.gDB.Users("username")
-	s.Len(users, 1)
+	c.SetPath("/v1/auth/register")
 
-	s.Equal(randUserName, users[0].Username)
-	s.NotEmpty(users[0].APIID)
-
-	err = regResp.Body.Close()
-	s.Nil(err)
-
-	s.gDB.DeleteUser(users[0].APIID)
+	t.NoError(t.server.Register(c))
+	t.Equal(http.StatusOK, t.rec.Code)
 }
 
-func (s *ServerTestSuite) TestRegisterConflictingUser() {
-	s.gDB.NewUser("test", "testtesttest")
+func (t *ServerTestSuite) TestLogin() {
+	username := "test"
+	password := "testtesttest"
 
-	regResp, err := http.PostForm(testBaseURL+"/v1/register",
-		url.Values{"username": {"test"}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
+	database.NewUser(username, password)
 
-	s.Equal(http.StatusConflict, regResp.StatusCode)
+	req := httptest.NewRequest(
+		echo.POST,
+		fmt.Sprintf("/?username=%s&password=%s", username, password),
+		nil,
+	)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	c := t.e.NewContext(req, t.rec)
+
+	c.SetPath("/v1/auth/login")
+
+	t.NoError(t.server.Login(c))
+	t.Equal(http.StatusOK, t.rec.Code)
+
+	keys := new(models.APIKeyPair)
+	t.NoError(json.Unmarshal(t.rec.Body.Bytes(), keys))
+	t.NotEmpty(keys.AccessKey)
+	t.NotEmpty(keys.RefreshKey)
 }
 
-func (s *ServerTestSuite) TestLogin() {
-	randUserName := RandStringRunes(8)
-	regResp, err := http.PostForm(testBaseURL+"/v1/register",
-		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestRenew() {
+	keyPair, err := t.server.aUsecase.Register("gopher", "testtesttest")
+	t.Require().NoError(err)
 
-	s.Equal(http.StatusNoContent, regResp.StatusCode)
+	req := httptest.NewRequest(
+		echo.POST,
+		"/",
+		strings.NewReader(
+			fmt.Sprintf(`{ "refreshToken": "%s" }`, keyPair.RefreshKey),
+		),
+	)
+	req.Header.Add("Content-Type", "application/json")
 
-	err = regResp.Body.Close()
-	s.Require().Nil(err)
+	c := t.e.NewContext(req, t.rec)
 
-	loginResp, err := http.PostForm(testBaseURL+"/v1/login",
-		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
+	c.SetPath("/v1/auth/renew")
 
-	s.Equal(http.StatusOK, loginResp.StatusCode)
-
-	type Token struct {
-		Token string `json:"token"`
-	}
-
-	var token Token
-	err = json.NewDecoder(loginResp.Body).Decode(&token)
-	s.Require().Nil(err)
-	s.NotEmpty(token.Token)
-
-	user, found := s.gDB.UserWithName(randUserName)
-	s.True(found)
-
-	err = loginResp.Body.Close()
-	s.Nil(err)
-
-	s.gDB.DeleteUser(user.APIID)
-}
-
-func (s *ServerTestSuite) TestLoginWithNonExistentUser() {
-	loginResp, err := http.PostForm(testBaseURL+"/v1/login",
-		url.Values{"username": {"bogus"}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
-
-	s.Equal(http.StatusUnauthorized, loginResp.StatusCode)
-
-	err = loginResp.Body.Close()
-	s.Nil(err)
-}
-
-func (s *ServerTestSuite) TestLoginWithBadPassword() {
-	randUserName := RandStringRunes(8)
-	regResp, err := http.PostForm(testBaseURL+"/v1/register",
-		url.Values{"username": {randUserName}, "password": {"testtesttest"}})
-	s.Require().Nil(err)
-
-	user, found := s.gDB.UserWithName(randUserName)
-	s.Require().True(found)
-	defer s.gDB.DeleteUser(user.APIID)
-
-	s.Equal(http.StatusNoContent, regResp.StatusCode)
-
-	err = regResp.Body.Close()
-	s.Require().Nil(err)
-
-	loginResp, err := http.PostForm(testBaseURL+"/v1/login",
-		url.Values{"username": {randUserName}, "password": {"bogus"}})
-	s.Require().Nil(err)
-
-	s.Equal(http.StatusUnauthorized, loginResp.StatusCode)
-
-	err = loginResp.Body.Close()
-	s.Nil(err)
+	t.NoError(t.server.Renew(c))
 }

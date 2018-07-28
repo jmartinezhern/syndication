@@ -19,46 +19,70 @@ package server
 
 import (
 	"net/http"
-	"time"
 
+	"github.com/varddum/syndication/models"
+	"github.com/varddum/syndication/usecases"
+
+	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
 )
 
+func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if c.Request().Method == "OPTIONS" || isPathUnauthorized(c.Path()) {
+			return next(c)
+		}
+
+		userClaim := c.Get("user").(*jwt.Token)
+		user, isAuth := s.aUsecase.Authenticate(*userClaim)
+
+		if !isAuth {
+			return echo.NewHTTPError(http.StatusUnauthorized)
+		}
+
+		c.Set(echoSyndUserKey, user)
+
+		return next(c)
+	}
+}
+
 // Login a user
 func (s *Server) Login(c echo.Context) error {
-	username := c.FormValue("username")
-	password := c.FormValue("password")
-
-	user, found := s.db.UserWithCredentials(username, password)
-	if !found {
-		return c.JSON(http.StatusUnauthorized, ErrorResp{
-			Message: "Credentials are invalid",
-		})
-	}
-
-	userDB := s.db.NewUserDB(user)
-
-	key, err := userDB.NewAPIKey(s.authSecret, time.Hour*72)
-	if err != nil {
+	keys, err := s.aUsecase.Login(c.FormValue("username"), c.FormValue("password"))
+	if err == usecases.ErrUserUnauthorized {
+		return echo.NewHTTPError(http.StatusConflict)
+	} else if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, key)
+	return c.JSON(http.StatusOK, keys)
 }
 
 // Register a user
 func (s *Server) Register(c echo.Context) error {
-	username := c.FormValue("username")
-	if _, found := s.db.UserWithName(username); found {
-		return c.JSON(http.StatusConflict, ErrorResp{
-			Message: "User already exists",
-		})
-	}
-
-	user := s.db.NewUser(username, c.FormValue("password"))
-	if user.ID == 0 {
+	keys, err := s.aUsecase.Register(c.FormValue("username"), c.FormValue("password"))
+	if err == usecases.ErrUserConflicts {
+		return echo.NewHTTPError(http.StatusConflict)
+	} else if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
 
-	return echo.NewHTTPError(http.StatusNoContent)
+	return c.JSON(http.StatusOK, keys)
+}
+
+// Renew an API Token
+func (s *Server) Renew(c echo.Context) error {
+	key := models.APIKeyPair{}
+	if err := c.Bind(&key); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest)
+	}
+
+	renewedKey, err := s.aUsecase.Renew(key.RefreshKey)
+	if err == usecases.ErrUserUnauthorized {
+		return echo.NewHTTPError(http.StatusUnauthorized)
+	} else if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError)
+	}
+
+	return c.JSON(http.StatusOK, renewedKey)
 }

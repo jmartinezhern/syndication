@@ -20,10 +20,8 @@
 package database
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"io"
 	mathRand "math/rand"
 	"strconv"
 	"time"
@@ -35,9 +33,6 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"golang.org/x/crypto/scrypt"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // Password salt and Hash byte sizes
@@ -47,7 +42,7 @@ const (
 )
 
 type (
-	// DB represents a connectin to a SQL database
+	// DB represents a connection to a SQL database
 	DB struct {
 		db *gorm.DB
 	}
@@ -58,6 +53,19 @@ var (
 	// on a model that is not found in the database.
 	ErrModelNotFound = errors.New("Model not found in database")
 )
+
+var (
+	lastTimeIDWasCreated int64
+	random32Int          uint32
+	defaultInstance      *DB
+)
+
+// Init initializes a database instance
+func Init(dbType, connection string) error {
+	var err error
+	defaultInstance, err = NewDB(dbType, connection)
+	return err
+}
 
 // NewDB creates a new DB instance
 func NewDB(dbType, connection string) (*DB, error) {
@@ -80,12 +88,31 @@ func NewDB(dbType, connection string) (*DB, error) {
 	return db, nil
 }
 
-var lastTimeIDWasCreated int64
-var random32Int uint32
-
 // Close ends connections with the database
 func (db *DB) Close() error {
 	return db.db.Close()
+}
+
+// Close ends connections with the database
+func Close() error {
+	return defaultInstance.Close()
+}
+
+// Stats returns all Stats for the given user
+func (db *DB) Stats(user models.User) models.Stats {
+	stats := models.Stats{}
+
+	stats.Unread = db.db.Model(&user).Where("mark = ?", models.MarkerUnread).Association("Entries").Count()
+	stats.Read = db.db.Model(&user).Where("mark = ?", models.MarkerRead).Association("Entries").Count()
+	stats.Saved = db.db.Model(&user).Where("saved = ?", true).Association("Entries").Count()
+	stats.Total = db.db.Model(&user).Association("Entries").Count()
+
+	return stats
+}
+
+// Stats returns all Stats for the given user
+func Stats(user models.User) models.Stats {
+	return defaultInstance.Stats(user)
 }
 
 func createAPIID() string {
@@ -101,136 +128,4 @@ func createAPIID() string {
 
 	idStr := strconv.FormatInt(currentTime+int64(random32Int), 10)
 	return base64.StdEncoding.EncodeToString([]byte(idStr))
-}
-
-func createPasswordHashAndSalt(password string) ([]byte, []byte) {
-	var err error
-
-	salt := make([]byte, PWSaltBytes)
-	_, err = io.ReadFull(rand.Reader, salt)
-	if err != nil {
-		panic(err) // We must be able to read from random
-	}
-
-	hash, err := scrypt.Key([]byte(password), salt, 1<<14, 8, 1, PWHashBytes)
-	if err != nil {
-		panic(err) // We must never get an error
-	}
-
-	return hash, salt
-}
-
-// NewUser creates a new User object
-func (db *DB) NewUser(username, password string) models.User {
-	user := models.User{}
-	hash, salt := createPasswordHashAndSalt(password)
-
-	// Construct the user system categories
-	unctgAPIID := createAPIID()
-	user.Categories = append(user.Categories, models.Category{
-		APIID: unctgAPIID,
-		Name:  models.Uncategorized,
-	})
-	user.UncategorizedCategoryAPIID = unctgAPIID
-
-	user.APIID = createAPIID()
-	user.PasswordHash = hash
-	user.PasswordSalt = salt
-	user.Username = username
-
-	db.db.Create(&user).Related(&user.Categories)
-
-	return user
-}
-
-// DeleteUser with apiID
-func (db *DB) DeleteUser(apiID string) error {
-	user, found := db.UserWithAPIID(apiID)
-	if !found {
-		return ErrModelNotFound
-	}
-
-	db.db.Delete(&user)
-	return nil
-}
-
-// ChangeUserName for user with userID
-func (db *DB) ChangeUserName(apiID, newName string) error {
-	user, found := db.UserWithAPIID(apiID)
-	if !found {
-		return ErrModelNotFound
-	}
-
-	db.db.Model(&user).Update("username", newName)
-	return nil
-}
-
-// ChangeUserPassword for user with apiID
-func (db *DB) ChangeUserPassword(apiID, newPassword string) error {
-	user, found := db.UserWithAPIID(apiID)
-	if !found {
-		return ErrModelNotFound
-	}
-
-	hash, salt := createPasswordHashAndSalt(newPassword)
-
-	db.db.Model(&user).Update(models.User{
-		PasswordHash: hash,
-		PasswordSalt: salt,
-	})
-
-	return nil
-}
-
-// Users returns a list of all User entries.
-// The parameter fields provides a way to select
-// which fields are populated in the returned models.
-func (db *DB) Users(fields ...string) []models.User {
-	users := []models.User{}
-
-	selectFields := "id,api_id"
-	if len(fields) != 0 {
-		for _, field := range fields {
-			selectFields = selectFields + "," + field
-		}
-	}
-	db.db.Select(selectFields).Find(&users)
-
-	return users
-}
-
-// UserWithName returns a User with username
-func (db *DB) UserWithName(username string) (user models.User, found bool) {
-	found = !db.db.First(&user, "username = ?", username).RecordNotFound()
-	return
-}
-
-// UserWithCredentials returns a user whose credentials matches the ones given.
-// Ok will be false if the user was not found or if the credentials did not match.
-// This function assumes that the password does not exceed scrypt's payload size.
-func (db *DB) UserWithCredentials(username, password string) (models.User, bool) {
-	foundUser, ok := db.UserWithName(username)
-	if !ok {
-		return models.User{}, ok
-	}
-
-	hash, err := scrypt.Key([]byte(password), foundUser.PasswordSalt, 1<<14, 8, 1, PWHashBytes)
-	if err != nil {
-		log.Error("Failed to generate a hash: ", err)
-		return models.User{}, false
-	}
-
-	for i, hashByte := range hash {
-		if hashByte != foundUser.PasswordHash[i] {
-			return models.User{}, false
-		}
-	}
-
-	return foundUser, true
-}
-
-// UserWithAPIID returns a User with id
-func (db *DB) UserWithAPIID(apiID string) (user models.User, found bool) {
-	found = !db.db.First(&user, "api_id = ?", apiID).RecordNotFound()
-	return
 }

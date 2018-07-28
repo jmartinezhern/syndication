@@ -18,367 +18,284 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
-	"strconv"
+	"net/http/httptest"
+	"strings"
 
+	"github.com/labstack/echo"
+
+	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
-	"github.com/varddum/syndication/sync"
 )
 
-func (s *ServerTestSuite) TestNewFeed() {
-	payload := []byte(`{"title":"RSS Test", "subscription": "` + mockRSSServer.URL + `/rss.xml"}`)
-	req, err := http.NewRequest("POST", testBaseURL+"/v1/feeds", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-	req.Header.Set("Authorization", "Bearer "+s.token)
+func (t *ServerTestSuite) TestNewFeed() {
+	feed := `{ "title": "Example", "subscription": "exampel.com" }`
+
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(feed))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	s.Equal(http.StatusCreated, resp.StatusCode)
+	c.SetPath("/v1/feeds")
 
-	respFeed := new(models.Feed)
-	err = json.NewDecoder(resp.Body).Decode(respFeed)
-	s.Require().Nil(err)
-
-	s.Require().NotEmpty(respFeed.APIID)
-	s.NotEmpty(respFeed.Title)
-
-	dbFeed, found := s.db.FeedWithAPIID(respFeed.APIID)
-	s.Require().True(found)
-	s.Equal(dbFeed.Title, respFeed.Title)
-
-	entries := s.db.EntriesFromFeed(respFeed.APIID, false, models.MarkerAny)
-	s.Require().Len(entries, 5)
-
-	s.Equal("Item 1", entries[0].Title)
+	t.NoError(t.server.NewFeed(c))
+	t.Equal(http.StatusCreated, t.rec.Code)
 }
 
-func (s *ServerTestSuite) TestNewUnretrievableFeed() {
-	payload := []byte(`{"title":"EFF", "subscription": "https://localhost:17170/rss/updates.xml"}`)
-	req, err := http.NewRequest("POST", testBaseURL+"/v1/feeds", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-	req.Header.Set("Authorization", "Bearer "+s.token)
+func (t *ServerTestSuite) TestGetFeeds() {
+	feed := database.NewFeed("Example", "example.com", t.user)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	s.Equal(http.StatusBadRequest, resp.StatusCode)
-}
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-func (s *ServerTestSuite) TestGetFeeds() {
-	for i := 0; i < 5; i++ {
-		feed := s.db.NewFeed("Feed "+strconv.Itoa(i+1), "http://example.com/feed")
-		s.Require().NotEmpty(feed.APIID)
-	}
+	c.SetPath("/v1/feeds")
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/feeds", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusOK, resp.StatusCode)
+	t.NoError(t.server.GetFeeds(c))
+	t.Equal(http.StatusOK, t.rec.Code)
 
 	type Feeds struct {
 		Feeds []models.Feed `json:"feeds"`
 	}
 
-	respFeeds := new(Feeds)
-	err = json.NewDecoder(resp.Body).Decode(respFeeds)
-	s.Require().Nil(err)
-	s.Len(respFeeds.Feeds, 5)
+	var feeds Feeds
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &feeds))
+
+	t.Len(feeds.Feeds, 1)
+	t.Equal(feed.Title, feeds.Feeds[0].Title)
 }
 
-func (s *ServerTestSuite) TestGetFeed() {
-	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
-	s.Require().NotEmpty(feed.APIID)
+func (t *ServerTestSuite) TestGetFeed() {
+	feed := database.NewFeed("Example", "example.com", t.user)
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/feeds/"+feed.APIID, nil)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues(feed.APIID)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/feeds/:feedID")
 
-	s.Equal(http.StatusOK, resp.StatusCode)
+	t.NoError(t.server.GetFeed(c))
+	t.Equal(http.StatusOK, t.rec.Code)
 
-	respFeed := new(models.Feed)
-	err = json.NewDecoder(resp.Body).Decode(respFeed)
-	s.Require().Nil(err)
+	var sFeed models.Feed
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &sFeed))
 
-	s.Equal(feed.Title, respFeed.Title)
-	s.Equal(feed.APIID, respFeed.APIID)
+	t.Equal(feed.Title, sFeed.Title)
 }
 
-func (s *ServerTestSuite) TestGetNonExistentFeed() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/feeds/123456", nil)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestGetUnknownFeed() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues("bogus")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/feeds/:feedID")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	t.EqualError(
+		t.server.GetFeed(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestEditFeed() {
-	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
-	s.Require().NotEmpty(feed.APIID)
+func (t *ServerTestSuite) TestEditFeed() {
+	newFeed := `{ "title": "NewName" }`
+	feed := database.NewFeed("Example", "example.com", t.user)
 
-	payload := []byte(`{"title": "EFF Updates"}`)
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/feeds/"+feed.APIID, bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(newFeed))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues(feed.APIID)
 
-	s.Equal(http.StatusNoContent, resp.StatusCode)
+	c.SetPath("/v1/feeds/:feedID")
 
-	respFeed, found := s.db.FeedWithAPIID(feed.APIID)
-	s.True(found)
-	s.Equal(respFeed.Title, "EFF Updates")
+	t.NoError(t.server.EditFeed(c))
+	t.Equal(http.StatusOK, t.rec.Code)
+
+	var sFeed models.Feed
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &sFeed))
+
+	t.Equal("NewName", sFeed.Title)
 }
 
-func (s *ServerTestSuite) TestEditNonExistentFeed() {
-	payload := []byte(`{"title": "EFF Updates"}`)
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/feeds/123456", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestEditUnkownFeed() {
+	newFeed := `{ "title": "NewName" }`
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(newFeed))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues("bogus")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	c.SetPath("/v1/feeds/:feedID")
+
+	t.EqualError(
+		t.server.EditFeed(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestDeleteFeed() {
-	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
-	s.Require().NotEmpty(feed.APIID)
+func (t *ServerTestSuite) TestDeleteFeed() {
+	feed := database.NewFeed("Example", "example.com", t.user)
+	t.NotEmpty(database.Feeds(t.user))
 
-	req, err := http.NewRequest("DELETE", testBaseURL+"/v1/feeds/"+feed.APIID, nil)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues(feed.APIID)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/feeds/:feedID")
 
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	_, found := s.db.FeedWithAPIID(feed.APIID)
-	s.False(found)
+	t.NoError(t.server.DeleteFeed(c))
 }
 
-func (s *ServerTestSuite) TestDeleteNonExistentFeed() {
-	req, err := http.NewRequest("DELETE", testBaseURL+"/v1/feeds/123456", nil)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestDeleteUnknownFeed() {
+	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues("bogus")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/feeds/:feedID")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	t.EqualError(
+		echo.NewHTTPError(http.StatusNotFound),
+		t.server.DeleteFeed(c).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestGetEntriesFromFeed() {
-	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
-	s.db.NewFeed(feed.Title, feed.Subscription)
-	s.Require().NotEmpty(feed.APIID)
+func (t *ServerTestSuite) TestMarkFeeed() {
+	feed := database.NewFeed(
+		"Example", "example.com", t.user,
+	)
 
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
+	database.NewEntry(models.Entry{
+		Title: "Test Entry",
+		Mark:  models.MarkerUnread,
+	}, feed.APIID, t.user)
 
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
+	t.Require().Len(database.Entries(true, models.MarkerRead, t.user), 0)
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/feeds/"+feed.APIID+"/entries", nil)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues(feed.APIID)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/feeds/:feedID/mark")
 
-	s.Equal(http.StatusOK, resp.StatusCode)
+	t.NoError(t.server.MarkFeed(c))
+	t.Equal(http.StatusNoContent, t.rec.Code)
+}
+
+func (t *ServerTestSuite) TestMarkUnknownFeeed() {
+	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues("bogus")
+
+	c.SetPath("/v1/feeds/:feedID/mark")
+
+	t.EqualError(
+		t.server.MarkFeed(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
+}
+
+func (t *ServerTestSuite) TestGetFeedEntries() {
+	feed := database.NewFeed("Example", "example.com", t.user)
+
+	entry, err := database.NewEntry(models.Entry{
+		Title: "Test Entry",
+	}, feed.APIID, t.user)
+	t.Require().NoError(err)
+
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+
+	c.SetParamNames("feedID")
+	c.SetParamValues(feed.APIID)
+	c.SetPath("/v1/feeds/:feedID/entries")
+
+	t.NoError(t.server.GetFeedEntries(c))
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
 	}
 
-	respEntries := new(Entries)
-	err = json.NewDecoder(resp.Body).Decode(respEntries)
-	s.Require().Nil(err)
-	s.Len(respEntries.Entries, 5)
+	var entries Entries
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &entries))
+
+	t.Len(entries.Entries, 1)
+	t.Equal(entry.Title, entries.Entries[0].Title)
 }
 
-func (s *ServerTestSuite) TestGetEntriesFromNonExistentFeed() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/feeds/123456/entries", nil)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestGetUnknownFeedEntries() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetParamNames("feedID")
+	c.SetParamValues("bogus")
+	c.SetPath("/v1/feeds/:feedID/entries")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	t.EqualError(
+		t.server.GetFeedEntries(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestMarkFeed() {
-	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
-	s.Require().NotEmpty(feed.APIID)
+func (t *ServerTestSuite) TestGetFeedStats() {
+	feed := database.NewFeed("Example", "example.com", t.user)
 
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
-	s.Require().Nil(err)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues(feed.APIID)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
-	s.Require().Len(entries, 5)
+	c.SetPath("/v1/feeds/:feedID/stats")
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
-	s.Require().Len(entries, 0)
+	t.NoError(t.server.GetFeedStats(c))
 
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/feeds/"+feed.APIID+"/mark?as=read", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
-	s.Require().Len(entries, 0)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
-	s.Require().Len(entries, 5)
+	var stats models.Stats
+	t.NoError(json.Unmarshal(t.rec.Body.Bytes(), &stats))
 }
 
-func (s *ServerTestSuite) TestMarkNonExistentFeed() {
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/feeds/123456/mark?as=read", nil)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestGetUnknownFeedStats() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("feedID")
+	c.SetParamValues("bogus")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/feeds/:feedID/stats")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
-}
-
-func (s *ServerTestSuite) TestMarkFeedWithoutMarker() {
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/feeds/123456/mark", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusBadRequest, resp.StatusCode)
-}
-
-func (s *ServerTestSuite) TestGetStatsForFeed() {
-	feed := s.db.NewFeed("News", "http://example.com")
-	s.Require().NotEmpty(feed.APIID)
-
-	for i := 0; i < 3; i++ {
-		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Mark:  models.MarkerRead,
-			Saved: true,
-		}
-
-		s.db.NewEntry(entry, feed.APIID)
-	}
-
-	for i := 0; i < 7; i++ {
-		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Mark:  models.MarkerUnread,
-		}
-
-		s.db.NewEntry(entry, feed.APIID)
-	}
-
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/feeds/"+feed.APIID+"/stats", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusOK, resp.StatusCode)
-
-	respStats := new(models.Stats)
-	err = json.NewDecoder(resp.Body).Decode(respStats)
-	s.Require().Nil(err)
-
-	s.Equal(7, respStats.Unread)
-	s.Equal(3, respStats.Read)
-	s.Equal(3, respStats.Saved)
-	s.Equal(10, respStats.Total)
-}
-
-func (s *ServerTestSuite) TestGetStatsForNonExistentFeed() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/feeds/123456/stats", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	t.EqualError(
+		t.server.GetFeedStats(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }

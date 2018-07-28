@@ -40,18 +40,15 @@ func main() {
 
 	config := cmd.EffectiveConfig
 
-	db, err := database.NewDB(
-		config.Database.Type,
-		config.Database.Connection)
-	if err != nil {
+	if err := database.Init(config.Database.Type, config.Database.Connection); err != nil {
 		log.Error(err)
 		os.Exit(1)
 	}
 
-	sync := sync.NewService(db, config.SyncInterval)
+	sync := sync.NewService(config.Sync.Interval)
 
 	if config.Admin.Enable {
-		adminServ, err := admin.NewService(db, config.Admin.SocketPath)
+		adminServ, err := admin.NewService(config.Admin.SocketPath)
 		if err != nil {
 			log.Error(err)
 			os.Exit(1)
@@ -65,7 +62,7 @@ func main() {
 
 	listenForInterrupt()
 
-	server := server.NewServer(db)
+	server := server.NewServer(config.AuthSecret)
 	go func() {
 		for sig := range intSignal {
 			if sig == os.Interrupt || sig == os.Kill {
@@ -78,7 +75,9 @@ func main() {
 		}
 	}()
 
-	err = server.Start(
+	log.Info("Starting server on ", config.Host.Address, ":", config.Host.Port)
+
+	err := server.Start(
 		config.Host.Address,
 		config.Host.Port)
 

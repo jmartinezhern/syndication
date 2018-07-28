@@ -15,27 +15,54 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package models
+package usecases
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/models"
 )
 
 type (
-	ModelsTestSuite struct {
+	UsecasesTestSuite struct {
 		suite.Suite
+
+		user  models.User
+		entry Entry
+		ctgs  Category
+		feed  Feed
+		tag   Tag
+		auth  Auth
 	}
 )
 
-func (s *ModelsTestSuite) TestMarkerFromString() {
-	s.EqualValues(MarkerUnread, MarkerFromString("unread"))
-	s.EqualValues(MarkerRead, MarkerFromString("read"))
-	s.EqualValues(MarkerNone, MarkerFromString(""))
-	s.EqualValues(MarkerNone, MarkerFromString("bogus"))
+const (
+	testDBPath = "/tmp/syndication-test-usecases.db"
+)
+
+func (t *UsecasesTestSuite) SetupTest() {
+	var err error
+	t.ctgs = new(CategoryUsecase)
+	t.auth = new(AuthUsecase)
+	t.entry = new(EntryUsecase)
+	t.feed = new(FeedUsecase)
+	t.tag = new(TagUsecase)
+
+	err = database.Init("sqlite3", testDBPath)
+	t.Require().Nil(err)
+
+	t.user = database.NewUser("gopher", "testtesttest")
 }
 
-func TestImporterTestSuite(t *testing.T) {
-	suite.Run(t, new(ModelsTestSuite))
+func (t *UsecasesTestSuite) TearDownTest() {
+	os.Remove(testDBPath)
+}
+
+func TestUsecasesTestSuite(t *testing.T) {
+
+	suite.Run(t, new(UsecasesTestSuite))
 }

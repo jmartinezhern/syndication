@@ -18,457 +18,349 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"strconv"
+	"net/http/httptest"
+	"strings"
 
+	"github.com/labstack/echo"
+
+	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
-	"github.com/varddum/syndication/sync"
 )
 
-func (s *ServerTestSuite) TestNewCategory() {
-	payload := []byte(`{"name": "` + RandStringRunes(8) + `"}`)
-	req, err := http.NewRequest("POST", testBaseURL+"/v1/categories", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-	req.Header.Set("Authorization", "Bearer "+s.token)
+func (t *ServerTestSuite) TestNewCategory() {
+	ctg := `{ "name": "Test" }`
+
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(ctg))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	s.Equal(http.StatusCreated, resp.StatusCode)
+	c.SetPath("/v1/categories")
 
-	respCtg := new(models.Category)
-	err = json.NewDecoder(resp.Body).Decode(respCtg)
-	s.Require().Nil(err)
-
-	s.Require().NotEmpty(respCtg.APIID)
-	s.NotEmpty(respCtg.Name)
-
-	dbCtg, found := s.db.CategoryWithAPIID(respCtg.APIID)
-	s.True(found)
-	s.Equal(dbCtg.Name, respCtg.Name)
+	t.NoError(t.server.NewCategory(c))
+	t.Equal(http.StatusCreated, t.rec.Code)
 }
 
-func (s *ServerTestSuite) TestNewConflictingCategory() {
-	ctgName := "Sports"
-	s.db.NewCategory(ctgName)
+func (t *ServerTestSuite) TestNewConflictingCategory() {
+	ctg := `{ "name": "Test" }`
 
-	payload := []byte(`{"name": "` + ctgName + `"}`)
-	req, err := http.NewRequest("POST", testBaseURL+"/v1/categories", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	database.NewCategory("Test", t.user)
+
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(ctg))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	s.Equal(http.StatusConflict, resp.StatusCode)
+	c.SetPath("/v1/categories")
+
+	t.EqualError(
+		echo.NewHTTPError(http.StatusConflict),
+		t.server.NewCategory(c).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestGetCategories() {
-	for i := 0; i < 5; i++ {
-		ctg := s.db.NewCategory("Category " + strconv.Itoa(i+1))
-		s.Require().NotEmpty(ctg.APIID)
-	}
+func (t *ServerTestSuite) TestNewCategoryWithBadInput() {
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(""))
+	req.Header.Set("Content-Type", "application/json")
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/categories", nil)
-	s.Require().Nil(err)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c.SetPath("/v1/categories")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	t.EqualError(
+		echo.NewHTTPError(http.StatusBadRequest),
+		t.server.NewCategory(c).Error(),
+	)
+}
 
-	s.Equal(http.StatusOK, resp.StatusCode)
+func (t *ServerTestSuite) TestGetCategory() {
+	ctg := database.NewCategory("Test", t.user)
 
-	type Categories struct {
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+
+	c.SetPath("/v1/categories/:categoryID")
+	c.SetParamNames("categoryID")
+	c.SetParamValues(ctg.APIID)
+
+	t.NoError(t.server.GetCategory(c))
+	t.Equal(http.StatusOK, t.rec.Code)
+
+	var sCtg models.Category
+	t.NoError(json.Unmarshal(t.rec.Body.Bytes(), &sCtg))
+	t.Equal(ctg.Name, sCtg.Name)
+}
+
+func (t *ServerTestSuite) TestGetMissingCategory() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+
+	c.SetPath("/v1/categories/:categoryID")
+	c.SetParamNames("categoryID")
+	c.SetParamValues("bogus")
+
+	t.EqualError(
+		echo.NewHTTPError(http.StatusNotFound),
+		t.server.GetCategory(c).Error(),
+	)
+}
+
+func (t *ServerTestSuite) TestGetCategories() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+
+	c.SetPath("/v1/categories")
+
+	t.NoError(t.server.GetCategories(c))
+	t.Equal(http.StatusOK, t.rec.Code)
+
+	type ctgs struct {
 		Categories []models.Category `json:"categories"`
 	}
 
-	respCtgs := new(Categories)
-	err = json.NewDecoder(resp.Body).Decode(respCtgs)
-	s.Require().Nil(err)
-
-	s.Len(respCtgs.Categories, 6)
+	var categories ctgs
+	t.NoError(json.Unmarshal(t.rec.Body.Bytes(), &categories))
+	t.Len(categories.Categories, 1)
+	t.Equal("uncategorized", categories.Categories[0].Name)
 }
 
-func (s *ServerTestSuite) TestGetCategory() {
-	ctg := s.db.NewCategory("News")
-	s.Require().NotEmpty(ctg.APIID)
+func (t *ServerTestSuite) TestGetCategoryFeeds() {
+	ctg := database.NewCategory("test", t.user)
+	database.NewFeedWithCategory("example", "example.com", ctg.APIID, t.user)
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/categories/"+ctg.APIID, nil)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues(ctg.APIID)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/categories/:categoryID/feeds")
 
-	s.Equal(http.StatusOK, resp.StatusCode)
+	t.NoError(t.server.GetCategoryFeeds(c))
+	t.Equal(http.StatusOK, t.rec.Code)
 
-	respCtg := new(models.Category)
-	err = json.NewDecoder(resp.Body).Decode(respCtg)
-	s.Require().Nil(err)
-
-	s.Equal(respCtg.Name, ctg.Name)
-	s.Equal(respCtg.APIID, ctg.APIID)
-}
-
-func (s *ServerTestSuite) TestGetNonExistingCategory() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/categories/123456", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNotFound, resp.StatusCode)
-}
-
-func (s *ServerTestSuite) TestEditCategory() {
-	ctg := s.db.NewCategory("News")
-	s.Require().NotEmpty(ctg.APIID)
-
-	payload := []byte(`{"name": "World News"}`)
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/categories/"+ctg.APIID, bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	editedCtg, found := s.db.CategoryWithAPIID(ctg.APIID)
-	s.Require().True(found)
-	s.Equal(editedCtg.Name, "World News")
-}
-
-func (s *ServerTestSuite) TestEditNonExistingCategory() {
-	payload := []byte(`{"name": "World News"}`)
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/categories/123456", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNotFound, resp.StatusCode)
-}
-
-func (s *ServerTestSuite) TestDeleteCategory() {
-	ctg := s.db.NewCategory("News")
-	s.Require().NotEmpty(ctg.APIID)
-
-	req, err := http.NewRequest("DELETE", testBaseURL+"/v1/categories/"+ctg.APIID, nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	_, found := s.db.CategoryWithAPIID(ctg.APIID)
-	s.False(found)
-}
-
-func (s *ServerTestSuite) TestDeleteNonExistingCategory() {
-	req, err := http.NewRequest("DELETE", testBaseURL+"/v1/categories/123456", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNotFound, resp.StatusCode)
-}
-
-func (s *ServerTestSuite) TestGetFeedsFromCategory() {
-	ctg := s.db.NewCategory("News")
-	s.Require().NotEmpty(ctg.APIID)
-
-	_, err := s.db.NewFeedWithCategory("Test feed", testBaseURL, ctg.APIID)
-	s.Require().Nil(err)
-
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/categories/"+ctg.APIID+"/feeds", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusOK, resp.StatusCode)
-
-	type Feeds struct {
+	type feeds struct {
 		Feeds []models.Feed `json:"feeds"`
 	}
 
-	respFeeds := new(Feeds)
-	err = json.NewDecoder(resp.Body).Decode(respFeeds)
-	s.Require().Nil(err)
-	s.Len(respFeeds.Feeds, 1)
+	var ctgFeeds feeds
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &ctgFeeds))
+
+	t.Len(ctgFeeds.Feeds, 1)
 }
 
-func (s *ServerTestSuite) TestGetFeedsFromNonExistingCategory() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/categories/123456/feeds", nil)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestEditCategory() {
+	ctg := database.NewCategory("test", t.user)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	mdfdCtgJSON := `{"name": "gopher"}`
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(mdfdCtgJSON))
+	req.Header.Set("Content-Type", "application/json")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues(ctg.APIID)
+
+	c.SetPath("/v1/categories/:categoryID")
+
+	t.NoError(t.server.EditCategory(c))
+	t.Equal(http.StatusOK, t.rec.Code)
 }
 
-func (s *ServerTestSuite) TestGetEntriesFromCategory() {
-	ctg := s.db.NewCategory("News")
-	s.Require().NotEmpty(ctg.APIID)
+func (t *ServerTestSuite) TestAppendFeeds() {
+	ctg := database.NewCategory("test", t.user)
+	feed := database.NewFeed("example", "example.com", t.user)
 
-	feed, err := s.db.NewFeedWithCategory("World News", mockRSSServer.URL+"/rss.xml", ctg.APIID)
-	s.Require().Nil(err)
-	s.Require().NotEmpty(feed.APIID)
+	feeds := fmt.Sprintf(`{ "feeds": ["%s"] }`, feed.APIID)
 
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(feeds))
+	req.Header.Set("Content-Type", "application/json")
 
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues(ctg.APIID)
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/categories/"+ctg.APIID+"/entries", nil)
-	s.Require().Nil(err)
+	c.SetPath("/v1/categories/:categoryID/feeds")
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	t.NoError(t.server.AppendCategoryFeeds(c))
+	t.Equal(http.StatusNoContent, t.rec.Code)
+}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+func (t *ServerTestSuite) TestDeleteCategory() {
+	ctg := database.NewCategory("test", t.user)
 
-	s.Equal(http.StatusOK, resp.StatusCode)
+	req := httptest.NewRequest(echo.DELETE, "/", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues(ctg.APIID)
+
+	c.SetPath("/v1/categories/:categoryID")
+
+	t.NoError(t.server.DeleteCategory(c))
+	t.Equal(http.StatusNoContent, t.rec.Code)
+}
+
+func (t *ServerTestSuite) TestMarkCategory() {
+	ctg := database.NewCategory("test", t.user)
+
+	feed, err := database.NewFeedWithCategory(
+		"Example", "example.com", ctg.APIID, t.user,
+	)
+	t.Require().NoError(err)
+
+	database.NewEntry(models.Entry{
+		Title: "Test Entry",
+		Mark:  models.MarkerUnread,
+	}, feed.APIID, t.user)
+
+	t.Require().Len(database.Entries(true, models.MarkerRead, t.user), 0)
+
+	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues(ctg.APIID)
+
+	c.SetPath("/v1/categories/:categoryID/mark")
+
+	t.NoError(t.server.MarkCategory(c))
+	t.Equal(http.StatusNoContent, t.rec.Code)
+}
+
+func (t *ServerTestSuite) TestMarkUnknownCategory() {
+	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues("bogus")
+
+	c.SetPath("/v1/categories/:categoryID/mark")
+
+	t.EqualError(
+		echo.NewHTTPError(http.StatusNotFound),
+		t.server.MarkCategory(c).Error(),
+	)
+}
+
+func (t *ServerTestSuite) TestMarkCategoryWithBadMarker() {
+	req := httptest.NewRequest(echo.PUT, "/?as=bogus", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues("bogus")
+
+	c.SetPath("/v1/categories/:categoryID/mark")
+
+	t.EqualError(
+		echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required"),
+		t.server.MarkCategory(c).Error(),
+	)
+}
+
+func (t *ServerTestSuite) TestGetCategoryEntries() {
+	ctg := database.NewCategory("test", t.user)
+
+	feed, err := database.NewFeedWithCategory(
+		"Example",
+		"example.com",
+		ctg.APIID,
+		t.user)
+	t.Require().NoError(err)
+
+	entry, err := database.NewEntry(models.Entry{
+		Title: "Test Entry",
+		Mark:  models.MarkerUnread,
+	}, feed.APIID, t.user)
+	t.Require().NoError(err)
+
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues(ctg.APIID)
+
+	c.SetPath("/v1/categories/:categoryID/mark")
+
+	t.NoError(t.server.GetCategoryEntries(c))
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
 	}
 
-	respEntries := new(Entries)
-	err = json.NewDecoder(resp.Body).Decode(respEntries)
-	s.Require().Nil(err)
-	s.Len(respEntries.Entries, 5)
+	var entries Entries
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &entries))
+
+	t.Len(entries.Entries, 1)
+	t.Equal(entries.Entries[0].Title, entry.Title)
 }
 
-func (s *ServerTestSuite) TestGetEntriesFromNonExistentCategory() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/categories/123456/entries", nil)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestGetUnknownCategoryEntries() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues("bogus")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/categories/:categoryID/entries")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	t.EqualError(
+		echo.NewHTTPError(http.StatusNotFound),
+		t.server.GetCategoryEntries(c).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestMarkCategory() {
-	ctg := s.db.NewCategory("News")
-	s.Require().NotEmpty(ctg.APIID)
+func (t *ServerTestSuite) TestGetCategoryStats() {
+	ctg := database.NewCategory("test", t.user)
 
-	feed, err := s.db.NewFeedWithCategory("World News", mockRSSServer.URL+"/rss.xml", ctg.APIID)
-	s.Require().Nil(err)
-	s.Require().NotEmpty(feed.APIID)
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues(ctg.APIID)
 
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
+	c.SetPath("/v1/categories/:categoryID/stats")
 
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.MarkerUnread)
-	s.Require().Len(entries, 5)
+	t.NoError(t.server.GetCategoryStats(c))
 
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.MarkerRead)
-	s.Require().Len(entries, 0)
-
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/categories/"+ctg.APIID+"/mark?as=read", nil)
-
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.MarkerUnread)
-	s.Require().Len(entries, 0)
-
-	entries = s.db.EntriesFromCategory(ctg.APIID, true, models.MarkerRead)
-	s.Require().Len(entries, 5)
+	var stats models.Stats
+	t.NoError(json.Unmarshal(t.rec.Body.Bytes(), &stats))
 }
 
-func (s *ServerTestSuite) TestMarkNonExistingCategory() {
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/categories/123456/mark?as=read", nil)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestGetUnknownCategoryStats() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("categoryID")
+	c.SetParamValues("bogus")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/categories/:categoryID/stats")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
-}
-
-func (s *ServerTestSuite) TestAddFeedsToCategory() {
-	feed := s.db.NewFeed("Example Feed", "http://example.com/feed")
-
-	ctg := s.db.NewCategory("Test")
-
-	type FeedList struct {
-		Feeds []string `json:"feeds"`
-	}
-
-	list := FeedList{
-		Feeds: []string{feed.APIID},
-	}
-
-	b, err := json.Marshal(list)
-	s.Require().Nil(err)
-
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/categories/"+ctg.APIID+"/feeds", bytes.NewBuffer(b))
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	feed, found := s.db.FeedWithAPIID(feed.APIID)
-	s.True(found)
-}
-
-func (s *ServerTestSuite) TestAddFeedsToNonExistingCategory() {
-	payload := []byte(`{"feeds": ["123456"]}`)
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/categories/123456/feeds", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNotFound, resp.StatusCode)
-
-}
-
-func (s *ServerTestSuite) TestGetStatsForCategory() {
-	ctg := s.db.NewCategory("World")
-	s.Require().NotEmpty(ctg.APIID)
-
-	feed, err := s.db.NewFeedWithCategory("News", "http://example.com", ctg.APIID)
-	s.Require().Nil(err)
-	s.Require().NotEmpty(feed.APIID)
-
-	for i := 0; i < 3; i++ {
-		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Mark:  models.MarkerRead,
-			Saved: true,
-		}
-
-		s.db.NewEntry(entry, feed.APIID)
-	}
-
-	for i := 0; i < 7; i++ {
-		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Mark:  models.MarkerUnread,
-		}
-
-		s.db.NewEntry(entry, feed.APIID)
-	}
-
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/categories/"+ctg.APIID+"/stats", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusOK, resp.StatusCode)
-
-	respStats := new(models.Stats)
-	err = json.NewDecoder(resp.Body).Decode(respStats)
-	s.Require().Nil(err)
-
-	s.Equal(7, respStats.Unread)
-	s.Equal(3, respStats.Read)
-	s.Equal(3, respStats.Saved)
-	s.Equal(10, respStats.Total)
-}
-
-func (s *ServerTestSuite) TestGetStatsForNonExistentCategory() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/categories/123456/stats", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	t.EqualError(
+		t.server.GetCategoryStats(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }

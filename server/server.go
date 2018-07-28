@@ -21,32 +21,22 @@
 package server
 
 import (
-	"bufio"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"os/user"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
-
-	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"golang.org/x/crypto/acme/autocert"
+
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/usecases"
 )
 
 const (
-	generatedSecretLength    = 128
-	echoSyndUserDBKey        = "syndUserDB"
-	syndicationDirPathSuffix = "/.config/syndication"
-	authSecretPathSuffix     = "/.config/syndication/auth_secret"
+	echoSyndUserKey = "syndUser"
 )
 
 var unauthorizedPaths []string
@@ -54,12 +44,6 @@ var unauthorizedPaths []string
 var serverShutdownTimeout = time.Second * 5
 
 type (
-	// EntryQueryParams maps query parameters used when GETting entries resources
-	EntryQueryParams struct {
-		Marker  string `query:"markedAs"`
-		Saved   bool   `query:"saved"`
-		OrderBy string `query:"orderBy"`
-	}
 
 	// Server represents a echo server instance and holds references to other components
 	// needed for the REST API handlers.
@@ -68,41 +52,33 @@ type (
 		db     *database.DB
 		groups map[string]*echo.Group
 
+		eUsecase usecases.Entry
+		tUsecase usecases.Tag
+		fUsecase usecases.Feed
+		cUsecase usecases.Category
+		aUsecase usecases.Auth
+
 		isTLSEnabled bool
 		port         string
-		authSecret   string
-	}
 
-	// ErrorResp represents a common format for error responses returned by a Server
-	ErrorResp struct {
-		Message string `json:"message"`
+		authSecret string
 	}
 )
 
 // NewServer creates a new server instance
-func NewServer(db *database.DB) *Server {
+func NewServer(authSecret string) *Server {
 	server := Server{
-		handle: echo.New(),
-		db:     db,
-		groups: map[string]*echo.Group{},
+		handle:     echo.New(),
+		groups:     map[string]*echo.Group{},
+		authSecret: authSecret,
+		cUsecase:   &usecases.CategoryUsecase{},
+		eUsecase:   &usecases.EntryUsecase{},
+		fUsecase:   &usecases.FeedUsecase{},
+		tUsecase:   &usecases.TagUsecase{},
+		aUsecase:   &usecases.AuthUsecase{AuthSecret: authSecret},
 	}
 
 	server.groups["v1"] = server.handle.Group("v1")
-
-	secret, err := getSecretFromFilesystem()
-	if err != nil {
-		secret, err = generateSecret()
-		if err != nil {
-			panic(err)
-		}
-
-		err = saveSecretToFilesystem(secret)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	server.authSecret = secret
 
 	server.handle.HideBanner = true
 
@@ -130,66 +106,6 @@ func (s *Server) Start(address string, port int) error {
 	return s.handle.Start(conn)
 }
 
-func getSecretFromFilesystem() (string, error) {
-	currUser, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-
-	b, err := ioutil.ReadFile(currUser.HomeDir + authSecretPathSuffix)
-
-	return string(b), err
-}
-
-func saveSecretToFilesystem(secret string) error {
-	currUser, err := user.Current()
-	if err != nil {
-		return err
-	}
-
-	dir := currUser.HomeDir + syndicationDirPathSuffix
-	err = os.MkdirAll(dir, os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(currUser.HomeDir+authSecretPathSuffix, []byte(secret), 0600)
-}
-
-func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		if c.Request().Method == "OPTIONS" || isPathUnauthorized(c.Path()) {
-			return next(c)
-		}
-
-		userClaim := c.Get("user").(*jwt.Token)
-		claims := userClaim.Claims.(jwt.MapClaims)
-		user, found := s.db.UserWithAPIID(claims["id"].(string))
-		if !found {
-			return c.JSON(http.StatusUnauthorized, ErrorResp{
-				Message: "Credentials are invalid",
-			})
-		}
-
-		userDB := s.db.NewUserDB(user)
-
-		key := models.APIKey{
-			Key: userClaim.Raw,
-		}
-
-		found = userDB.KeyBelongsToUser(key)
-		if !found {
-			return c.JSON(http.StatusUnauthorized, ErrorResp{
-				Message: "Credentials are invalid",
-			})
-		}
-
-		c.Set(echoSyndUserDBKey, userDB)
-
-		return next(c)
-	}
-}
-
 // Stop the server gracefully
 func (s *Server) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
@@ -200,109 +116,6 @@ func (s *Server) Stop() error {
 // OptionsHandler is a simple default handler for the OPTIONS method.
 func (s *Server) OptionsHandler(c echo.Context) error {
 	return c.NoContent(200)
-}
-
-func (s *Server) exportFeeds(exporter models.Exporter, userDB *database.UserDB) ([]byte, error) {
-	ctgs := userDB.Categories()
-
-	for idx, ctg := range ctgs {
-		ctg.Feeds = userDB.FeedsFromCategory(ctg.APIID)
-		ctgs[idx] = ctg
-	}
-
-	return exporter.Export(ctgs)
-}
-
-// Export feeds and categories out of Syndication.
-// Accept header must be set to a supported MIME type.
-// The current supported formats are:
-//    - OPML (application/xml)
-func (s *Server) Export(c echo.Context) error {
-	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
-
-	contType := c.Request().Header.Get("Accept")
-
-	var data []byte
-	var err error
-	switch contType {
-	case "application/xml":
-		data, err = s.exportFeeds(models.NewOPMLExporter(), &userDB)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError)
-		}
-
-		return c.XMLBlob(http.StatusOK, data)
-	}
-
-	return echo.NewHTTPError(http.StatusBadRequest, "Accept header must be set to a supported value")
-}
-
-// Import feeds and categories into Syndication.
-// Content-Type header must be set to a supported MIME type.
-// The current supported formats are:
-//    - OPML (application/xml)
-func (s *Server) Import(c echo.Context) error {
-	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
-
-	contLength := c.Request().ContentLength
-	if contLength <= 0 {
-		return echo.NewHTTPError(http.StatusNoContent)
-	}
-
-	contType := c.Request().Header.Get("Content-Type")
-	data := make([]byte, contLength)
-	_, err := bufio.NewReader(c.Request().Body).Read(data)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Could not read request body")
-	}
-
-	if contType == "" && contLength > 0 {
-		contType = http.DetectContentType(data)
-	}
-
-	switch contType {
-	case "application/xml":
-		err = s.importFeeds(data, models.NewOPMLImporter(), &userDB)
-	}
-
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError)
-	}
-
-	return echo.NewHTTPError(http.StatusNoContent)
-}
-
-func (s *Server) importFeeds(data []byte, reqImporter models.Importer, userDB *database.UserDB) error {
-	feeds := reqImporter.Import(data)
-	for _, feed := range feeds {
-		if feed.Category.Name != "" {
-			dbCtg := models.Category{}
-			if ctg, ok := userDB.CategoryWithName(feed.Category.Name); ok {
-				dbCtg = ctg
-			} else {
-				dbCtg = userDB.NewCategory(feed.Category.Name)
-			}
-
-			_, err := userDB.NewFeedWithCategory(feed.Title, feed.Subscription, dbCtg.APIID)
-			if err != nil {
-				return err
-			}
-		} else {
-			userDB.NewFeed(feed.Title, feed.Subscription)
-		}
-	}
-
-	return nil
-}
-
-func generateSecret() (string, error) {
-	b := make([]byte, generatedSecretLength)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-
-	return base64.URLEncoding.EncodeToString(b)[0:generatedSecretLength], nil
 }
 
 func (s *Server) registerMiddleware() {
@@ -333,22 +146,23 @@ func (s *Server) registerMiddleware() {
 }
 
 func isPathUnauthorized(path string) bool {
-	for _, skpPath := range unauthorizedPaths {
-		if skpPath == path {
-			return true
-		}
-	}
-
-	return false
+	i := sort.SearchStrings(unauthorizedPaths, path)
+	return i < len(unauthorizedPaths) && unauthorizedPaths[i] == path
 }
 
 func (s *Server) registerHandlers() {
 	v1 := s.groups["v1"]
 
-	v1.POST("/login", s.Login)
-	v1.POST("/register", s.Register)
+	unauthorizedPaths = append(
+		unauthorizedPaths,
+		"/v1/auth/login",
+		"/v1/auth/register",
+		"/v1/auth/renew",
+	)
 
-	unauthorizedPaths = append(unauthorizedPaths, "/v1/login", "/v1/register")
+	v1.POST("/auth/login", s.Login)
+	v1.POST("/auth/register", s.Register)
+	v1.POST("/auth/renew", s.Renew)
 
 	v1.POST("/import", s.Import)
 	v1.GET("/export", s.Export)
@@ -358,9 +172,10 @@ func (s *Server) registerHandlers() {
 	v1.GET("/feeds/:feedID", s.GetFeed)
 	v1.PUT("/feeds/:feedID", s.EditFeed)
 	v1.DELETE("/feeds/:feedID", s.DeleteFeed)
-	v1.GET("/feeds/:feedID/entries", s.GetEntriesFromFeed)
+	v1.GET("/feeds/:feedID/entries", s.GetFeedEntries)
 	v1.PUT("/feeds/:feedID/mark", s.MarkFeed)
-	v1.GET("/feeds/:feedID/stats", s.GetStatsForFeed)
+	v1.GET("/feeds/:feedID/stats", s.GetFeedStats)
+
 	v1.OPTIONS("/feeds", s.OptionsHandler)
 	v1.OPTIONS("/feeds/:feedID", s.OptionsHandler)
 	v1.OPTIONS("/feeds/:feedID/mark", s.OptionsHandler)
@@ -387,11 +202,12 @@ func (s *Server) registerHandlers() {
 	v1.DELETE("/categories/:categoryID", s.DeleteCategory)
 	v1.PUT("/categories/:categoryID", s.EditCategory)
 	v1.GET("/categories/:categoryID", s.GetCategory)
-	v1.PUT("/categories/:categoryID/feeds", s.AddFeedsToCategory)
-	v1.GET("/categories/:categoryID/feeds", s.GetFeedsFromCategory)
-	v1.GET("/categories/:categoryID/entries", s.GetEntriesFromCategory)
+	v1.PUT("/categories/:categoryID/feeds", s.AppendCategoryFeeds)
+	v1.GET("/categories/:categoryID/feeds", s.GetCategoryFeeds)
+	v1.GET("/categories/:categoryID/entries", s.GetCategoryEntries)
 	v1.PUT("/categories/:categoryID/mark", s.MarkCategory)
-	v1.GET("/categories/:categoryID/stats", s.GetStatsForCategory)
+	v1.GET("/categories/:categoryID/stats", s.GetCategoryStats)
+
 	v1.OPTIONS("/categories", s.OptionsHandler)
 	v1.OPTIONS("/categories/:categoryID", s.OptionsHandler)
 	v1.OPTIONS("/categories/:categoryID/mark", s.OptionsHandler)
@@ -402,7 +218,7 @@ func (s *Server) registerHandlers() {
 	v1.GET("/entries", s.GetEntries)
 	v1.GET("/entries/:entryID", s.GetEntry)
 	v1.PUT("/entries/:entryID/mark", s.MarkEntry)
-	v1.GET("/entries/stats", s.GetStatsForEntries)
+	v1.GET("/entries/stats", s.GetEntryStats)
 	v1.OPTIONS("/entries", s.OptionsHandler)
 	v1.OPTIONS("/entries/stats", s.OptionsHandler)
 	v1.OPTIONS("/entries/:entryID", s.OptionsHandler)

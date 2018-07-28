@@ -51,8 +51,6 @@ type (
 		suite.Suite
 
 		user   models.User
-		db     database.UserDB
-		gDB    *database.DB
 		server *http.Server
 	}
 )
@@ -74,11 +72,10 @@ func (s *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SyncTestSuite) SetupTest() {
-	s.gDB, _ = database.NewDB("sqlite3", testDatabasePath)
+	_ = database.Init("sqlite3", testDatabasePath)
 
 	randUserName := RandStringRunes(8)
-	s.user = s.gDB.NewUser(randUserName, "golang")
-	s.db = s.gDB.NewUserDB(s.user)
+	s.user = database.NewUser(randUserName, "golang")
 	s.Require().NotEmpty(s.user.APIID)
 }
 
@@ -107,79 +104,73 @@ func (s *SyncTestSuite) TestPullFeedWithBadSubscription() {
 }
 
 func (s *SyncTestSuite) TestSyncWithEtags() {
-	feed := s.db.NewFeed("Sync Test", rssURL)
+	feed := database.NewFeed("Sync Test", rssURL, s.user)
 	s.Require().NotEmpty(feed.APIID)
 
 	entries, err := PullFeed(&feed)
 	s.Require().Nil(err)
 	s.Require().Len(entries, 5)
 
-	_, err = s.db.NewEntries(entries, feed.APIID)
+	_, err = database.NewEntries(entries, feed.APIID, s.user)
 	s.Require().Nil(err)
 
-	serv := NewService(s.gDB, testSyncInterval)
+	serv := NewService(testSyncInterval)
 	err = serv.SyncUser(&s.user)
 	s.Require().Nil(err)
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
+	entries = database.FeedEntries(feed.APIID, true, models.MarkerAny, s.user)
 	s.Require().Nil(err)
 	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestSyncUser() {
-	feed := s.db.NewFeed("Sync Test", rssMinimalURL)
+	feed := database.NewFeed("Sync Test", rssMinimalURL, s.user)
 	s.Require().NotEmpty(feed.APIID)
 
-	serv := NewService(s.gDB, testSyncInterval)
+	serv := NewService(testSyncInterval)
 	err := serv.SyncUser(&s.user)
 	s.Require().Nil(err)
 
-	entries := s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
+	entries := database.FeedEntries(feed.APIID, true, models.MarkerAny, s.user)
 	s.Require().Nil(err)
 	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestSyncUsers() {
 	for i := 0; i < 10; i++ {
-		user := s.gDB.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
+		user := database.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
 
-		_, found := s.gDB.UserWithName("test" + strconv.Itoa(i))
+		_, found := database.UserWithName("test" + strconv.Itoa(i))
 		s.Require().True(found)
 
-		userDB := s.gDB.NewUserDB(user)
-
-		userDB.NewFeed("Sync Test", rssMinimalURL)
+		database.NewFeed("Sync Test", rssMinimalURL, user)
 	}
 
-	serv := NewService(s.gDB, testSyncInterval)
+	serv := NewService(testSyncInterval)
 
 	serv.SyncUsers()
 
 	serv.userWaitGroup.Wait()
 
-	users := s.gDB.Users()
-	users = users[1:]
+	users := database.Users()[1:]
 
 	for _, user := range users {
-		userDB := s.gDB.NewUserDB(user)
-		entries := userDB.Entries(true, models.MarkerAny)
+		entries := database.Entries(true, models.MarkerAny, user)
 		s.Len(entries, 5)
 	}
 }
 
 func (s *SyncTestSuite) TestSyncService() {
 	for i := 0; i < 10; i++ {
-		user := s.gDB.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
+		user := database.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
 
-		_, found := s.gDB.UserWithName("test" + strconv.Itoa(i))
+		_, found := database.UserWithName("test" + strconv.Itoa(i))
 		s.Require().True(found)
 
-		userDB := s.gDB.NewUserDB(user)
-
-		userDB.NewFeed("Sync Test", rssMinimalURL)
+		database.NewFeed("Sync Test", rssMinimalURL, user)
 	}
 
-	serv := NewService(s.gDB, time.Second)
+	serv := NewService(time.Second)
 
 	serv.Start()
 
@@ -187,12 +178,10 @@ func (s *SyncTestSuite) TestSyncService() {
 
 	serv.Stop()
 
-	users := s.gDB.Users()
-	users = users[1:]
+	users := database.Users()[1:]
 
 	for _, user := range users {
-		userDB := s.gDB.NewUserDB(user)
-		entries := userDB.Entries(true, models.MarkerAny)
+		entries := database.Entries(true, models.MarkerAny, user)
 		s.Len(entries, 5)
 	}
 }
@@ -214,7 +203,7 @@ func TestSyncTestSuite(t *testing.T) {
 
 	suite.Run(t, &syncSuite)
 
-	syncSuite.gDB.Close()
+	database.Close()
 	syncSuite.server.Close()
 	os.Remove(testDatabasePath)
 }

@@ -63,7 +63,6 @@ type (
 
 	// Admin represents adminstration routines available over rpc
 	Admin struct {
-		db *database.DB
 	}
 )
 
@@ -71,24 +70,24 @@ const defaultSocketPath = "/var/run/syndication/admin"
 
 // NewUser creates a new user
 func (a *Admin) NewUser(args NewUserArgs, msg *string) error {
-	if _, found := a.db.UserWithName(args.Username); found {
+	if _, found := database.UserWithName(args.Username); found {
 		*msg = "User already exists"
 		return errors.New("User already exists")
 	}
 
-	a.db.NewUser(args.Username, args.Password)
+	database.NewUser(args.Username, args.Password)
 
 	return nil
 }
 
 // DeleteUser deletes a user with userID
 func (a *Admin) DeleteUser(userID string, msg *string) error {
-	return a.db.DeleteUser(userID)
+	return database.DeleteUser(userID)
 }
 
 // GetUserID retrieves the user id for a user with username
 func (a *Admin) GetUserID(username string, userID *string) error {
-	if user, found := a.db.UserWithName(username); found {
+	if user, found := database.UserWithName(username); found {
 		*userID = user.APIID
 		return nil
 	}
@@ -98,7 +97,7 @@ func (a *Admin) GetUserID(username string, userID *string) error {
 
 // GetUsers will return all existing usernames with their associated IDs
 func (a *Admin) GetUsers(outLen int, users *[]User) error {
-	dbUsers := a.db.Users("username,id")
+	dbUsers := database.Users("username,id")
 	*users = make([]User, outLen)
 	for idx, user := range dbUsers {
 		if idx >= outLen {
@@ -113,12 +112,12 @@ func (a *Admin) GetUsers(outLen int, users *[]User) error {
 
 // ChangeUserName modifies the username for a user with userID
 func (a *Admin) ChangeUserName(args ChangeUserNameArgs, msg *string) error {
-	return a.db.ChangeUserName(args.UserID, args.NewName)
+	return database.ChangeUserName(args.UserID, args.NewName)
 }
 
 // ChangeUserPassword modifies the password for a user with userID
 func (a *Admin) ChangeUserPassword(args ChangeUserPasswordArgs, msg *string) error {
-	return a.db.ChangeUserPassword(args.UserID, args.NewPassword)
+	return database.ChangeUserPassword(args.UserID, args.NewPassword)
 }
 
 // Start a admin rpc service
@@ -127,7 +126,6 @@ func (s *Service) Start() {
 		s.server.Accept(s.ln)
 		s.state <- true
 	}()
-
 }
 
 // Stop an admin rpc service
@@ -139,7 +137,7 @@ func (s *Service) Stop() {
 }
 
 // NewService creates a new admin rpc service
-func NewService(db *database.DB, socketPath string) (*Service, error) {
+func NewService(socketPath string) (*Service, error) {
 	s := &Service{
 		server: rpc.NewServer(),
 		state:  make(chan bool),
@@ -167,9 +165,7 @@ func NewService(db *database.DB, socketPath string) (*Service, error) {
 		return nil, err
 	}
 
-	a := &Admin{
-		db: db,
-	}
+	a := &Admin{}
 
 	err = s.server.Register(a)
 
