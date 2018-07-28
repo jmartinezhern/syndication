@@ -18,11 +18,18 @@
 package cmd
 
 import (
-	"fmt"
+	"crypto/rand"
+	"encoding/base64"
+	"os"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+)
+
+const (
+	generatedSecretLength = 128
 )
 
 type (
@@ -50,13 +57,19 @@ type (
 		Connection string
 	}
 
+	// Sync configuration
+	Sync struct {
+		Interval time.Duration
+	}
+
 	// Config represents a complete configuration
 	Config struct {
-		SyncInterval time.Duration `mapstructure:"sync_interval"`
-		EnableTLS    bool          `mapstructure:"enable_tls"`
-		Database     Database
-		Host         Host
-		Admin        Admin
+		Sync       Sync
+		EnableTLS  bool   `mapstructure:"enable_tls"`
+		AuthSecret string `mapstructure:"auth_secret"`
+		Database   Database
+		Host       Host
+		Admin      Admin
 	}
 )
 
@@ -81,79 +94,51 @@ func Execute() error {
 		return err
 	}
 
-	if viper.ConfigFileUsed() == "" {
-		err := readDatabaseTypeFromFlags()
-		if err != nil {
-			return err
-		}
+	if EffectiveConfig.AuthSecret == "" {
+		secret := generateSecret()
+		EffectiveConfig.AuthSecret = secret
+		viper.Set("auth_secret", secret)
 
+		if err := viper.WriteConfig(); err != nil {
+			log.Error(err)
+			os.Exit(1)
+		}
 	}
 
 	return nil
 }
 
-func readDatabaseTypeFromFlags() error {
-	isSqlite, err := rootCmd.Flags().GetBool("sqlite")
+func generateSecret() string {
+	log.Info("No auth secret found. Generating new one...")
+
+	b := make([]byte, generatedSecretLength)
+	_, err := rand.Read(b)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
-	if isSqlite {
-		EffectiveConfig.Database.Type = "sqlite3"
-	}
-
-	return nil
+	return base64.URLEncoding.EncodeToString(b)[0:generatedSecretLength]
 }
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 
-	rootCmd.Flags().Bool("admin", true, "enable admin")
-	rootCmd.Flags().String("admin-socket", "/tmp/syndication.socket", "admin socket path")
-	rootCmd.Flags().Bool("sqlite", true, "use sqlite db")
-	rootCmd.Flags().String("db-connection", "/var/lib/syndication.db", "SQL DB specific connection")
-	rootCmd.Flags().Duration("sync-interval", time.Minute*5, "sync interval")
-	rootCmd.Flags().String("host", "localhost", "server host address")
-	rootCmd.Flags().Int("port", 8080, "server host port")
-	rootCmd.Flags().Bool("tls", false, "enable tls")
-
-	err := viper.BindPFlag("host.address", rootCmd.Flags().Lookup("host"))
-
-	if err == nil {
-		err = viper.BindPFlag("host.port", rootCmd.Flags().Lookup("port"))
-	}
-
-	if err == nil {
-		err = viper.BindPFlag("database.connection", rootCmd.Flags().Lookup("db-connection"))
-	}
-
-	if err == nil {
-		err = viper.BindPFlag("sync_interval", rootCmd.Flags().Lookup("sync-interval"))
-	}
-
-	if err == nil {
-		err = viper.BindPFlag("enable_tls", rootCmd.Flags().Lookup("tls"))
-	}
-
-	if err == nil {
-		err = viper.BindPFlag("admin.enable", rootCmd.Flags().Lookup("admin"))
-	}
-
-	if err == nil {
-		err = viper.BindPFlag("admin.socket_path", rootCmd.Flags().Lookup("admin-socket"))
-	}
-
-	if err != nil {
-		panic(err)
-	}
+	viper.SetDefault("sync.interval", time.Minute*15)
+	viper.SetDefault("host.port", 8080)
+	viper.SetDefault("host.address", "localhost")
+	viper.SetDefault("database.type", "sqlite3")
+	viper.SetDefault("database.connection", "/var/lib/syndication.db")
 }
 
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
-	}
-
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println(err)
+		if err := viper.ReadInConfig(); err != nil {
+			log.Error(err)
+			os.Exit(1)
+		}
+	} else {
+		log.Error("Config was not provided")
+		os.Exit(1)
 	}
 }

@@ -18,328 +18,283 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"strconv"
+	"net/http/httptest"
+	"strings"
 
+	"github.com/labstack/echo"
+
+	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
-	"github.com/varddum/syndication/sync"
 )
 
-func (s *ServerTestSuite) TestNewTag() {
-	payload := []byte(`{"name": "` + RandStringRunes(8) + `"}`)
-	req, err := http.NewRequest("POST", testBaseURL+"/v1/tags", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-	req.Header.Set("Authorization", "Bearer "+s.token)
+func (t *ServerTestSuite) TestNewTag() {
+	tag := `{ "name": "Test" }`
+
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(tag))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	s.Equal(http.StatusCreated, resp.StatusCode)
+	c.SetPath("/v1/tags")
 
-	respTag := new(models.Tag)
-	err = json.NewDecoder(resp.Body).Decode(respTag)
-	s.Require().Nil(err)
-
-	s.Require().NotEmpty(respTag.APIID)
-	s.NotEmpty(respTag.Name)
-
-	dbTag, found := s.db.TagWithAPIID(respTag.APIID)
-	s.True(found)
-	s.Equal(dbTag.Name, respTag.Name)
+	t.NoError(t.server.NewTag(c))
+	t.Equal(http.StatusCreated, t.rec.Code)
 }
 
-func (s *ServerTestSuite) TestConflictingNewTag() {
-	tagName := "Sports"
-	s.db.NewTag(tagName)
+func (t *ServerTestSuite) TestNewConflictingTag() {
+	database.NewTag("Test", t.user)
 
-	payload := []byte(`{"name": "` + tagName + `"}`)
-	req, err := http.NewRequest("POST", testBaseURL+"/v1/tags", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
+	tag := `{ "name": "Test" }`
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(tag))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	s.Equal(http.StatusConflict, resp.StatusCode)
+	c.SetPath("/v1/tags")
+
+	t.EqualError(
+		t.server.NewTag(c),
+		echo.NewHTTPError(http.StatusConflict).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestGetTags() {
-	for i := 0; i < 5; i++ {
-		tag := s.db.NewTag("Tag " + strconv.Itoa(i+1))
-		s.Require().NotEmpty(tag.APIID)
-	}
+func (t *ServerTestSuite) TestGetTags() {
+	tag := database.NewTag("Test", t.user)
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/tags", nil)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/tags")
 
-	s.Equal(http.StatusOK, resp.StatusCode)
+	t.NoError(t.server.GetTags(c))
+	t.Equal(http.StatusOK, t.rec.Code)
 
 	type Tags struct {
 		Tags []models.Tag `json:"tags"`
 	}
 
-	respTags := new(Tags)
-	err = json.NewDecoder(resp.Body).Decode(respTags)
-	s.Require().Nil(err)
+	var tags Tags
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &tags))
 
-	s.Len(respTags.Tags, 5)
+	t.Len(tags.Tags, 1)
+	t.Equal(tag.Name, tags.Tags[0].Name)
 }
 
-func (s *ServerTestSuite) TestGetTag() {
-	tag := s.db.NewTag("News")
-	s.Require().NotEmpty(tag.APIID)
+func (t *ServerTestSuite) TestDeleteTag() {
+	tag := database.NewTag("Test", t.user)
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/tags/"+tag.APIID, nil)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues(tag.APIID)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/tags/:tagID")
 
-	s.Equal(http.StatusOK, resp.StatusCode)
-
-	respTag := new(models.Tag)
-	err = json.NewDecoder(resp.Body).Decode(respTag)
-	s.Require().Nil(err)
-
-	s.Equal(respTag.Name, tag.Name)
-	s.Equal(respTag.APIID, tag.APIID)
+	t.NoError(t.server.DeleteTag(c))
+	t.Equal(http.StatusNoContent, t.rec.Code)
 }
 
-func (s *ServerTestSuite) TestGetNonExistingTag() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/tags/123456", nil)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestDeleteUnknownTag() {
+	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues("bogus")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/tags/:tagID")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	t.EqualError(
+		t.server.DeleteTag(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestEditTag() {
-	tag := s.db.NewTag("News")
-	s.Require().NotEmpty(tag.APIID)
+func (t *ServerTestSuite) TestEditTag() {
+	tag := database.NewTag("test", t.user)
 
-	payload := []byte(`{"name": "World News"}`)
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/tags/"+tag.APIID, bytes.NewBuffer(payload))
-	s.Nil(err)
+	mdfTagJSON := `{"name": "gopher"}`
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(mdfTagJSON))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues(tag.APIID)
 
-	s.Equal(http.StatusNoContent, resp.StatusCode)
+	c.SetPath("/v1/tags/:tagID")
 
-	editedTag, found := s.db.TagWithAPIID(tag.APIID)
-	s.Require().True(found)
-	s.Equal(editedTag.Name, "World News")
+	t.NoError(t.server.EditTag(c))
+	t.Equal(http.StatusOK, t.rec.Code)
 }
 
-func (s *ServerTestSuite) TestEditNonExistingTag() {
-	payload := []byte(`{"name": "World News"}`)
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/tags/123456", bytes.NewBuffer(payload))
-	s.Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
+func (t *ServerTestSuite) TestEditUnknownTag() {
+	req := httptest.NewRequest(
+		echo.PUT,
+		"/",
+		strings.NewReader(`{"name" : "bogus" }`),
+	)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues("bogus")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	c.SetPath("/v1/tags/:tagID")
+
+	t.EqualError(
+		t.server.EditTag(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestDeleteTag() {
-	tag := s.db.NewTag("News")
-	s.Require().NotEmpty(tag.APIID)
+func (t *ServerTestSuite) TestTagEntries() {
+	tag := database.NewTag("test", t.user)
 
-	req, err := http.NewRequest("DELETE", testBaseURL+"/v1/tags/"+tag.APIID, nil)
-	s.Require().Nil(err)
+	feed := database.NewFeed("Example", "example.com", t.user)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	entry, err := database.NewEntry(models.Entry{
+		Title: "Test",
+	}, feed.APIID, t.user)
+	t.Require().NoError(err)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	_, found := s.db.CategoryWithAPIID(tag.APIID)
-	s.False(found)
-}
-
-func (s *ServerTestSuite) TestDeleteNonExistingTag() {
-	req, err := http.NewRequest("DELETE", testBaseURL+"/v1/tags/123456", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNotFound, resp.StatusCode)
-}
-
-func (s *ServerTestSuite) TestTagEntries() {
-	tag := s.db.NewTag("News")
-
-	feed := s.db.NewFeed("Test site", "http://example.com")
-
-	type EntryIds struct {
-		Entries []string `json:"entries"`
-	}
-
-	var entries []models.Entry
-	for i := 0; i < 5; i++ {
-		entry := models.Entry{
-			Title:  "Test Entry",
-			Author: "varddum",
-			Link:   "http://example.com",
-			Mark:   models.MarkerUnread,
-			Feed:   feed,
-		}
-
-		entries = append(entries, entry)
-	}
-
-	_, err := s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
-
-	entryAPIIDs := make([]string, len(entries))
-	for i, entry := range entries {
-		entryAPIIDs[i] = entry.APIID
-	}
-
-	list := EntryIds{
-		Entries: entryAPIIDs,
-	}
-
-	b, err := json.Marshal(list)
-	s.Require().Nil(err)
-
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/tags/"+tag.APIID+"/entries", bytes.NewBuffer(b))
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	req := httptest.NewRequest(
+		echo.PUT,
+		"/",
+		strings.NewReader(fmt.Sprintf(`{
+			"entries" :  ["%s"]
+		}`, entry.APIID)),
+	)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues(tag.APIID)
 
-	s.Equal(http.StatusNoContent, resp.StatusCode)
+	c.SetPath("/v1/tags/:tagID")
 
-	taggedEntries := s.db.EntriesFromTag(tag.APIID, models.MarkerAny, true)
-	s.Len(taggedEntries, 5)
+	t.NoError(t.server.TagEntries(c))
+	t.Equal(http.StatusNoContent, t.rec.Code)
 }
 
-func (s *ServerTestSuite) TestTagEntriesWithNonExistingTag() {
-	payload := []byte(`{"entries": ["12345"]}`)
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/tags/123456/entries", bytes.NewBuffer(payload))
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
+func (t *ServerTestSuite) TestTagEntriesWithUnknownTag() {
+	req := httptest.NewRequest(
+		echo.PUT,
+		"/",
+		strings.NewReader(`{
+			"entries" :  ["foo"]
+		}`),
+	)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues("bogus")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	c.SetPath("/v1/tags/:tagID")
+
+	t.EqualError(
+		t.server.TagEntries(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestGetEntriesFromTag() {
-	tag := s.db.NewTag("News")
-	s.Require().NotEmpty(tag.APIID)
+func (t *ServerTestSuite) TestGetTag() {
+	tag := database.NewTag("test", t.user)
 
-	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
-	s.Require().NotEmpty(feed.APIID)
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues(tag.APIID)
 
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
+	c.SetPath("/v1/tags/:tagID")
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerAny)
-	s.Require().NotEmpty(entries)
+	t.NoError(t.server.GetTag(c))
 
-	entryAPIIDs := make([]string, len(entries))
-	for i, entry := range entries {
-		entryAPIIDs[i] = entry.APIID
-	}
+	var sTag models.Tag
+	t.NoError(json.Unmarshal(t.rec.Body.Bytes(), &sTag))
+	t.Equal(tag.Name, sTag.Name)
+}
 
-	err = s.db.TagEntries(tag.APIID, entryAPIIDs)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestGetUnknownTag() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/tags/"+tag.APIID+"/entries", nil)
-	s.Nil(err)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues("bogus")
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c.SetPath("/v1/tags/:tagID")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	t.EqualError(
+		t.server.GetTag(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
+}
 
-	s.Equal(200, resp.StatusCode)
+func (t *ServerTestSuite) TestGetEntriesFromTag() {
+	tag := database.NewTag("test", t.user)
+
+	feed := database.NewFeed("Example", "example.com", t.user)
+
+	entry, err := database.NewEntry(models.Entry{
+		Title: "Test",
+	}, feed.APIID, t.user)
+	t.Require().NoError(err)
+
+	t.NoError(database.TagEntries(tag.APIID, []string{entry.APIID}, t.user))
+
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues(tag.APIID)
+
+	c.SetPath("/v1/tags/:tagID")
+
+	t.NoError(t.server.GetEntriesFromTag(c))
+	t.Equal(http.StatusOK, t.rec.Code)
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
 	}
 
-	respEntries := new(Entries)
-	err = json.NewDecoder(resp.Body).Decode(respEntries)
-	s.Require().Nil(err)
-	s.Len(respEntries.Entries, 5)
+	var entries Entries
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &entries))
+	t.Len(entries.Entries, 1)
+	t.Equal(entries.Entries[0].Title, entry.Title)
+	t.Equal(entries.Entries[0].APIID, entry.APIID)
 }
 
-func (s *ServerTestSuite) TestGetEntriesFromNonExistingTag() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/tags/123456/entries", nil)
-	s.Nil(err)
+func (t *ServerTestSuite) TestGetEntriesFromUnknownTag() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+	c.SetParamNames("tagID")
+	c.SetParamValues("bogus")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetPath("/v1/tags/:tagID")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	t.EqualError(
+		t.server.GetEntriesFromTag(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }

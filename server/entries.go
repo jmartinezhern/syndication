@@ -18,24 +18,31 @@
 package server
 
 import (
+	"github.com/varddum/syndication/usecases"
 	"net/http"
 
 	"github.com/labstack/echo"
-	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
+)
+
+type (
+	// EntryQueryParams maps query parameters used when GETting entries resources
+	EntryQueryParams struct {
+		Marker  string `query:"markedAs"`
+		Saved   bool   `query:"saved"`
+		OrderBy string `query:"orderBy"`
+	}
 )
 
 // GetEntry with id
 func (s *Server) GetEntry(c echo.Context) error {
-	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
+	user := c.Get(echoSyndUserKey).(models.User)
 
-	entryID := c.Param("entryID")
-
-	entry, found := userDB.EntryWithAPIID(entryID)
-	if !found {
-		return c.JSON(http.StatusNotFound, ErrorResp{
-			Message: "Entry does not exist",
-		})
+	entry, err := s.eUsecase.Entry(c.Param("entryID"), user)
+	if err == usecases.ErrEntryNotFound {
+		return echo.NewHTTPError(http.StatusNotFound)
+	} else if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
 
 	return c.JSON(http.StatusOK, entry)
@@ -43,61 +50,51 @@ func (s *Server) GetEntry(c echo.Context) error {
 
 // GetEntries returns a list of entries that belong to a user
 func (s *Server) GetEntries(c echo.Context) error {
-	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	markedAs := models.MarkerFromString(params.Marker)
-	if markedAs == models.MarkerNone {
-		markedAs = models.MarkerAny
+	marker := models.MarkerFromString(params.Marker)
+	if marker == models.MarkerNone {
+		marker = models.MarkerAny
 	}
 
-	entries := userDB.Entries(convertOrderByParamToValue(params.OrderBy),
-		markedAs,
+	entries := s.eUsecase.Entries(
+		convertOrderByParamToValue(params.OrderBy),
+		marker,
+		user,
 	)
 
-	type Entries struct {
-		Entries []models.Entry `json:"entries"`
-	}
-
-	return c.JSON(http.StatusOK, Entries{
-		Entries: entries,
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"entries": entries,
 	})
 }
 
 // MarkEntry applies a Marker to an Entry
 func (s *Server) MarkEntry(c echo.Context) error {
-	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
-
-	entryID := c.Param("entryID")
+	user := c.Get(echoSyndUserKey).(models.User)
 
 	marker := models.MarkerFromString(c.FormValue("as"))
 	if marker == models.MarkerNone {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
-	if _, found := userDB.EntryWithAPIID(entryID); !found {
-		return c.JSON(http.StatusNotFound, ErrorResp{
-			Message: "Entry does not exist",
-		})
+	err := s.eUsecase.Mark(c.Param("entryID"), marker, user)
+	if err == usecases.ErrEntryNotFound {
+		return echo.NewHTTPError(http.StatusNotFound)
+	} else if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
 
-	err := userDB.MarkEntry(entryID, marker)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, ErrorResp{
-			Message: "Entry could not be marked",
-		})
-	}
-
-	return echo.NewHTTPError(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }
 
-// GetStatsForEntries provides statistics related to Entries
-func (s *Server) GetStatsForEntries(c echo.Context) error {
-	userDB := c.Get(echoSyndUserDBKey).(database.UserDB)
+// GetEntryStats provides statistics related to Entries
+func (s *Server) GetEntryStats(c echo.Context) error {
+	user := c.Get(echoSyndUserKey).(models.User)
 
-	return c.JSON(http.StatusOK, userDB.Stats())
+	return c.JSON(http.StatusOK, s.eUsecase.Stats(user))
 }

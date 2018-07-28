@@ -15,17 +15,19 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package models
+package usecases
 
 import (
 	"encoding/xml"
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/models"
 )
 
 type (
-	// Exporter is an interface that wraps the basic
+	// ExporterUsecase is an interface that wraps the basic
 	// export functions.
-	Exporter interface {
-		Export([]Category) ([]byte, error)
+	ExporterUsecase interface {
+		Export(user models.User) ([]byte, error)
 	}
 
 	// An OPMLExporter represents an exporter for the OPML 2.0 format
@@ -33,49 +35,43 @@ type (
 	OPMLExporter struct{}
 )
 
-// NewOPMLExporter creates a new instance of OPMLExporter
-func NewOPMLExporter() OPMLExporter {
-	return OPMLExporter{}
-}
-
 // Export categories and feeds to data in OPML 2.0 format.
-func (i OPMLExporter) Export(ctgs []Category) ([]byte, error) {
-	b := OPML{
-		Body: OPMLBody{},
+func (i OPMLExporter) Export(user models.User) ([]byte, error) {
+	ctgs := database.Categories(user)
+
+	for idx, ctg := range ctgs {
+		ctg.Feeds = database.CategoryFeeds(ctg.APIID, user)
+		ctgs[idx] = ctg
+	}
+
+	b := models.OPML{
+		Body: models.OPMLBody{},
 	}
 
 	for _, ctg := range ctgs {
-		if ctg.Name != Uncategorized {
-			ctgOutline := OPMLOutline{
-				Text:  ctg.Name,
-				Title: ctg.Name,
+		items := make([]models.OPMLOutline, len(ctg.Feeds))
+
+		for idx, feed := range ctg.Feeds {
+			items[idx] = models.OPMLOutline{
+				Title:   feed.Title,
+				Text:    feed.Title,
+				Type:    "rss",
+				XMLUrl:  feed.Subscription,
+				HTMLUrl: feed.Subscription,
 			}
 
-			for _, feed := range ctg.Feeds {
-				outline := OPMLOutline{
-					Title:   feed.Title,
-					Text:    feed.Title,
-					Type:    rssType,
-					XMLUrl:  feed.Subscription,
-					HTMLUrl: feed.Subscription,
-				}
+		}
 
-				ctgOutline.Items = append(ctgOutline.Items, outline)
+		if ctg.Name != models.Uncategorized {
+			ctgOutline := models.OPMLOutline{
+				Text:  ctg.Name,
+				Title: ctg.Name,
+				Items: items,
 			}
 
 			b.Body.Items = append(b.Body.Items, ctgOutline)
 		} else {
-			for _, feed := range ctg.Feeds {
-				outline := OPMLOutline{
-					Title:   feed.Title,
-					Text:    feed.Title,
-					Type:    rssType,
-					XMLUrl:  feed.Subscription,
-					HTMLUrl: feed.Subscription,
-				}
-
-				b.Body.Items = append(b.Body.Items, outline)
-			}
+			b.Body.Items = append(b.Body.Items, items...)
 		}
 	}
 

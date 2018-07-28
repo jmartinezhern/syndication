@@ -55,7 +55,6 @@ type syncStatus = int
 // Service will update all feeds for all users periodically.
 type Service struct {
 	ticker        *time.Ticker
-	db            *database.DB
 	userPool      userPool
 	userWaitGroup sync.WaitGroup
 	status        chan syncStatus
@@ -144,7 +143,7 @@ func convertItemToEntry(item *gofeed.Item) models.Entry {
 // SyncUsers sync's all user's feeds.
 func (s *Service) SyncUsers() {
 	s.dbLock.Lock()
-	users := s.db.Users()
+	users := database.Users()
 	s.dbLock.Unlock()
 
 	for _, user := range users {
@@ -201,8 +200,7 @@ func (s *Service) SyncUser(user *models.User) error {
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
-	userDB := s.db.NewUserDB(*user)
-	feeds := userDB.Feeds()
+	feeds := database.Feeds(*user)
 	for _, feed := range feeds {
 		if !time.Now().After(feed.LastUpdated.Add(s.interval)) {
 			continue
@@ -213,19 +211,19 @@ func (s *Service) SyncUser(user *models.User) error {
 			log.Error(err)
 		}
 
-		err = userDB.EditFeed(&feed)
+		_, err = database.EditFeed(feed.APIID, feed, *user)
 		if err != nil {
 			log.Error(err)
 		}
 
 		entries := []models.Entry{}
 		for _, entry := range fetchedEntries {
-			if found := userDB.EntryWithGUIDExists(entry.GUID, feed.APIID); !found {
+			if found := database.EntryWithGUIDExists(entry.GUID, feed.APIID, *user); !found {
 				entries = append(entries, entry)
 			}
 		}
 
-		_, err = userDB.NewEntries(entries, feed.APIID)
+		_, err = database.NewEntries(entries, feed.APIID, *user)
 		if err != nil {
 			log.Error(err)
 		}
@@ -264,9 +262,8 @@ func (s *Service) Stop() {
 }
 
 // NewService creates a new SyncService object
-func NewService(db *database.DB, syncInterval time.Duration) Service {
+func NewService(syncInterval time.Duration) Service {
 	return Service{
-		db:       db,
 		status:   make(chan syncStatus),
 		interval: syncInterval,
 	}

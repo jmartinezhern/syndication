@@ -20,149 +20,134 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 
+	"github.com/labstack/echo"
+
+	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
-	"github.com/varddum/syndication/sync"
 )
 
-func (s *ServerTestSuite) TestGetEntries() {
-	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
-	s.Require().NotEmpty(feed.APIID)
+func (t *ServerTestSuite) TestGetEntry() {
+	feed := database.NewFeed("Example", "example.com", t.user)
 
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
+	entry, err := database.NewEntry(models.Entry{
+		Title: "Test Entry",
+	}, feed.APIID, t.user)
 
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
+	t.Require().NoError(err)
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/entries", nil)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetParamNames("entryID")
+	c.SetParamValues(entry.APIID)
+	c.SetPath("/v1/entries/:entryID")
 
-	s.Equal(http.StatusOK, resp.StatusCode)
+	t.NoError(t.server.GetEntry(c))
+	t.Equal(http.StatusOK, t.rec.Code)
+
+	var sEntry models.Entry
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &sEntry))
+
+	t.Equal(entry.Title, sEntry.Title)
+}
+
+func (t *ServerTestSuite) TestGetUnknownEntry() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+
+	c.SetParamNames("entryID")
+	c.SetParamValues("bogus")
+	c.SetPath("/v1/entries/:entryID")
+
+	t.EqualError(
+		t.server.GetEntry(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
+}
+
+func (t *ServerTestSuite) TestGetEntries() {
+	feed := database.NewFeed("Example", "example.com", t.user)
+
+	entry, err := database.NewEntry(models.Entry{
+		Title: "Test Entry",
+	}, feed.APIID, t.user)
+	t.Require().NoError(err)
+
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+
+	c.SetPath("/v1/entries")
+
+	t.NoError(t.server.GetEntries(c))
 
 	type Entries struct {
 		Entries []models.Entry `json:"entries"`
 	}
 
-	respEntries := new(Entries)
-	err = json.NewDecoder(resp.Body).Decode(respEntries)
-	s.Require().Nil(err)
-	s.Len(respEntries.Entries, 5)
+	var entries Entries
+	t.Require().NoError(json.Unmarshal(t.rec.Body.Bytes(), &entries))
+
+	t.Len(entries.Entries, 1)
+	t.Equal(entry.Title, entries.Entries[0].Title)
 }
 
-func (s *ServerTestSuite) TestGetEntry() {
-	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
-	s.Require().NotEmpty(feed.APIID)
+func (t *ServerTestSuite) TestMarkEntry() {
+	feed := database.NewFeed("Example", "example.com", t.user)
 
-	entry := models.Entry{
-		Title: "Item 1",
-		Link:  testBaseURL + "/item_1",
-	}
+	entry, err := database.NewEntry(models.Entry{
+		Title: "Test Entry",
+		Mark:  models.MarkerUnread,
+	}, feed.APIID, t.user)
+	t.Require().NoError(err)
 
-	entry, err := s.db.NewEntry(entry, feed.APIID)
-	s.Require().Nil(err)
-	s.Require().NotEmpty(entry.APIID)
+	t.Empty(database.Entries(true, models.MarkerRead, t.user))
 
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/entries/"+entry.APIID, nil)
-	s.Require().Nil(err)
+	req := httptest.NewRequest(echo.GET, "/?as=read", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetParamNames("entryID")
+	c.SetParamValues(entry.APIID)
+	c.SetPath("/v1/entries/:entryID/mark")
 
-	s.Equal(http.StatusOK, resp.StatusCode)
-
-	respEntry := new(models.Entry)
-	err = json.NewDecoder(resp.Body).Decode(respEntry)
-	s.Require().Nil(err)
-
-	s.Equal(entry.Title, respEntry.Title)
-	s.Equal(entry.APIID, respEntry.APIID)
+	t.NoError(t.server.MarkEntry(c))
 }
 
-func (s *ServerTestSuite) TestGetNonExistentEntry() {
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/entries/123456", nil)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) TestMarkUnknownEntry() {
+	req := httptest.NewRequest(echo.GET, "/?as=read", nil)
 
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
+	c.SetParamNames("entryID")
+	c.SetParamValues("bogus")
+	c.SetPath("/v1/entries/:entryID/mark")
 
-	s.Equal(http.StatusNotFound, resp.StatusCode)
+	t.EqualError(
+		t.server.MarkEntry(c),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
 }
 
-func (s *ServerTestSuite) TestMarkEntry() {
-	feed := s.db.NewFeed("World News", mockRSSServer.URL+"/rss.xml")
-	s.Require().NotEmpty(feed.APIID)
+func (t *ServerTestSuite) TestGetEntryStats() {
+	req := httptest.NewRequest(echo.GET, "/", nil)
 
-	entries, err := sync.PullFeed(&feed)
-	s.Require().Nil(err)
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
 
-	_, err = s.db.NewEntries(entries, feed.APIID)
-	s.Require().Nil(err)
+	c.SetPath("/v1/entries/stats")
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
-	s.Require().Len(entries, 0)
+	t.NoError(t.server.GetEntryStats(c))
 
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
-	s.Require().Len(entries, 5)
-
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/entries/"+entries[0].APIID+"/mark?as=read", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerUnread)
-	s.Require().Len(entries, 4)
-
-	entries = s.db.EntriesFromFeed(feed.APIID, true, models.MarkerRead)
-	s.Require().Len(entries, 1)
-}
-
-func (s *ServerTestSuite) TestMarkNonExistentEntry() {
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/entries/123456/mark?as=read", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNotFound, resp.StatusCode)
-}
-
-func (s *ServerTestSuite) TestMarkEntryWithoutMarker() {
-	req, err := http.NewRequest("PUT", testBaseURL+"/v1/entries/123456/mark", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusBadRequest, resp.StatusCode)
+	var stats models.Stats
+	t.NoError(json.Unmarshal(t.rec.Body.Bytes(), &stats))
 }

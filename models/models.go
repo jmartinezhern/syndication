@@ -34,8 +34,13 @@ const (
 	MarkerAny
 )
 
+// APIKeyType alias
+type APIKeyType int
+
+// APIKeyTypes identifies the kind of access or purpose of a key
 const (
-	rssType = "rss"
+	RefreshKey APIKeyType = iota
+	AccessKey
 )
 
 const (
@@ -121,7 +126,7 @@ type (
 
 		Title        string    `json:"title,optional"`
 		Description  string    `json:"description,omitempty"`
-		Subscription string    `json:"subscription,required"`
+		Subscription string    `json:"subscription"`
 		Source       string    `json:"source,omitempty"`
 		TTL          int       `json:"ttl,omitempty"`
 		Etag         string    `json:"-"`
@@ -184,10 +189,18 @@ type (
 		CreatedAt time.Time `json:"-"`
 		UpdatedAt time.Time `json:"-"`
 
-		Key string `json:"token"`
+		Key  string     `json:"token"`
+		Type APIKeyType `json:"-"`
 
-		User   User `json:"-"`
-		UserID uint `json:"-"`
+		User    User      `json:"-"`
+		UserID  uint      `json:"-"`
+		Expires time.Time `json:"expires"`
+	}
+
+	// APIKeyPair collects a refresh and access token
+	APIKeyPair struct {
+		RefreshKey string `json:"refreshToken"`
+		AccessKey  string `json:"accessToken"`
 	}
 
 	// An OPMLOutline represents an OPML Outline element.

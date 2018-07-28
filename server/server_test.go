@@ -18,10 +18,7 @@
 package server
 
 import (
-	"bytes"
-	"encoding/json"
-	"encoding/xml"
-	"io/ioutil"
+	"github.com/labstack/echo"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -30,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/labstack/gommon/log"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/varddum/syndication/database"
@@ -54,11 +52,10 @@ type (
 	ServerTestSuite struct {
 		suite.Suite
 
-		gDB    *database.DB
-		db     database.UserDB
 		server *Server
 		user   models.User
-		token  string
+		rec    *httptest.ResponseRecorder
+		e      *echo.Echo
 	}
 )
 
@@ -76,171 +73,23 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func (s *ServerTestSuite) SetupTest() {
-	var err error
-	s.gDB, err = database.NewDB("sqlite3", testDBPath)
-	s.Require().Nil(err)
+func (t *ServerTestSuite) SetupTest() {
+	err := database.Init("sqlite3", testDBPath)
+	t.Require().NoError(err)
 
-	s.server = NewServer(s.gDB)
-	s.server.handle.HideBanner = true
-	go s.server.Start(testHost, testHTTPPort)
+	t.server = NewServer("secret_cat")
+	t.server.handle.Logger.SetLevel(log.OFF)
+	t.server.handle.HideBanner = true
 
 	randUserName := RandStringRunes(8)
+	t.user = database.NewUser("123456", randUserName)
 
-	user := s.gDB.NewUser(randUserName, "testtesttest")
-	s.db = s.gDB.NewUserDB(user)
-
-	s.Require().NotEmpty(user.APIID)
-
-	token, err := s.db.NewAPIKey(s.server.authSecret, time.Hour*72)
-	s.Require().Nil(err)
-	s.Require().NotEmpty(token.Key)
-
-	s.token = token.Key
-	s.user = user
+	t.rec = httptest.NewRecorder()
+	t.e = echo.New()
 }
 
-func (s *ServerTestSuite) TearDownTest() {
+func (t *ServerTestSuite) TearDownTest() {
 	os.Remove(testDBPath)
-
-	s.server.Stop()
-}
-
-func (s *ServerTestSuite) TestGetStats() {
-	feed := s.db.NewFeed("News", "http://example.com")
-	s.Require().NotEmpty(feed.APIID)
-
-	for i := 0; i < 3; i++ {
-		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Mark:  models.MarkerRead,
-			Saved: true,
-		}
-
-		s.db.NewEntry(entry, feed.APIID)
-	}
-
-	for i := 0; i < 7; i++ {
-		entry := models.Entry{
-			Title: "Item",
-			Link:  "http://example.com",
-			Mark:  models.MarkerUnread,
-		}
-
-		s.db.NewEntry(entry, feed.APIID)
-	}
-
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/entries/stats", nil)
-
-	s.Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(200, resp.StatusCode)
-
-	respStats := new(models.Stats)
-	err = json.NewDecoder(resp.Body).Decode(respStats)
-	s.Require().Nil(err)
-
-	s.Equal(7, respStats.Unread)
-	s.Equal(3, respStats.Read)
-	s.Equal(3, respStats.Saved)
-	s.Equal(10, respStats.Total)
-}
-
-func (s *ServerTestSuite) TestOPMLImport() {
-	data := []byte(`
-	<opml>
-		<body>
-			<outline text="Sports" title="Sports">
-				<outline type="rss"  text="Basketball" title="Basketball" xmlUrl="http://example.com/basketball" htmlUrl="http://example.com/basketball"/>
-			</outline>
-			<outline type="rss" text="Baseball" title="Baseball" xmlUrl="http://example.com/baseball" htmlUrl="http://example.com/baseball"/>
-		</body>
-	</opml>
-	`)
-
-	req, err := http.NewRequest("POST", testBaseURL+"/v1/import", bytes.NewBuffer(data))
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Content-Type", "application/xml")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusNoContent, resp.StatusCode)
-
-	ctgs := s.db.Categories()
-	s.Require().Len(ctgs, 2)
-
-	sportsCtg, ok := s.db.CategoryWithName("Sports")
-	s.Require().True(ok)
-
-	sportsFeeds := s.db.FeedsFromCategory(sportsCtg.APIID)
-	s.Require().Len(sportsFeeds, 1)
-	s.Equal("Basketball", sportsFeeds[0].Title)
-
-	unctgCtg, ok := s.db.CategoryWithName(models.Uncategorized)
-	s.Require().True(ok)
-
-	unctgFeeds := s.db.FeedsFromCategory(unctgCtg.APIID)
-	s.Require().Len(unctgFeeds, 1)
-	s.Equal("Baseball", unctgFeeds[0].Title)
-}
-
-func (s *ServerTestSuite) TestOPMLExport() {
-	ctg := s.db.NewCategory("Sports")
-
-	bsktblFeed, err := s.db.NewFeedWithCategory("Basketball", "http://example.com/basketball", ctg.APIID)
-	s.Require().Nil(err)
-
-	bsblFeed := s.db.NewFeed("Baseball", "http://example.com/baseball")
-
-	req, err := http.NewRequest("GET", testBaseURL+"/v1/export", nil)
-	s.Require().Nil(err)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Accept", "application/xml")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-
-	s.Equal(http.StatusOK, resp.StatusCode)
-
-	data, err := ioutil.ReadAll(resp.Body)
-	s.Require().Nil(err)
-
-	b := models.OPML{}
-	err = xml.Unmarshal(data, &b)
-	s.Require().Nil(err)
-
-	s.Require().Len(b.Body.Items, 2)
-
-	passed := true
-	for _, item := range b.Body.Items {
-		if len(item.Items) == 1 {
-			if item.Title != "Sports" || len(item.Items) != 1 && item.Items[0].Title != bsktblFeed.Title {
-				passed = false
-				break
-			}
-		} else if item.Title != bsblFeed.Title {
-			passed = false
-			break
-		}
-	}
-
-	s.True(passed)
 }
 
 func TestServerTestSuite(t *testing.T) {

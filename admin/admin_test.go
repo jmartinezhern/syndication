@@ -31,7 +31,6 @@ type (
 	AdminTestSuite struct {
 		suite.Suite
 
-		db   *database.DB
 		serv *Service
 
 		client *rpc.Client
@@ -44,11 +43,10 @@ const (
 )
 
 func (s *AdminTestSuite) SetupTest() {
-	var err error
-	s.db, err = database.NewDB("sqlite3", TestDBPath)
+	err := database.Init("sqlite3", TestDBPath)
 	s.Require().Nil(err)
 
-	s.serv, err = NewService(s.db, TestSocketPath)
+	s.serv, err = NewService(TestSocketPath)
 	s.Require().NotNil(s.serv)
 	s.Require().Nil(err)
 
@@ -61,7 +59,7 @@ func (s *AdminTestSuite) SetupTest() {
 func (s *AdminTestSuite) TearDownTest() {
 	s.serv.Stop()
 
-	err := s.db.Close()
+	err := database.Close()
 	s.Nil(err)
 
 	err = os.Remove(TestDBPath)
@@ -79,12 +77,12 @@ func (s *AdminTestSuite) TestNewUser() {
 	err := s.client.Call("Admin.NewUser", args, &msg)
 	s.Nil(err)
 
-	_, found := s.db.UserWithName("test")
+	_, found := database.UserWithName("test")
 	s.True(found)
 }
 
 func (s *AdminTestSuite) TestNewConflictingUser() {
-	s.db.NewUser("test", "testtesttest")
+	database.NewUser("test", "testtesttest")
 
 	args := NewUserArgs{
 		"test",
@@ -97,18 +95,18 @@ func (s *AdminTestSuite) TestNewConflictingUser() {
 }
 
 func (s *AdminTestSuite) TestDeleteUser() {
-	user := s.db.NewUser("test", "testtesttest")
+	user := database.NewUser("test", "testtesttest")
 
 	var msg string
 	err := s.client.Call("Admin.DeleteUser", user.APIID, &msg)
 	s.Nil(err)
 
-	_, found := s.db.UserWithAPIID(user.APIID)
+	_, found := database.UserWithAPIID(user.APIID)
 	s.False(found)
 }
 
 func (s *AdminTestSuite) TestGetUserID() {
-	user := s.db.NewUser("test", "testtesttest")
+	user := database.NewUser("test", "testtesttest")
 
 	var userID string
 	err := s.client.Call("Admin.GetUserID", user.Username, &userID)
@@ -124,8 +122,8 @@ func (s *AdminTestSuite) TestGetNonExistentUserID() {
 }
 
 func (s *AdminTestSuite) TestGetUsers() {
-	user1 := s.db.NewUser("test1", "testtesttest")
-	user2 := s.db.NewUser("test2", "testtesttest")
+	user1 := database.NewUser("test1", "testtesttest")
+	user2 := database.NewUser("test2", "testtesttest")
 
 	var users []User
 
@@ -133,12 +131,16 @@ func (s *AdminTestSuite) TestGetUsers() {
 	s.Nil(err)
 	s.Len(users, 2)
 
-	s.NotZero(sort.Search(len(users), func(i int) bool { return users[i].Name == user1.Username && users[i].ID == user1.APIID }))
-	s.NotZero(sort.Search(len(users), func(i int) bool { return users[i].Name == user2.Username && users[i].ID == user2.APIID }))
+	s.NotZero(sort.Search(len(users), func(i int) bool {
+		return users[i].Name == user1.Username && users[i].ID == user1.APIID
+	}))
+	s.NotZero(sort.Search(len(users), func(i int) bool {
+		return users[i].Name == user2.Username && users[i].ID == user2.APIID
+	}))
 }
 
 func (s *AdminTestSuite) TestChangeUserName() {
-	user := s.db.NewUser("test", "testtesttest")
+	user := database.NewUser("test", "testtesttest")
 
 	var msg string
 	args := ChangeUserNameArgs{
@@ -149,14 +151,14 @@ func (s *AdminTestSuite) TestChangeUserName() {
 	err := s.client.Call("Admin.ChangeUserName", args, &msg)
 	s.Nil(err)
 
-	modifiedUser, found := s.db.UserWithAPIID(user.APIID)
+	modifiedUser, found := database.UserWithAPIID(user.APIID)
 	s.Require().True(found)
 
 	s.Equal("gopher", modifiedUser.Username)
 }
 
 func (s *AdminTestSuite) TestChangeUserPassword() {
-	user := s.db.NewUser("test", "testtesttest")
+	user := database.NewUser("test", "testtesttest")
 
 	var msg string
 	args := ChangeUserPasswordArgs{
@@ -167,7 +169,7 @@ func (s *AdminTestSuite) TestChangeUserPassword() {
 	err := s.client.Call("Admin.ChangeUserPassword", args, &msg)
 	s.Nil(err)
 
-	_, ok := s.db.UserWithCredentials(user.Username, "gopherpass")
+	_, ok := database.UserWithCredentials(user.Username, "gopherpass")
 	s.True(ok)
 }
 

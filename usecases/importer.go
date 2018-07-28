@@ -15,17 +15,19 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package models
+package usecases
 
 import (
 	"encoding/xml"
+	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/models"
 )
 
 type (
 	// Importer is an interface that wraps the basic
 	// import functions.
 	Importer interface {
-		Import([]byte) []Feed
+		Import([]byte, models.User) error
 	}
 
 	// An OPMLImporter represents an importer for the OPML 2.0 format
@@ -33,25 +35,20 @@ type (
 	OPMLImporter struct{}
 )
 
-// NewOPMLImporter creates a new OPMLImporter instance
-func NewOPMLImporter() OPMLImporter {
-	return OPMLImporter{}
-}
-
 // Import data that must be in a OPML 2.0 format.
-func (i OPMLImporter) Import(data []byte) []Feed {
-	b := OPML{}
+func (i OPMLImporter) Import(data []byte, user models.User) error {
+	b := models.OPML{}
 
 	err := xml.Unmarshal(data, &b)
 	if err != nil {
 		return nil
 	}
 
-	feeds := []Feed{}
+	feeds := []models.Feed{}
 
 	for _, outline := range b.Body.Items {
 		if outline.Type == "rss" {
-			feed := Feed{
+			feed := models.Feed{
 				Title:        outline.Title,
 				Subscription: outline.XMLUrl,
 			}
@@ -59,11 +56,11 @@ func (i OPMLImporter) Import(data []byte) []Feed {
 			feeds = append(feeds, feed)
 		} else if outline.Type == "" && len(outline.Items) > 0 {
 			// We consider this a category
-			ctg := Category{
+			ctg := models.Category{
 				Name: outline.Title,
 			}
 			for _, ctgOutline := range outline.Items {
-				feed := Feed{
+				feed := models.Feed{
 					Title:        ctgOutline.Title,
 					Subscription: ctgOutline.XMLUrl,
 					Category:     ctg,
@@ -74,5 +71,23 @@ func (i OPMLImporter) Import(data []byte) []Feed {
 		}
 	}
 
-	return feeds
+	for _, feed := range feeds {
+		if feed.Category.Name != "" {
+			dbCtg := models.Category{}
+			if ctg, ok := database.CategoryWithName(feed.Category.Name, user); ok {
+				dbCtg = ctg
+			} else {
+				dbCtg = database.NewCategory(feed.Category.Name, user)
+			}
+
+			_, err := database.NewFeedWithCategory(feed.Title, feed.Subscription, dbCtg.APIID, user)
+			if err != nil {
+				return err
+			}
+		} else {
+			database.NewFeed(feed.Title, feed.Subscription, user)
+		}
+	}
+
+	return nil
 }
