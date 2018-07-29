@@ -21,6 +21,7 @@ import (
 	"errors"
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
+	"strings"
 )
 
 type (
@@ -75,6 +76,8 @@ var (
 // New creates a new category. If the category conflicts with an existing category,
 // this errors
 func (c *CategoryUsecase) New(name string, user models.User) (models.Category, error) {
+	name = strings.ToLower(name)
+
 	if _, found := database.CategoryWithName(name, user); found {
 		return models.Category{}, ErrCategoryConflicts
 	}

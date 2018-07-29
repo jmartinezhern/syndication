@@ -46,9 +46,9 @@ func (t *ServerTestSuite) TestNewCategory() {
 }
 
 func (t *ServerTestSuite) TestNewConflictingCategory() {
-	ctg := `{ "name": "Test" }`
+	ctg := `{ "name": "test" }`
 
-	database.NewCategory("Test", t.user)
+	database.NewCategory("test", t.user)
 
 	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(ctg))
 	req.Header.Set("Content-Type", "application/json")
@@ -58,9 +58,11 @@ func (t *ServerTestSuite) TestNewConflictingCategory() {
 
 	c.SetPath("/v1/categories")
 
+	err := t.server.NewCategory(c)
+
 	t.EqualError(
-		echo.NewHTTPError(http.StatusConflict),
-		t.server.NewCategory(c).Error(),
+		err,
+		echo.NewHTTPError(http.StatusConflict).Error(),
 	)
 }
 
