@@ -77,7 +77,7 @@
   version = "v1.0"
 
 [[projects]]
-  digest = "1:4f6cd0d237c912bc66fb70f380688fcdc30618c99cfa076f014899eba7253e93"
+  digest = "1:8fe19266ce82209076d4a81007ff93f40dd349faca4a917aea59d33956bbd4fd"
   name = "github.com/jinzhu/gorm"
   packages = [
     ".",
@@ -86,8 +86,8 @@
     "dialects/sqlite",
   ]
   pruneopts = "UT"
-  revision = "5174cc5c242a728b435ea2be8a2f7f998e15429b"
-  version = "v1.0"
+  revision = "6ed508ec6a4ecb3531899a69cbc746ccf65a4166"
+  version = "v1.9.1"
 
 [[projects]]
   branch = "master"
