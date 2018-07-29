@@ -78,8 +78,6 @@ func main() {
 		}
 	}()
 
-	log.Info("Starting server on ", config.Host.Address, ":", config.Host.Port)
-
 	err := server.Start(
 		config.Host.Address,
 		config.Host.Port)

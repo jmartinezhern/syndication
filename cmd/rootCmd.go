@@ -30,6 +30,7 @@ import (
 
 const (
 	generatedSecretLength = 128
+	configFileName        = "config"
 )
 
 type (
@@ -121,7 +122,7 @@ func generateSecret() string {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
+	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file")
 
 	viper.SetDefault("sync.interval", time.Minute*15)
 	viper.SetDefault("host.port", 8080)
@@ -133,12 +134,14 @@ func init() {
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
-		if err := viper.ReadInConfig(); err != nil {
-			log.Error(err)
-			os.Exit(1)
-		}
 	} else {
-		log.Error("Config was not provided")
+		viper.SetConfigName(configFileName)
+		viper.AddConfigPath("/etc/syndication")
+		viper.AddConfigPath("$HOME/.config/syndication/config")
+	}
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Error(err)
 		os.Exit(1)
 	}
 }
