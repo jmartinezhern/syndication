@@ -29,7 +29,7 @@ func (t *UsecasesTestSuite) TestNewFeed() {
 }
 
 func (t *UsecasesTestSuite) TestFeeds() {
-	feed := t.feed.New("Example", "example.com", t.user)
+	feed := database.NewFeed("Example", "example.com", t.user)
 
 	feeds := t.feed.Feeds(t.user)
 	t.Len(feeds, 1)
@@ -37,13 +37,13 @@ func (t *UsecasesTestSuite) TestFeeds() {
 }
 
 func (t *UsecasesTestSuite) TestFeed() {
-	feed := t.feed.New("Example", "example.com", t.user)
+	feed := database.NewFeed("Example", "example.com", t.user)
 	_, found := t.feed.Feed(feed.APIID, t.user)
 	t.True(found)
 }
 
 func (t *UsecasesTestSuite) TestEditFeed() {
-	feed := t.feed.New("Example", "'example.com", t.user)
+	feed := database.NewFeed("Example", "'example.com", t.user)
 	newFeed, err := t.feed.Edit(feed.APIID, models.Feed{Title: "New Title"}, t.user)
 	t.NoError(err)
 	t.Equal("New Title", newFeed.Title)
@@ -55,7 +55,7 @@ func (t *UsecasesTestSuite) TestEditMissingFeed() {
 }
 
 func (t *UsecasesTestSuite) TestDeleteFeed() {
-	feed := t.feed.New("Example", "example.com", t.user)
+	feed := database.NewFeed("Example", "example.com", t.user)
 	err := t.feed.Delete(feed.APIID, t.user)
 	t.NoError(err)
 

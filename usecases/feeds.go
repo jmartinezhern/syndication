@@ -19,8 +19,12 @@ package usecases
 
 import (
 	"errors"
+
+	log "github.com/sirupsen/logrus"
+
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
+	"github.com/varddum/syndication/sync"
 )
 
 type (
@@ -63,7 +67,25 @@ var (
 
 // New creates a new Feed
 func (f *FeedUsecase) New(title, subscription string, user models.User) models.Feed {
-	return database.NewFeed(title, subscription, user)
+	feed := database.NewFeed(title, subscription, user)
+	fetchedFeed, entries, err := sync.PullFeed(subscription, "")
+	if err != nil {
+		// Consume the error for now
+		log.Error(err)
+		return feed
+	}
+
+	feed, err = database.EditFeed(feed.APIID, fetchedFeed, user)
+	if err != nil {
+		log.Error(err)
+		return feed
+	}
+
+	_, err = database.NewEntries(entries, feed.APIID, user)
+	if err != nil {
+		log.Error(err)
+	}
+	return feed
 }
 
 // Feeds returns all feeds owned by user

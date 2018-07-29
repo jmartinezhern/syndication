@@ -84,31 +84,21 @@ func (s *SyncTestSuite) TearDownTest() {
 }
 
 func (s *SyncTestSuite) TestPullUnreachableFeed() {
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: baseURL + feedPort + "/bogus.xml",
-	}
-
-	_, err := PullFeed(&feed)
-	s.NotNil(err)
+	_, _, err := PullFeed("Sync Test", baseURL+feedPort+"/bogus.xml")
+	s.Error(err)
 }
 
 func (s *SyncTestSuite) TestPullFeedWithBadSubscription() {
-	feed := models.Feed{
-		Title:        "Sync Test",
-		Subscription: "bogus",
-	}
-
-	_, err := PullFeed(&feed)
-	s.NotNil(err)
+	_, _, err := PullFeed("Sync Test", "bogus")
+	s.Error(err)
 }
 
 func (s *SyncTestSuite) TestSyncWithEtags() {
 	feed := database.NewFeed("Sync Test", rssURL, s.user)
 	s.Require().NotEmpty(feed.APIID)
 
-	entries, err := PullFeed(&feed)
-	s.Require().Nil(err)
+	_, entries, err := PullFeed(feed.Subscription, "")
+	s.Require().NoError(err)
 	s.Require().Len(entries, 5)
 
 	_, err = database.NewEntries(entries, feed.APIID, s.user)

@@ -176,23 +176,25 @@ func (s *Service) SyncUsers() {
 // PullFeed and return all entries for that feed. If getting the
 // subscription source or parsing the response fails, this function
 // will error.
-func PullFeed(feed *models.Feed) ([]models.Entry, error) {
-	fetchedFeed, err := fetchFeed(feed.Subscription, feed.Etag)
+func PullFeed(url, etag string) (models.Feed, []models.Entry, error) {
+	fetchedFeed, err := fetchFeed(url, etag)
 	if err != nil {
-		return nil, err
+		return models.Feed{}, nil, err
 	}
 
-	feed.Title = fetchedFeed.Title
-	feed.Description = fetchedFeed.Description
-	feed.Source = fetchedFeed.Link
-	feed.LastUpdated = time.Now()
+	feed := models.Feed{
+		Title:       fetchedFeed.Title,
+		Description: fetchedFeed.Description,
+		Source:      fetchedFeed.Link,
+		LastUpdated: time.Now(),
+	}
 
 	entries := make([]models.Entry, len(fetchedFeed.Items))
 	for idx, item := range fetchedFeed.Items {
 		entries[idx] = convertItemToEntry(item)
 	}
 
-	return entries, nil
+	return feed, entries, nil
 }
 
 // SyncUser sync's all feeds owned by user
@@ -206,12 +208,12 @@ func (s *Service) SyncUser(user *models.User) error {
 			continue
 		}
 
-		fetchedEntries, err := PullFeed(&feed)
+		fetchedFeed, fetchedEntries, err := PullFeed(feed.Subscription, feed.Etag)
 		if err != nil {
 			log.Error(err)
 		}
 
-		_, err = database.EditFeed(feed.APIID, feed, *user)
+		_, err = database.EditFeed(feed.APIID, fetchedFeed, *user)
 		if err != nil {
 			log.Error(err)
 		}
