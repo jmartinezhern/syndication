@@ -40,7 +40,10 @@ func main() {
 
 	config := cmd.EffectiveConfig
 
-	if err := database.Init(config.Database.Type, config.Database.Connection); err != nil {
+	if err := database.Init(
+		config.Database.Type,
+		config.Database.Connection,
+	); err != nil {
 		log.Error(err)
 		os.Exit(1)
 	}
