@@ -116,8 +116,8 @@ type (
 
 		APIID string `json:"id"`
 
-		Category   Category
-		CategoryID uint `json:"-"`
+		Category   Category `json:"category,omitempty"`
+		CategoryID uint     `json:"-"`
 
 		User   User `json:"-"`
 		UserID uint `json:"-"`
@@ -147,7 +147,7 @@ type (
 
 		APIID string `json:"id"`
 
-		Entries []Entry `json:"entries" gorm:"many2many:entry_tags;"`
+		Entries []Entry `json:"entries,omitempty" gorm:"many2many:entry_tags;"`
 	}
 
 	// Entry represents subscription items obtained from Feed objects.
@@ -161,10 +161,10 @@ type (
 		User   User `json:"-"`
 		UserID uint `json:"-"`
 
-		Feed   Feed
+		Feed   Feed `json:"-"`
 		FeedID uint `json:"-"`
 
-		Tags []Tag `json:"tags" gorm:"many2many:entry_tags;"`
+		Tags []Tag `json:"tags,omitempty" gorm:"many2many:entry_tags;"`
 
 		GUID      string    `json:"-"`
 		Title     string    `json:"title"`

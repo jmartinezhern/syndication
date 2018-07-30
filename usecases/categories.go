@@ -19,9 +19,12 @@ package usecases
 
 import (
 	"errors"
+	"strings"
+
+	log "github.com/sirupsen/logrus"
+
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
-	"strings"
 )
 
 type (
@@ -45,7 +48,7 @@ type (
 		Edit(newName, ctgID string, user models.User) (models.Category, error)
 
 		// AddFeeds to a category
-		AddFeeds(ctgID string, feeds []string, user models.User) error
+		AddFeeds(ctgID string, feeds []string, user models.User)
 
 		// Delete a category with ID that belongs to a user
 		Delete(id string, user models.User) error
@@ -71,6 +74,9 @@ var (
 
 	// ErrCategoryConflicts signals that a category model conflicts with an existing category
 	ErrCategoryConflicts = errors.New("Category conflicts")
+
+	// ErrCategoryProtected signals that a modification to a "system" category was attempted
+	ErrCategoryProtected = errors.New("Category cannot be modified")
 )
 
 // New creates a new category. If the category conflicts with an existing category,
@@ -106,34 +112,40 @@ func (c *CategoryUsecase) Feeds(id string, user models.User) ([]models.Feed, err
 
 // Edit a category with ID that belongs to user
 func (c *CategoryUsecase) Edit(newName, ctgID string, user models.User) (models.Category, error) {
-	ctg, err := database.EditCategory(ctgID, models.Category{Name: newName}, user)
-	if err == database.ErrModelNotFound {
+	ctg, found := database.CategoryWithAPIID(ctgID, user)
+	if !found {
 		return models.Category{}, ErrCategoryNotFound
 	}
 
-	return ctg, err
+	if ctg.Name == models.Uncategorized {
+		return models.Category{}, ErrCategoryProtected
+	}
+
+	return database.EditCategory(ctgID, models.Category{Name: newName}, user)
 }
 
 // AddFeeds to a category
-func (c *CategoryUsecase) AddFeeds(ctgID string, feeds []string, user models.User) error {
+func (c *CategoryUsecase) AddFeeds(ctgID string, feeds []string, user models.User) {
 	for _, id := range feeds {
 		err := database.ChangeFeedCategory(id, ctgID, user)
 		if err != nil {
-			return err
+			log.Error(err)
 		}
 	}
-
-	return nil
 }
 
 // Delete a category with ID that belongs to a user
 func (c *CategoryUsecase) Delete(id string, user models.User) error {
-	err := database.DeleteCategory(id, user)
-	if err == database.ErrModelNotFound {
+	ctg, found := database.CategoryWithAPIID(id, user)
+	if !found {
 		return ErrCategoryNotFound
 	}
 
-	return err
+	if ctg.Name == models.Uncategorized {
+		return ErrCategoryProtected
+	}
+
+	return database.DeleteCategory(id, user)
 }
 
 // Mark a category

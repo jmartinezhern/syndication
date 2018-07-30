@@ -89,8 +89,7 @@ func (t *UsecasesTestSuite) TestAddFeedsToCategory() {
 	feeds := database.CategoryFeeds(ctg.APIID, t.user)
 	t.Empty(feeds)
 
-	err := t.ctgs.AddFeeds(ctg.APIID, []string{feed.APIID}, t.user)
-	t.NoError(err)
+	t.ctgs.AddFeeds(ctg.APIID, []string{feed.APIID}, t.user)
 
 	feeds = database.CategoryFeeds(ctg.APIID, t.user)
 	t.Require().Len(feeds, 1)

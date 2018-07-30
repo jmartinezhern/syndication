@@ -96,6 +96,8 @@ func (s *Server) EditCategory(c echo.Context) error {
 	newCtg, err := s.cUsecase.Edit(ctg.Name, ctgID, user)
 	if err == usecases.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
+	} else if err == usecases.ErrCategoryProtected {
+		return echo.NewHTTPError(http.StatusBadRequest)
 	} else if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
@@ -118,10 +120,7 @@ func (s *Server) AppendCategoryFeeds(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err := s.cUsecase.AddFeeds(ctgID, feeds.Feeds, user)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError)
-	}
+	s.cUsecase.AddFeeds(ctgID, feeds.Feeds, user)
 
 	return c.NoContent(http.StatusNoContent)
 }
@@ -133,6 +132,8 @@ func (s *Server) DeleteCategory(c echo.Context) error {
 	err := s.cUsecase.Delete(c.Param("categoryID"), user)
 	if err == usecases.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
+	} else if err == usecases.ErrCategoryProtected {
+		return echo.NewHTTPError(http.StatusBadRequest)
 	} else if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
