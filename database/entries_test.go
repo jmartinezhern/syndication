@@ -242,3 +242,22 @@ func (s *DatabaseTestSuite) TestMarkUnknownEntry() {
 	err := MarkEntry("bogus", models.MarkerRead, s.user)
 	s.EqualError(err, ErrModelNotFound.Error())
 }
+
+func (s *DatabaseTestSuite) TestMarkAll() {
+	feed := NewFeed("News", "http://localhost/news", s.user)
+
+	entry := models.Entry{
+		Title:     "Article",
+		Mark:      models.MarkerUnread,
+		Published: time.Now(),
+	}
+
+	_, err := NewEntry(entry, feed.APIID, s.user)
+	s.Require().NoError(err)
+
+	s.Require().Empty(Entries(true, models.MarkerRead, s.user))
+
+	MarkAll(models.MarkerRead, s.user)
+
+	s.Require().Len(Entries(true, models.MarkerRead, s.user), 1)
+}

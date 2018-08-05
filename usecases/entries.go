@@ -35,6 +35,9 @@ type (
 		// Mark entry with id
 		Mark(id string, marker models.Marker, user models.User) error
 
+		// MarkAll entries
+		MarkAll(marker models.Marker, user models.User)
+
 		// Stats returns statistics for all entries
 		Stats(user models.User) models.Stats
 	}
@@ -72,6 +75,11 @@ func (e *EntryUsecase) Mark(id string, marker models.Marker, user models.User) e
 	}
 
 	return err
+}
+
+// MarkAll entries
+func (e *EntryUsecase) MarkAll(marker models.Marker, user models.User) {
+	database.MarkAll(marker, user)
 }
 
 // Stats returns statistics for all entries

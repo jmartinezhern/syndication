@@ -218,6 +218,7 @@ func (s *Server) registerHandlers() {
 	v1.GET("/entries", s.GetEntries)
 	v1.GET("/entries/:entryID", s.GetEntry)
 	v1.PUT("/entries/:entryID/mark", s.MarkEntry)
+	v1.PUT("/entries/mark", s.MarkAllEntries)
 	v1.GET("/entries/stats", s.GetEntryStats)
 
 	v1.OPTIONS("/entries", s.OptionsHandler)

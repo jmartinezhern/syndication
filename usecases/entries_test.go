@@ -68,6 +68,7 @@ func (t *UsecasesTestSuite) TestMarkEntry() {
 
 	err = t.entry.Mark(entry.APIID, models.MarkerRead, t.user)
 	t.NoError(err)
+
 	entries := database.Entries(true, models.MarkerRead, t.user)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
@@ -76,4 +77,22 @@ func (t *UsecasesTestSuite) TestMarkEntry() {
 func (t *UsecasesTestSuite) TestMarkMissingEntry() {
 	err := t.entry.Mark("bogus", models.MarkerRead, t.user)
 	t.EqualError(err, ErrEntryNotFound.Error())
+}
+
+func (t *UsecasesTestSuite) TestMarkAll() {
+	feed := database.NewFeed("Example", "example.com", t.user)
+
+	entry, err := database.NewEntry(models.Entry{
+		Title: "Test Entry",
+		Mark:  models.MarkerUnread,
+	}, feed.APIID, t.user)
+	t.Require().NoError(err)
+
+	t.Require().Empty(database.Entries(true, models.MarkerRead, t.user))
+
+	t.entry.MarkAll(models.MarkerRead, t.user)
+
+	entries := database.Entries(true, models.MarkerRead, t.user)
+	t.Len(entries, 1)
+	t.Equal(entry.Title, entries[0].Title)
 }
