@@ -92,6 +92,20 @@ func (s *Server) MarkEntry(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// MarkAllEntries applies a Marker to all Entries
+func (s *Server) MarkAllEntries(c echo.Context) error {
+	user := c.Get(echoSyndUserKey).(models.User)
+
+	marker := models.MarkerFromString(c.FormValue("as"))
+	if marker == models.MarkerNone {
+		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
+	}
+
+	s.eUsecase.MarkAll(marker, user)
+
+	return c.NoContent(http.StatusNoContent)
+}
+
 // GetEntryStats provides statistics related to Entries
 func (s *Server) GetEntryStats(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)

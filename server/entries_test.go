@@ -110,7 +110,7 @@ func (t *ServerTestSuite) TestMarkEntry() {
 
 	t.Empty(database.Entries(true, models.MarkerRead, t.user))
 
-	req := httptest.NewRequest(echo.GET, "/?as=read", nil)
+	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
 	c.Set(echoSyndUserKey, t.user)
@@ -123,7 +123,7 @@ func (t *ServerTestSuite) TestMarkEntry() {
 }
 
 func (t *ServerTestSuite) TestMarkUnknownEntry() {
-	req := httptest.NewRequest(echo.GET, "/?as=read", nil)
+	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
 	c.Set(echoSyndUserKey, t.user)
@@ -138,8 +138,29 @@ func (t *ServerTestSuite) TestMarkUnknownEntry() {
 	)
 }
 
+func (t *ServerTestSuite) TestMarkAllEntries() {
+	feed := database.NewFeed("Example", "example.com", t.user)
+
+	_, err := database.NewEntry(models.Entry{
+		Title: "Test Entry",
+		Mark:  models.MarkerUnread,
+	}, feed.APIID, t.user)
+	t.Require().NoError(err)
+
+	t.Empty(database.Entries(true, models.MarkerRead, t.user))
+
+	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+
+	c.SetPath("/v1/entries/mark")
+
+	t.NoError(t.server.MarkAllEntries(c))
+}
+
 func (t *ServerTestSuite) TestGetEntryStats() {
-	req := httptest.NewRequest(echo.GET, "/", nil)
+	req := httptest.NewRequest(echo.PUT, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
 	c.Set(echoSyndUserKey, t.user)

@@ -172,6 +172,16 @@ func MarkEntry(id string, marker models.Marker, user models.User) error {
 	return defaultInstance.MarkEntry(id, marker, user)
 }
 
+// MarkAll entries
+func (db *DB) MarkAll(marker models.Marker, user models.User) {
+	db.db.Model(new(models.Entry)).Where("user_id = ?", user.ID).Update(models.Entry{Mark: marker})
+}
+
+// MarkAll entries
+func MarkAll(marker models.Marker, user models.User) {
+	defaultInstance.MarkAll(marker, user)
+}
+
 // EntriesFromTag returns all Entries which are tagged with tagID
 func (db *DB) EntriesFromTag(tagID string, marker models.Marker, orderByNewest bool, user models.User) []models.Entry {
 	tag := &models.Tag{}
