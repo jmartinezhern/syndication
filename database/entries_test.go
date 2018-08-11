@@ -261,3 +261,32 @@ func (s *DatabaseTestSuite) TestMarkAll() {
 
 	s.Require().Len(Entries(true, models.MarkerRead, s.user), 1)
 }
+
+func (s *DatabaseTestSuite) TestDeleteOldEntries() {
+	feed := NewFeed("News", "http://localhost/news", s.user)
+
+	entry, err := NewEntry(models.Entry{
+		Title:     "Article 1",
+		Mark:      models.MarkerUnread,
+		Published: time.Now(),
+	}, feed.APIID, s.user)
+	s.Require().NoError(err)
+
+	savedEntry, err := NewEntry(models.Entry{
+		Title:     "Article 2",
+		Mark:      models.MarkerUnread,
+		Published: time.Now(),
+		Saved:     true,
+	}, feed.APIID, s.user)
+	s.Require().NoError(err)
+
+	s.Require().WithinDuration(time.Now(), entry.CreatedAt, time.Second)
+
+	DeleteOldEntries(entry.CreatedAt.Add(10*time.Second), s.user)
+
+	_, found := EntryWithAPIID(entry.APIID, s.user)
+	s.False(found)
+
+	_, found = EntryWithAPIID(savedEntry.APIID, s.user)
+	s.True(found)
+}

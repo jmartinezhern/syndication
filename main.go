@@ -48,7 +48,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	sync := sync.NewService(config.Sync.Interval)
+	sync := sync.NewService(config.Sync.Interval, config.Sync.DeleteAfter)
 
 	if config.Admin.Enable {
 		adminServ, err := admin.NewService(config.Admin.SocketPath)
