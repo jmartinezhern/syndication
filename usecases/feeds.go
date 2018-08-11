@@ -20,8 +20,6 @@ package usecases
 import (
 	"errors"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 	"github.com/varddum/syndication/sync"
@@ -31,7 +29,7 @@ type (
 	// Feed defines the Feed Usecase interface
 	Feed interface {
 		// New creates a new Feed
-		New(title, subscription string, user models.User) models.Feed
+		New(title, subscription string, user models.User) (models.Feed, error)
 
 		// Feeds returns all feeds owned by user
 		Feeds(user models.User) []models.Feed
@@ -63,29 +61,31 @@ type (
 var (
 	// ErrFeedNotFound signals that a feed could not be found
 	ErrFeedNotFound = errors.New("Feed not found")
+
+	// ErrFetchingFeed Signals that an error ocurred while fetching
+	// a RSS or Atom feed
+	ErrFetchingFeed = errors.New("Could not fetch feed")
 )
 
 // New creates a new Feed
-func (f *FeedUsecase) New(title, subscription string, user models.User) models.Feed {
+func (f *FeedUsecase) New(title, subscription string, user models.User) (models.Feed, error) {
 	feed := database.NewFeed(title, subscription, user)
 	fetchedFeed, entries, err := sync.PullFeed(subscription, "")
 	if err != nil {
-		// Consume the error for now
-		log.Error(err)
-		return feed
+		return models.Feed{}, ErrFetchingFeed
 	}
 
 	feed, err = database.EditFeed(feed.APIID, fetchedFeed, user)
 	if err != nil {
-		log.Error(err)
-		return feed
+		return models.Feed{}, err
 	}
 
 	_, err = database.NewEntries(entries, feed.APIID, user)
 	if err != nil {
-		log.Error(err)
+		return models.Feed{}, err
 	}
-	return feed
+
+	return feed, nil
 }
 
 // Feeds returns all feeds owned by user
