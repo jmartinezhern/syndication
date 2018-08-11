@@ -34,7 +34,12 @@ func (s *Server) NewFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feed := s.fUsecase.New(newFeed.Title, newFeed.Subscription, user)
+	feed, err := s.fUsecase.New(newFeed.Title, newFeed.Subscription, user)
+	if err == usecases.ErrFetchingFeed {
+		return echo.NewHTTPError(http.StatusBadRequest)
+	} else if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError)
+	}
 
 	return c.JSON(http.StatusCreated, feed)
 }

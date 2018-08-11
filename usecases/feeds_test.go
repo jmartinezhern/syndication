@@ -18,14 +18,29 @@
 package usecases
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+
 	"github.com/varddum/syndication/database"
 	"github.com/varddum/syndication/models"
 )
 
 func (t *UsecasesTestSuite) TestNewFeed() {
-	feed := t.feed.New("Example", "example.com", t.user)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "<rss></rss>")
+	}))
+	defer ts.Close()
+
+	feed, err := t.feed.New("Example", ts.URL, t.user)
+	t.NoError(err)
 	_, found := database.FeedWithAPIID(feed.APIID, t.user)
 	t.True(found)
+}
+
+func (t *UsecasesTestSuite) TestUnreachableNewFeed() {
+	_, err := t.feed.New("Example", "bogus", t.user)
+	t.EqualError(err, ErrFetchingFeed.Error())
 }
 
 func (t *UsecasesTestSuite) TestFeeds() {

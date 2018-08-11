@@ -34,8 +34,8 @@ import (
 const maxThreads = 100
 
 var (
-	// ErrParsingFeed Signals that a an error occurred while processing
-	// a RSS or Atom Feed
+	// ErrParsingFeed Signals that an error occurred while processing
+	// a RSS or Atom feed
 	ErrParsingFeed = errors.New("Could not parse feed")
 )
 
@@ -54,12 +54,13 @@ type syncStatus = int
 // Service defines properties for running a Feed Sync Service.
 // Service will update all feeds for all users periodically.
 type Service struct {
-	ticker        *time.Ticker
-	userPool      userPool
-	userWaitGroup sync.WaitGroup
-	status        chan syncStatus
-	interval      time.Duration
-	dbLock        sync.Mutex
+	ticker          *time.Ticker
+	userPool        userPool
+	userWaitGroup   sync.WaitGroup
+	status          chan syncStatus
+	interval        time.Duration
+	deleteAfterDays int
+	dbLock          sync.Mutex
 }
 
 func (p *userPool) get() models.User {
@@ -231,6 +232,8 @@ func (s *Service) SyncUser(user *models.User) error {
 		}
 	}
 
+	database.DeleteOldEntries(time.Now().AddDate(0, 0, s.deleteAfterDays*-1), *user)
+
 	return nil
 }
 
@@ -264,9 +267,10 @@ func (s *Service) Stop() {
 }
 
 // NewService creates a new SyncService object
-func NewService(syncInterval time.Duration) Service {
+func NewService(syncInterval time.Duration, deleteAfter int) Service {
 	return Service{
-		status:   make(chan syncStatus),
-		interval: syncInterval,
+		status:          make(chan syncStatus),
+		interval:        syncInterval,
+		deleteAfterDays: deleteAfter,
 	}
 }

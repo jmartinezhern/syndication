@@ -60,7 +60,8 @@ type (
 
 	// Sync configuration
 	Sync struct {
-		Interval time.Duration
+		Interval    time.Duration
+		DeleteAfter int `mapstructure:"delete_after"`
 	}
 
 	// Config represents a complete configuration
@@ -125,6 +126,7 @@ func init() {
 	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file")
 
 	viper.SetDefault("sync.interval", time.Minute*15)
+	viper.SetDefault("sync.delete_after", 30)
 	viper.SetDefault("host.port", 8080)
 	viper.SetDefault("host.address", "localhost")
 	viper.SetDefault("database.type", "sqlite3")

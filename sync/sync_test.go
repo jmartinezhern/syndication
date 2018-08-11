@@ -104,7 +104,7 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 	_, err = database.NewEntries(entries, feed.APIID, s.user)
 	s.Require().Nil(err)
 
-	serv := NewService(testSyncInterval)
+	serv := NewService(testSyncInterval, 1)
 	err = serv.SyncUser(&s.user)
 	s.Require().Nil(err)
 
@@ -117,7 +117,7 @@ func (s *SyncTestSuite) TestSyncUser() {
 	feed := database.NewFeed("Sync Test", rssMinimalURL, s.user)
 	s.Require().NotEmpty(feed.APIID)
 
-	serv := NewService(testSyncInterval)
+	serv := NewService(testSyncInterval, 1)
 	err := serv.SyncUser(&s.user)
 	s.Require().Nil(err)
 
@@ -136,7 +136,7 @@ func (s *SyncTestSuite) TestSyncUsers() {
 		database.NewFeed("Sync Test", rssMinimalURL, user)
 	}
 
-	serv := NewService(testSyncInterval)
+	serv := NewService(testSyncInterval, 1)
 
 	serv.SyncUsers()
 
@@ -160,7 +160,7 @@ func (s *SyncTestSuite) TestSyncService() {
 		database.NewFeed("Sync Test", rssMinimalURL, user)
 	}
 
-	serv := NewService(time.Second)
+	serv := NewService(time.Second, 1)
 
 	serv.Start()
 

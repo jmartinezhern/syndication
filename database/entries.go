@@ -17,7 +17,10 @@
 
 package database
 
-import "github.com/varddum/syndication/models"
+import (
+	"github.com/varddum/syndication/models"
+	"time"
+)
 
 // NewEntry creates a new Entry object owned by user
 func (db *DB) NewEntry(entry models.Entry, feedID string, user models.User) (models.Entry, error) {
@@ -30,8 +33,8 @@ func (db *DB) NewEntry(entry models.Entry, feedID string, user models.User) (mod
 	entry.Feed = feed
 	entry.FeedID = feed.ID
 
-	db.db.Model(&user).Association("Entries").Append(entry)
-	db.db.Model(&feed).Association("Entries").Append(entry)
+	db.db.Model(&user).Association("Entries").Append(&entry)
+	db.db.Model(&feed).Association("Entries").Append(&entry)
 
 	return entry, nil
 }
@@ -244,4 +247,14 @@ func (db *DB) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marke
 // EntriesFromMultipleTags returns all Entries that are related to a Category with categoryID by the entries' owning Feed
 func EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marker models.Marker, user models.User) []models.Entry {
 	return defaultInstance.EntriesFromMultipleTags(tagIDs, orderByNewest, marker, user)
+}
+
+// DeleteOldEntries deletes entries older than a timestamp
+func (db *DB) DeleteOldEntries(timestamp time.Time, user models.User) {
+	db.db.Delete(models.Entry{}, "user_id = ? AND created_at < ? AND saved = ?", user.ID, timestamp, false)
+}
+
+// DeleteOldEntries deletes entries older than a timestamp
+func DeleteOldEntries(timestamp time.Time, user models.User) {
+	defaultInstance.DeleteOldEntries(timestamp, user)
 }

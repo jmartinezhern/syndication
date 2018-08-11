@@ -19,6 +19,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -30,7 +31,12 @@ import (
 )
 
 func (t *ServerTestSuite) TestNewFeed() {
-	feed := `{ "title": "Example", "subscription": "exampel.com" }`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "<rss></rss>")
+	}))
+	defer ts.Close()
+
+	feed := fmt.Sprintf(`{ "title": "Example", "subscription": "%s" }`, ts.URL)
 
 	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(feed))
 	req.Header.Set("Content-Type", "application/json")
@@ -42,6 +48,20 @@ func (t *ServerTestSuite) TestNewFeed() {
 
 	t.NoError(t.server.NewFeed(c))
 	t.Equal(http.StatusCreated, t.rec.Code)
+}
+
+func (t *ServerTestSuite) TestUnreachableNewFeed() {
+	feed := `{ "title": "Example", "subscription": "bogus" }`
+
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(feed))
+	req.Header.Set("Content-Type", "application/json")
+
+	c := t.e.NewContext(req, t.rec)
+	c.Set(echoSyndUserKey, t.user)
+
+	c.SetPath("/v1/feeds")
+
+	t.EqualError(t.server.NewFeed(c), echo.NewHTTPError(http.StatusBadRequest).Error())
 }
 
 func (t *ServerTestSuite) TestGetFeeds() {
