@@ -143,27 +143,23 @@ func (s *DatabaseTestSuite) TestTagMultipleEntries() {
 func (s *DatabaseTestSuite) TestEntriesFromMultipleTags() {
 	feed := NewFeed("Test site", "http://example.com", s.user)
 
-	var entries []models.Entry
-	for i := 0; i < 15; i++ {
-		entry := models.Entry{
-			Title:  "Test Entry " + strconv.Itoa(i),
+	entries := []models.Entry{
+		{
+			Title:  "Test Entry",
 			Author: "varddum",
 			Link:   "http://example.com",
 			Mark:   models.MarkerUnread,
-		}
-
-		entries = append(entries, entry)
+		},
+		{
+			Title:  "Test Entry",
+			Author: "varddum",
+			Link:   "http://example.com",
+			Mark:   models.MarkerUnread,
+		},
 	}
 
 	entries, err := NewEntries(entries, feed.APIID, s.user)
-	s.Require().Len(entries, 15)
 	s.Require().Nil(err)
-
-	entryAPIIDs := make([]string, len(entries))
-	for i, entry := range entries {
-		s.Require().NotEmpty(entry.APIID)
-		entryAPIIDs[i] = entry.APIID
-	}
 
 	firstTag := NewTag("First tag", s.user)
 	s.NotZero(firstTag.ID)
@@ -171,16 +167,14 @@ func (s *DatabaseTestSuite) TestEntriesFromMultipleTags() {
 	secondTag := NewTag("Second tag", s.user)
 	s.NotZero(secondTag.ID)
 
-	err = TagEntries(firstTag.APIID, entryAPIIDs[0:5], s.user)
-	s.Nil(err)
+	s.NoError(TagEntries(firstTag.APIID, []string{entries[0].APIID}, s.user))
 
-	err = TagEntries(secondTag.APIID, entryAPIIDs[5:10], s.user)
-	s.Nil(err)
+	s.NoError(TagEntries(secondTag.APIID, []string{entries[1].APIID}, s.user))
 
 	s.Require().NotEqual(firstTag.APIID, secondTag.APIID)
 
 	taggedEntries := EntriesFromMultipleTags([]string{firstTag.APIID, secondTag.APIID}, true, models.MarkerAny, s.user)
-	s.Len(taggedEntries, 10)
+	s.Len(taggedEntries, 2)
 }
 
 func (s *DatabaseTestSuite) TestDeleteTag() {
