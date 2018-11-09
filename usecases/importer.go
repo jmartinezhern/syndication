@@ -35,18 +35,10 @@ type (
 	OPMLImporter struct{}
 )
 
-// Import data that must be in a OPML 2.0 format.
-func (i OPMLImporter) Import(data []byte, user models.User) error {
-	b := models.OPML{}
-
-	err := xml.Unmarshal(data, &b)
-	if err != nil {
-		return nil
-	}
-
+func (i OPMLImporter) extractFeeds(items []models.OPMLOutline) []models.Feed {
 	feeds := []models.Feed{}
 
-	for _, outline := range b.Body.Items {
+	for _, outline := range items {
 		if outline.Type == "rss" {
 			feed := models.Feed{
 				Title:        outline.Title,
@@ -71,10 +63,28 @@ func (i OPMLImporter) Import(data []byte, user models.User) error {
 		}
 	}
 
+	return feeds
+}
+
+// Import data that must be in a OPML 2.0 format.
+func (i OPMLImporter) Import(data []byte, user models.User) error {
+	b := models.OPML{}
+
+	err := xml.Unmarshal(data, &b)
+	if err != nil {
+		return nil
+	}
+
+	feeds := i.extractFeeds(b.Body.Items)
+
+	if len(feeds) == 0 {
+		return nil
+	}
+
 	for _, feed := range feeds {
 		if feed.Category.Name != "" {
 			dbCtg := models.Category{}
-			if ctg, ok := database.CategoryWithName(feed.Category.Name, user); ok {
+			if ctg, exists := database.CategoryWithName(feed.Category.Name, user); exists {
 				dbCtg = ctg
 			} else {
 				dbCtg = database.NewCategory(feed.Category.Name, user)
