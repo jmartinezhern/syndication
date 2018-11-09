@@ -64,8 +64,7 @@ type (
 	}
 
 	// CategoryUsecase implements the Category interface
-	CategoryUsecase struct {
-	}
+	CategoryUsecase struct{}
 )
 
 var (

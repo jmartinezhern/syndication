@@ -62,8 +62,7 @@ type (
 	}
 
 	// Admin represents adminstration routines available over rpc
-	Admin struct {
-	}
+	Admin struct{}
 )
 
 const defaultSocketPath = "/var/run/syndication/admin"

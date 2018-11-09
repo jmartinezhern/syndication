@@ -54,8 +54,7 @@ type (
 	}
 
 	// FeedUsecase implementation
-	FeedUsecase struct {
-	}
+	FeedUsecase struct{}
 )
 
 var (

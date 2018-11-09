@@ -43,8 +43,7 @@ type (
 	}
 
 	// EntryUsecase implements Entry usecase
-	EntryUsecase struct {
-	}
+	EntryUsecase struct{}
 )
 
 var (

@@ -49,8 +49,7 @@ type (
 	}
 
 	// TagUsecase implementation
-	TagUsecase struct {
-	}
+	TagUsecase struct{}
 )
 
 var (

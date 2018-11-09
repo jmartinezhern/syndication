@@ -39,9 +39,10 @@ const (
 	echoSyndUserKey = "syndUser"
 )
 
-var unauthorizedPaths []string
-
-var serverShutdownTimeout = time.Second * 5
+var (
+	unauthorizedPaths     []string
+	serverShutdownTimeout = time.Second * 5
+)
 
 type (
 
