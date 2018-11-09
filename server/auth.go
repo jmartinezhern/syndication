@@ -29,7 +29,7 @@ import (
 
 func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		if c.Request().Method == "OPTIONS" || isPathUnauthorized(c.Path()) {
+		if isPathUnauthorized(c) {
 			return next(c)
 		}
 

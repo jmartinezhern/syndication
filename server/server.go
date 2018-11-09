@@ -16,7 +16,7 @@
 */
 
 // Package server provides Syndication's REST API.
-// See docs/API_refrence.md for more information on
+// See docs/API_reference.md for more information on
 // server requests and responses
 package server
 
@@ -64,6 +64,12 @@ type (
 		authSecret string
 	}
 )
+
+func isPathUnauthorized(c echo.Context) bool {
+	path := c.Path()
+	i := sort.SearchStrings(unauthorizedPaths, path)
+	return i < len(unauthorizedPaths) && unauthorizedPaths[i] == path
+}
 
 // NewServer creates a new server instance
 func NewServer(authSecret string) *Server {
@@ -113,11 +119,6 @@ func (s *Server) Stop() error {
 	return s.handle.Shutdown(ctx)
 }
 
-// OptionsHandler is a simple default handler for the OPTIONS method.
-func (s *Server) OptionsHandler(c echo.Context) error {
-	return c.NoContent(200)
-}
-
 func (s *Server) registerMiddleware() {
 	s.handle.Use(middleware.CORS())
 
@@ -135,19 +136,12 @@ func (s *Server) registerMiddleware() {
 	}))
 
 	s.handle.Use(middleware.JWTWithConfig(middleware.JWTConfig{
-		Skipper: func(c echo.Context) bool {
-			return c.Request().Method == "OPTIONS" || isPathUnauthorized(c.Path())
-		},
+		Skipper:       isPathUnauthorized,
 		SigningKey:    []byte(s.authSecret),
 		SigningMethod: "HS256",
 	}))
 
 	s.handle.Use(s.checkAuth)
-}
-
-func isPathUnauthorized(path string) bool {
-	i := sort.SearchStrings(unauthorizedPaths, path)
-	return i < len(unauthorizedPaths) && unauthorizedPaths[i] == path
 }
 
 func (s *Server) registerHandlers() {
@@ -176,12 +170,6 @@ func (s *Server) registerHandlers() {
 	v1.PUT("/feeds/:feedID/mark", s.MarkFeed)
 	v1.GET("/feeds/:feedID/stats", s.GetFeedStats)
 
-	v1.OPTIONS("/feeds", s.OptionsHandler)
-	v1.OPTIONS("/feeds/:feedID", s.OptionsHandler)
-	v1.OPTIONS("/feeds/:feedID/mark", s.OptionsHandler)
-	v1.OPTIONS("/feeds/:feedID/entries", s.OptionsHandler)
-	v1.OPTIONS("/feeds/:feedID/stats", s.OptionsHandler)
-
 	v1.POST("/tags", s.NewTag)
 	v1.GET("/tags", s.GetTags)
 	v1.GET("/tags/:tagID", s.GetTag)
@@ -189,13 +177,6 @@ func (s *Server) registerHandlers() {
 	v1.PUT("/tags/:tagID", s.EditTag)
 	v1.GET("/tags/:tagID/entries", s.GetEntriesFromTag)
 	v1.PUT("/tags/:tagID/entries", s.TagEntries)
-
-	v1.OPTIONS("/tags", s.OptionsHandler)
-	v1.OPTIONS("/tags", s.OptionsHandler)
-	v1.OPTIONS("/tags/:tagID", s.OptionsHandler)
-	v1.OPTIONS("/tags/:tagID", s.OptionsHandler)
-	v1.OPTIONS("/tags/:tagID", s.OptionsHandler)
-	v1.OPTIONS("/tags/:tagID/entries", s.OptionsHandler)
 
 	v1.POST("/categories", s.NewCategory)
 	v1.GET("/categories", s.GetCategories)
@@ -208,23 +189,11 @@ func (s *Server) registerHandlers() {
 	v1.PUT("/categories/:categoryID/mark", s.MarkCategory)
 	v1.GET("/categories/:categoryID/stats", s.GetCategoryStats)
 
-	v1.OPTIONS("/categories", s.OptionsHandler)
-	v1.OPTIONS("/categories/:categoryID", s.OptionsHandler)
-	v1.OPTIONS("/categories/:categoryID/mark", s.OptionsHandler)
-	v1.OPTIONS("/categories/:categoryID/feeds", s.OptionsHandler)
-	v1.OPTIONS("/categories/:categoryID/entries", s.OptionsHandler)
-	v1.OPTIONS("/categories/:categoryID/stats", s.OptionsHandler)
-
 	v1.GET("/entries", s.GetEntries)
 	v1.GET("/entries/:entryID", s.GetEntry)
 	v1.PUT("/entries/:entryID/mark", s.MarkEntry)
 	v1.PUT("/entries/mark", s.MarkAllEntries)
 	v1.GET("/entries/stats", s.GetEntryStats)
-
-	v1.OPTIONS("/entries", s.OptionsHandler)
-	v1.OPTIONS("/entries/stats", s.OptionsHandler)
-	v1.OPTIONS("/entries/:entryID", s.OptionsHandler)
-	v1.OPTIONS("/entries/:entryID/mark", s.OptionsHandler)
 }
 
 func convertOrderByParamToValue(param string) bool {
