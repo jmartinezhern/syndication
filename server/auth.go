@@ -34,7 +34,7 @@ func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		userClaim := c.Get("user").(*jwt.Token)
-		user, isAuth := s.aUsecase.Authenticate(*userClaim)
+		user, isAuth := s.auth.Authenticate(*userClaim)
 
 		if !isAuth {
 			return echo.NewHTTPError(http.StatusUnauthorized)
@@ -48,7 +48,7 @@ func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
 
 // Login a user
 func (s *Server) Login(c echo.Context) error {
-	keys, err := s.aUsecase.Login(c.FormValue("username"), c.FormValue("password"))
+	keys, err := s.auth.Login(c.FormValue("username"), c.FormValue("password"))
 	if err == usecases.ErrUserUnauthorized {
 		return echo.NewHTTPError(http.StatusConflict)
 	} else if err != nil {
@@ -60,7 +60,7 @@ func (s *Server) Login(c echo.Context) error {
 
 // Register a user
 func (s *Server) Register(c echo.Context) error {
-	keys, err := s.aUsecase.Register(c.FormValue("username"), c.FormValue("password"))
+	keys, err := s.auth.Register(c.FormValue("username"), c.FormValue("password"))
 	if err == usecases.ErrUserConflicts {
 		return echo.NewHTTPError(http.StatusConflict)
 	} else if err != nil {
@@ -77,7 +77,7 @@ func (s *Server) Renew(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	renewedKey, err := s.aUsecase.Renew(key.RefreshKey)
+	renewedKey, err := s.auth.Renew(key.RefreshKey)
 	if err == usecases.ErrUserUnauthorized {
 		return echo.NewHTTPError(http.StatusUnauthorized)
 	} else if err != nil {

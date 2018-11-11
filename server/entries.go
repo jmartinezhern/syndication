@@ -38,7 +38,7 @@ type (
 func (s *Server) GetEntry(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	entry, err := s.eUsecase.Entry(c.Param("entryID"), user)
+	entry, err := s.entries.Entry(c.Param("entryID"), user)
 	if err == usecases.ErrEntryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -62,7 +62,7 @@ func (s *Server) GetEntries(c echo.Context) error {
 		marker = models.MarkerAny
 	}
 
-	entries := s.eUsecase.Entries(
+	entries := s.entries.Entries(
 		convertOrderByParamToValue(params.OrderBy),
 		marker,
 		user,
@@ -82,7 +82,7 @@ func (s *Server) MarkEntry(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
-	err := s.eUsecase.Mark(c.Param("entryID"), marker, user)
+	err := s.entries.Mark(c.Param("entryID"), marker, user)
 	if err == usecases.ErrEntryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -101,7 +101,7 @@ func (s *Server) MarkAllEntries(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
-	s.eUsecase.MarkAll(marker, user)
+	s.entries.MarkAll(marker, user)
 
 	return c.NoContent(http.StatusNoContent)
 }
@@ -110,5 +110,5 @@ func (s *Server) MarkAllEntries(c echo.Context) error {
 func (s *Server) GetEntryStats(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	return c.JSON(http.StatusOK, s.eUsecase.Stats(user))
+	return c.JSON(http.StatusOK, s.entries.Stats(user))
 }

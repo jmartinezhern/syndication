@@ -35,7 +35,7 @@ func (s *Server) NewCategory(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	newCtg, err := s.cUsecase.New(ctg.Name, user)
+	newCtg, err := s.categories.New(ctg.Name, user)
 	if err == usecases.ErrCategoryConflicts {
 		return echo.NewHTTPError(http.StatusConflict)
 	} else if err != nil {
@@ -49,7 +49,7 @@ func (s *Server) NewCategory(c echo.Context) error {
 func (s *Server) GetCategory(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	ctg, found := s.cUsecase.Category(c.Param("categoryID"), user)
+	ctg, found := s.categories.Category(c.Param("categoryID"), user)
 	if found {
 		return c.JSON(http.StatusOK, ctg)
 	}
@@ -62,7 +62,7 @@ func (s *Server) GetCategories(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"categories": s.cUsecase.Categories(user),
+		"categories": s.categories.Categories(user),
 	})
 }
 
@@ -70,7 +70,7 @@ func (s *Server) GetCategories(c echo.Context) error {
 func (s *Server) GetCategoryFeeds(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	feeds, err := s.cUsecase.Feeds(c.Param("categoryID"), user)
+	feeds, err := s.categories.Feeds(c.Param("categoryID"), user)
 	if err == usecases.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -93,7 +93,7 @@ func (s *Server) EditCategory(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	newCtg, err := s.cUsecase.Edit(ctg.Name, ctgID, user)
+	newCtg, err := s.categories.Edit(ctg.Name, ctgID, user)
 	if err == usecases.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err == usecases.ErrCategoryProtected {
@@ -120,7 +120,7 @@ func (s *Server) AppendCategoryFeeds(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	s.cUsecase.AddFeeds(ctgID, feeds.Feeds, user)
+	s.categories.AddFeeds(ctgID, feeds.Feeds, user)
 
 	return c.NoContent(http.StatusNoContent)
 }
@@ -129,7 +129,7 @@ func (s *Server) AppendCategoryFeeds(c echo.Context) error {
 func (s *Server) DeleteCategory(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	err := s.cUsecase.Delete(c.Param("categoryID"), user)
+	err := s.categories.Delete(c.Param("categoryID"), user)
 	if err == usecases.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err == usecases.ErrCategoryProtected {
@@ -151,7 +151,7 @@ func (s *Server) MarkCategory(c echo.Context) error {
 			"'as' parameter is required")
 	}
 
-	err := s.cUsecase.Mark(c.Param("categoryID"), marker, user)
+	err := s.categories.Mark(c.Param("categoryID"), marker, user)
 	if err == usecases.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
@@ -174,7 +174,7 @@ func (s *Server) GetCategoryEntries(c echo.Context) error {
 		marker = models.MarkerAny
 	}
 
-	entries, err := s.cUsecase.Entries(
+	entries, err := s.categories.Entries(
 		c.Param("categoryID"),
 		convertOrderByParamToValue(params.OrderBy),
 		marker,
@@ -194,7 +194,7 @@ func (s *Server) GetCategoryEntries(c echo.Context) error {
 func (s *Server) GetCategoryStats(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	stats, err := s.cUsecase.Stats(c.Param("categoryID"), user)
+	stats, err := s.categories.Stats(c.Param("categoryID"), user)
 	if err == usecases.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {

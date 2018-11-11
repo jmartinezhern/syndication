@@ -76,7 +76,7 @@ func (t *ServerTestSuite) TestLogin() {
 }
 
 func (t *ServerTestSuite) TestRenew() {
-	keyPair, err := t.server.aUsecase.Register("gopher", "testtesttest")
+	keyPair, err := t.server.auth.Register("gopher", "testtesttest")
 	t.Require().NoError(err)
 
 	req := httptest.NewRequest(

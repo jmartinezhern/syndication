@@ -34,7 +34,7 @@ func (s *Server) NewFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feed, err := s.fUsecase.New(newFeed.Title, newFeed.Subscription, user)
+	feed, err := s.feeds.New(newFeed.Title, newFeed.Subscription, user)
 	if err == usecases.ErrFetchingFeed {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	} else if err != nil {
@@ -48,7 +48,7 @@ func (s *Server) NewFeed(c echo.Context) error {
 func (s *Server) GetFeeds(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	feeds := s.fUsecase.Feeds(user)
+	feeds := s.feeds.Feeds(user)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"feeds": feeds,
 	})
@@ -58,7 +58,7 @@ func (s *Server) GetFeeds(c echo.Context) error {
 func (s *Server) GetFeed(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	feed, found := s.fUsecase.Feed(c.Param("feedID"), user)
+	feed, found := s.feeds.Feed(c.Param("feedID"), user)
 	if !found {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
@@ -75,7 +75,7 @@ func (s *Server) EditFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	newFeed, err := s.fUsecase.Edit(c.Param("feedID"), *feed, user)
+	newFeed, err := s.feeds.Edit(c.Param("feedID"), *feed, user)
 	if err == usecases.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -89,7 +89,7 @@ func (s *Server) EditFeed(c echo.Context) error {
 func (s *Server) DeleteFeed(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	err := s.fUsecase.Delete(c.Param("feedID"), user)
+	err := s.feeds.Delete(c.Param("feedID"), user)
 	if err == usecases.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -108,7 +108,7 @@ func (s *Server) MarkFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required")
 	}
 
-	err := s.fUsecase.Mark(c.Param("feedID"), marker, user)
+	err := s.feeds.Mark(c.Param("feedID"), marker, user)
 	if err == usecases.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -132,7 +132,7 @@ func (s *Server) GetFeedEntries(c echo.Context) error {
 		marker = models.MarkerAny
 	}
 
-	entries, err := s.fUsecase.Entries(
+	entries, err := s.feeds.Entries(
 		c.Param("feedID"),
 		convertOrderByParamToValue(params.OrderBy),
 		marker,
@@ -153,7 +153,7 @@ func (s *Server) GetFeedEntries(c echo.Context) error {
 func (s *Server) GetFeedStats(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	stats, err := s.fUsecase.Stats(c.Param("feedID"), user)
+	stats, err := s.feeds.Stats(c.Param("feedID"), user)
 	if err == usecases.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}

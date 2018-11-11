@@ -40,8 +40,11 @@ const (
 )
 
 var (
-	unauthorizedPaths     []string
-	serverShutdownTimeout = time.Second * 5
+	unauthorizedPaths = []string{
+		"/v1/auth/login",
+		"/v1/auth/register",
+		"/v1/auth/renew",
+	}
 )
 
 type (
@@ -49,15 +52,17 @@ type (
 	// Server represents a echo server instance and holds references to other components
 	// needed for the REST API handlers.
 	Server struct {
-		handle *echo.Echo
-		db     *database.DB
-		groups map[string]*echo.Group
+		ServerTimeout time.Duration
 
-		eUsecase usecases.Entry
-		tUsecase usecases.Tag
-		fUsecase usecases.Feed
-		cUsecase usecases.Category
-		aUsecase usecases.Auth
+		handle        *echo.Echo
+		db            *database.DB
+		groups        map[string]*echo.Group
+
+		entries    usecases.Entry
+		tags       usecases.Tag
+		feeds      usecases.Feed
+		categories usecases.Category
+		auth       usecases.Auth
 
 		isTLSEnabled bool
 		port         string
@@ -75,14 +80,15 @@ func isPathUnauthorized(c echo.Context) bool {
 // NewServer creates a new server instance
 func NewServer(authSecret string) *Server {
 	server := Server{
-		handle:     echo.New(),
-		groups:     map[string]*echo.Group{},
-		authSecret: authSecret,
-		cUsecase:   &usecases.CategoryUsecase{},
-		eUsecase:   &usecases.EntryUsecase{},
-		fUsecase:   &usecases.FeedUsecase{},
-		tUsecase:   &usecases.TagUsecase{},
-		aUsecase:   &usecases.AuthUsecase{AuthSecret: authSecret},
+		handle:        echo.New(),
+		groups:        map[string]*echo.Group{},
+		authSecret:    authSecret,
+		categories:    &usecases.CategoryUsecase{},
+		entries:       &usecases.EntryUsecase{},
+		feeds:         &usecases.FeedUsecase{},
+		tags:          &usecases.TagUsecase{},
+		auth:          &usecases.AuthUsecase{AuthSecret: authSecret},
+		ServerTimeout: time.Second * 5,
 	}
 
 	server.groups["v1"] = server.handle.Group("v1")
@@ -115,7 +121,7 @@ func (s *Server) Start(address string, port int) error {
 
 // Stop the server gracefully
 func (s *Server) Stop() error {
-	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), s.ServerTimeout)
 	defer cancel()
 	return s.handle.Shutdown(ctx)
 }
@@ -147,13 +153,6 @@ func (s *Server) registerMiddleware() {
 
 func (s *Server) registerHandlers() {
 	v1 := s.groups["v1"]
-
-	unauthorizedPaths = append(
-		unauthorizedPaths,
-		"/v1/auth/login",
-		"/v1/auth/register",
-		"/v1/auth/renew",
-	)
 
 	v1.POST("/auth/login", s.Login)
 	v1.POST("/auth/register", s.Register)

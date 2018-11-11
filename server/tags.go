@@ -34,7 +34,7 @@ func (s *Server) NewTag(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	newTag, err := s.tUsecase.New(tag.Name, user)
+	newTag, err := s.tags.New(tag.Name, user)
 	if err == usecases.ErrTagConflicts {
 		return echo.NewHTTPError(http.StatusConflict)
 	} else if err != nil {
@@ -49,7 +49,7 @@ func (s *Server) GetTags(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"tags": s.tUsecase.Tags(user),
+		"tags": s.tags.Tags(user),
 	})
 }
 
@@ -57,7 +57,7 @@ func (s *Server) GetTags(c echo.Context) error {
 func (s *Server) DeleteTag(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	err := s.tUsecase.Delete(c.Param("tagID"), user)
+	err := s.tags.Delete(c.Param("tagID"), user)
 	if err == usecases.ErrTagNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -77,7 +77,7 @@ func (s *Server) EditTag(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	newTag, err := s.tUsecase.Edit(c.Param("tagID"), tag, user)
+	newTag, err := s.tags.Edit(c.Param("tagID"), tag, user)
 	if err == usecases.ErrTagNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -100,7 +100,7 @@ func (s *Server) TagEntries(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err := s.tUsecase.Apply(c.Param("tagID"), entryIds.Entries, user)
+	err := s.tags.Apply(c.Param("tagID"), entryIds.Entries, user)
 	if err == usecases.ErrTagNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -114,7 +114,7 @@ func (s *Server) TagEntries(c echo.Context) error {
 func (s *Server) GetTag(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	tag, found := s.tUsecase.Tag(c.Param("tagID"), user)
+	tag, found := s.tags.Tag(c.Param("tagID"), user)
 	if !found {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
@@ -137,7 +137,7 @@ func (s *Server) GetEntriesFromTag(c echo.Context) error {
 		marker = models.MarkerAny
 	}
 
-	entries, err := s.tUsecase.Entries(
+	entries, err := s.tags.Entries(
 		c.Param("tagID"),
 		marker,
 		convertOrderByParamToValue(params.OrderBy),
