@@ -54,9 +54,9 @@ type (
 	Server struct {
 		ServerTimeout time.Duration
 
-		handle        *echo.Echo
-		db            *database.DB
-		groups        map[string]*echo.Group
+		handle *echo.Echo
+		db     *database.DB
+		groups map[string]*echo.Group
 
 		entries    usecases.Entry
 		tags       usecases.Tag
