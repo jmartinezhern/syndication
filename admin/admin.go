@@ -18,13 +18,12 @@
 package admin
 
 import (
-	"errors"
 	"net"
 	"net/rpc"
 	"os"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/varddum/syndication/database"
+	"github.com/varddum/syndication/usecases"
 )
 
 type (
@@ -62,41 +61,32 @@ type (
 	}
 
 	// Admin represents adminstration routines available over rpc
-	Admin struct{}
+	Admin struct {
+		adminUsecase usecases.Admin
+	}
 )
 
 const defaultSocketPath = "/var/run/syndication/admin"
 
 // NewUser creates a new user
 func (a *Admin) NewUser(args NewUserArgs, msg *string) error {
-	if _, found := database.UserWithName(args.Username); found {
-		*msg = "User already exists"
-		return errors.New("User already exists")
+	_, err := a.adminUsecase.NewUser(args.Username, args.Password)
+	if err != nil {
+		*msg = err.Error()
+		return err
 	}
-
-	database.NewUser(args.Username, args.Password)
 
 	return nil
 }
 
 // DeleteUser deletes a user with userID
 func (a *Admin) DeleteUser(userID string, msg *string) error {
-	return database.DeleteUser(userID)
-}
-
-// GetUserID retrieves the user id for a user with username
-func (a *Admin) GetUserID(username string, userID *string) error {
-	if user, found := database.UserWithName(username); found {
-		*userID = user.APIID
-		return nil
-	}
-
-	return errors.New("User does not exist")
+	return a.adminUsecase.DeleteUser(userID)
 }
 
 // GetUsers will return all existing usernames with their associated IDs
 func (a *Admin) GetUsers(outLen int, users *[]User) error {
-	dbUsers := database.Users("username,id")
+	dbUsers := a.adminUsecase.Users()
 	*users = make([]User, outLen)
 	for idx, user := range dbUsers {
 		if idx >= outLen {
@@ -111,12 +101,12 @@ func (a *Admin) GetUsers(outLen int, users *[]User) error {
 
 // ChangeUserName modifies the username for a user with userID
 func (a *Admin) ChangeUserName(args ChangeUserNameArgs, msg *string) error {
-	return database.ChangeUserName(args.UserID, args.NewName)
+	return a.adminUsecase.ChangeUserName(args.UserID, args.NewName)
 }
 
 // ChangeUserPassword modifies the password for a user with userID
 func (a *Admin) ChangeUserPassword(args ChangeUserPasswordArgs, msg *string) error {
-	return database.ChangeUserPassword(args.UserID, args.NewPassword)
+	return a.adminUsecase.ChangeUserPassword(args.UserID, args.NewPassword)
 }
 
 // Start a admin rpc service
@@ -164,7 +154,7 @@ func NewService(socketPath string) (*Service, error) {
 		return nil, err
 	}
 
-	a := &Admin{}
+	a := &Admin{adminUsecase: &usecases.AdminUsecase{}}
 
 	err = s.server.Register(a)
 

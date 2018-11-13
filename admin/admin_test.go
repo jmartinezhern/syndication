@@ -91,7 +91,7 @@ func (s *AdminTestSuite) TestNewConflictingUser() {
 
 	var msg string
 	err := s.client.Call("Admin.NewUser", args, &msg)
-	s.NotNil(err)
+	s.EqualError(err, "Username already exists")
 }
 
 func (s *AdminTestSuite) TestDeleteUser() {
@@ -103,15 +103,6 @@ func (s *AdminTestSuite) TestDeleteUser() {
 
 	_, found := database.UserWithAPIID(user.APIID)
 	s.False(found)
-}
-
-func (s *AdminTestSuite) TestGetUserID() {
-	user := database.NewUser("test", "testtesttest")
-
-	var userID string
-	err := s.client.Call("Admin.GetUserID", user.Username, &userID)
-	s.Nil(err)
-	s.Equal(user.APIID, userID)
 }
 
 func (s *AdminTestSuite) TestGetNonExistentUserID() {
