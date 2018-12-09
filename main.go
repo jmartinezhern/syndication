@@ -30,8 +30,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var intSignal chan os.Signal
-
 func main() {
 	if err := cmd.Execute(); err != nil {
 		log.Error(err)
@@ -49,46 +47,33 @@ func main() {
 	}
 
 	sync := sync.NewService(config.Sync.Interval, config.Sync.DeleteAfter)
+	sync.Start()
+	defer sync.Stop()
 
 	if config.Admin.Enable {
-		adminServ, err := admin.NewService(config.Admin.SocketPath)
+		admin, err := admin.NewService(config.Admin.SocketPath)
 		if err != nil {
 			log.Error(err)
 			os.Exit(1)
 		}
-		adminServ.Start()
+		admin.Start()
 
-		defer adminServ.Stop()
+		defer admin.Stop()
 	}
 
-	sync.Start()
-
-	listenForInterrupt()
-
 	server := server.NewServer(config.AuthSecret)
+
 	go func() {
-		for sig := range intSignal {
-			if sig == os.Interrupt || sig == os.Kill {
-				err := server.Stop()
-				if err != nil {
-					log.Error(err)
-					os.Exit(1)
-				}
-			}
+		if err := server.Start(config.Host.Address, config.Host.Port); err != nil {
+			log.Info("Shutting down...")
 		}
 	}()
 
-	err := server.Start(
-		config.Host.Address,
-		config.Host.Port)
+	quit := make(chan os.Signal)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
 
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+	if err := server.Stop(); err != nil {
+		log.Fatal(err)
 	}
-}
-
-func listenForInterrupt() {
-	intSignal = make(chan os.Signal, 1)
-	signal.Notify(intSignal, os.Interrupt)
 }
