@@ -67,7 +67,7 @@ func RandStringRunes(n int) string {
 
 func (s *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("If-None-Match") != rssFeedTag {
-		http.FileServer(http.Dir(os.Getenv("GOPATH")+"/src/github.com/varddum/syndication/sync/")).ServeHTTP(w, r)
+		http.FileServer(http.Dir(".")).ServeHTTP(w, r)
 	}
 }
 
