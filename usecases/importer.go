@@ -19,8 +19,8 @@ package usecases
 
 import (
 	"encoding/xml"
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 type (
@@ -90,12 +90,17 @@ func (i OPMLImporter) Import(data []byte, user models.User) error {
 				dbCtg = database.NewCategory(feed.Category.Name, user)
 			}
 
-			_, err := database.NewFeedWithCategory(feed.Title, feed.Subscription, dbCtg.APIID, user)
+			_, err := database.NewFeed(feed.Title, feed.Subscription, dbCtg.APIID, user)
 			if err != nil {
 				return err
 			}
 		} else {
-			database.NewFeed(feed.Title, feed.Subscription, user)
+			ctg, found := database.CategoryWithName(models.Uncategorized, user)
+			if !found {
+				panic("system category not found")
+			}
+
+			database.NewFeed(feed.Title, feed.Subscription, ctg.APIID, user)
 		}
 	}
 

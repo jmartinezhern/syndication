@@ -23,8 +23,8 @@ import (
 
 	"github.com/labstack/echo"
 
-	"github.com/varddum/syndication/models"
-	"github.com/varddum/syndication/usecases"
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/usecases"
 )
 
 // Import feeds and categories into Syndication.

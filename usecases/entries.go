@@ -19,8 +19,8 @@ package usecases
 
 import (
 	"errors"
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 type (
@@ -30,7 +30,7 @@ type (
 		Entry(id string, user models.User) (models.Entry, error)
 
 		// Entries returns all entries belong to a user with a marker
-		Entries(order bool, marker models.Marker, user models.User) []models.Entry
+		Entries(order bool, marker models.Marker, continuationID string, count int, user models.User) ([]models.Entry, string)
 
 		// Mark entry with id
 		Mark(id string, marker models.Marker, user models.User) error
@@ -62,8 +62,8 @@ func (e *EntryUsecase) Entry(id string, user models.User) (models.Entry, error) 
 }
 
 // Entries returns all entries belong to a user with a marker
-func (e *EntryUsecase) Entries(order bool, marker models.Marker, user models.User) []models.Entry {
-	return database.Entries(order, marker, user)
+func (e *EntryUsecase) Entries(order bool, marker models.Marker, continuationID string, count int, user models.User) ([]models.Entry, string) {
+	return database.Entries(order, marker, continuationID, count, user)
 }
 
 // Mark entry with id

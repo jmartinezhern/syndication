@@ -21,11 +21,11 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/varddum/syndication/admin"
-	"github.com/varddum/syndication/cmd"
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/server"
-	"github.com/varddum/syndication/sync"
+	"github.com/jmartinezhern/syndication/admin"
+	"github.com/jmartinezhern/syndication/cmd"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/server"
+	"github.com/jmartinezhern/syndication/sync"
 
 	log "github.com/sirupsen/logrus"
 )

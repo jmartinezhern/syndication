@@ -18,7 +18,7 @@
 package database
 
 import (
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 	"time"
 )
 
@@ -92,13 +92,19 @@ func EntryWithGUIDExists(guid string, feedID string, user models.User) bool {
 }
 
 // Entries returns a list of all entries owned by user
-func (db *DB) Entries(orderByNewest bool, marker models.Marker, user models.User) []models.Entry {
-	entries := []models.Entry{}
+func (db *DB) Entries(orderByNewest bool, marker models.Marker, continuationID string, count int, user models.User) (entries []models.Entry, next string) {
 	if marker == models.MarkerNone {
-		return nil
+		return
 	}
 
 	query := db.db.Model(&user)
+	if continuationID != "" {
+		entry, found := EntryWithAPIID(continuationID, user)
+		if found {
+			query = query.Where("id >= ?", entry.ID)
+		}
+	}
+
 	if marker != models.MarkerAny {
 		query = query.Where("mark = ?", marker)
 	}
@@ -109,14 +115,19 @@ func (db *DB) Entries(orderByNewest bool, marker models.Marker, user models.User
 		query = query.Order("published ASC")
 	}
 
-	query.Association("Entries").Find(&entries)
+	query.Limit(count + 1).Association("Entries").Find(&entries)
 
-	return entries
+	if len(entries) > count {
+		next = entries[len(entries)-1].APIID
+		entries = entries[:len(entries)-1]
+	}
+
+	return
 }
 
 // Entries returns a list of all entries owned by user
-func Entries(orderByNewest bool, marker models.Marker, user models.User) []models.Entry {
-	return defaultInstance.Entries(orderByNewest, marker, user)
+func Entries(orderByNewest bool, marker models.Marker, continuationID string, count int, user models.User) (entries []models.Entry, next string) {
+	return defaultInstance.Entries(orderByNewest, marker, continuationID, count, user)
 }
 
 // EntryWithAPIID returns an Entry with id that belongs to user

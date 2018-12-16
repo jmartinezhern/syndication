@@ -31,12 +31,12 @@ import (
 	"github.com/labstack/echo/middleware"
 	"golang.org/x/crypto/acme/autocert"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/usecases"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/usecases"
 )
 
 const (
-	echoSyndUserKey = "syndUser"
+	echoSyndUserKey = "user"
 )
 
 var (

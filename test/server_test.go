@@ -15,23 +15,21 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package server
+package test
 
 import (
 	"github.com/labstack/echo"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strconv"
 	"testing"
-	"time"
 
-	"github.com/labstack/gommon/log"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/server"
 )
 
 const (
@@ -52,37 +50,24 @@ type (
 	ServerTestSuite struct {
 		suite.Suite
 
-		server *Server
-		user   models.User
-		rec    *httptest.ResponseRecorder
-		e      *echo.Echo
+		server   *server.Server
+		user     models.User
+		rec      *httptest.ResponseRecorder
+		e        *echo.Echo
+		unctgCtg models.Category
 	}
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func RandStringRunes(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
-}
 
 func (t *ServerTestSuite) SetupTest() {
 	err := database.Init("sqlite3", testDBPath)
 	t.Require().NoError(err)
 
-	t.server = NewServer("secret_cat")
-	t.server.handle.Logger.SetLevel(log.OFF)
-	t.server.handle.HideBanner = true
+	t.server = server.NewServer("secret_cat")
 
 	randUserName := RandStringRunes(8)
 	t.user = database.NewUser("123456", randUserName)
+
+	t.unctgCtg = database.NewCategory(models.Uncategorized, t.user)
 
 	t.rec = httptest.NewRecorder()
 	t.e = echo.New()
@@ -93,7 +78,7 @@ func (t *ServerTestSuite) TearDownTest() {
 }
 
 func TestServerTestSuite(t *testing.T) {
-	dir := http.Dir(os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/server/")
+	dir := http.Dir(os.Getenv("GOPATH") + "/src/github.com/jmartinezhern/syndication/server/")
 	mockRSSServer = httptest.NewServer(http.FileServer(dir))
 	defer mockRSSServer.Close()
 

@@ -18,11 +18,13 @@
 package server
 
 import (
-	"github.com/varddum/syndication/usecases"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo"
-	"github.com/varddum/syndication/models"
+
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/usecases"
 )
 
 type (
@@ -62,14 +64,29 @@ func (s *Server) GetEntries(c echo.Context) error {
 		marker = models.MarkerAny
 	}
 
-	entries := s.entries.Entries(
+	continuationID := c.QueryParam("continuationID")
+
+	count := 100
+	countParam := c.QueryParam("count")
+	if countParam != "" {
+		var err error
+		count, err = strconv.Atoi(countParam)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "count must be an integer")
+		}
+	}
+
+	entries, next := s.entries.Entries(
 		convertOrderByParamToValue(params.OrderBy),
 		marker,
+		continuationID,
+		count,
 		user,
 	)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"entries": entries,
+		"entries":        entries,
+		"continuationID": next,
 	})
 }
 

@@ -18,11 +18,13 @@
 package server
 
 import (
-	"github.com/varddum/syndication/usecases"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo"
-	"github.com/varddum/syndication/models"
+
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/usecases"
 )
 
 // NewFeed creates a new feed
@@ -34,8 +36,10 @@ func (s *Server) NewFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feed, err := s.feeds.New(newFeed.Title, newFeed.Subscription, user)
+	feed, err := s.feeds.New(newFeed.Title, newFeed.Subscription, newFeed.Category.APIID, user)
 	if err == usecases.ErrFetchingFeed {
+		return echo.NewHTTPError(http.StatusBadRequest)
+	} else if err == usecases.ErrFeedCategoryNotFound {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	} else if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError)
@@ -48,9 +52,22 @@ func (s *Server) NewFeed(c echo.Context) error {
 func (s *Server) GetFeeds(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
-	feeds := s.feeds.Feeds(user)
+	continuationID := c.QueryParam("continuationID")
+
+	count := 100
+	countParam := c.QueryParam("count")
+	if countParam != "" {
+		var err error
+		count, err = strconv.Atoi(countParam)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "count must be an integer")
+		}
+	}
+
+	feeds, next := s.feeds.Feeds(continuationID, count, user)
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"feeds": feeds,
+		"feeds":          feeds,
+		"continuationID": next,
 	})
 }
 

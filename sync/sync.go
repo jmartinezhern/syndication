@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 
 	"github.com/mmcdole/gofeed"
 	log "github.com/sirupsen/logrus"
@@ -203,35 +203,41 @@ func (s *Service) SyncUser(user *models.User) error {
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
-	feeds := database.Feeds(*user)
-	for _, feed := range feeds {
-		if !time.Now().After(feed.LastUpdated.Add(s.interval)) {
-			continue
-		}
+	continuationID := ""
+	for {
+		feeds, continuationID := database.Feeds(continuationID, 100, *user)
+		for _, feed := range feeds {
+			if !time.Now().After(feed.LastUpdated.Add(s.interval)) {
+				continue
+			}
 
-		fetchedFeed, fetchedEntries, err := PullFeed(feed.Subscription, feed.Etag)
-		if err != nil {
-			log.Error(err)
-		}
+			fetchedFeed, fetchedEntries, err := PullFeed(feed.Subscription, feed.Etag)
+			if err != nil {
+				log.Error(err)
+			}
 
-		_, err = database.EditFeed(feed.APIID, fetchedFeed, *user)
-		if err != nil {
-			log.Error(err)
-		}
+			_, err = database.EditFeed(feed.APIID, fetchedFeed, *user)
+			if err != nil {
+				log.Error(err)
+			}
 
-		entries := []models.Entry{}
-		for _, entry := range fetchedEntries {
-			if found := database.EntryWithGUIDExists(entry.GUID, feed.APIID, *user); !found {
-				entries = append(entries, entry)
+			entries := []models.Entry{}
+			for _, entry := range fetchedEntries {
+				if found := database.EntryWithGUIDExists(entry.GUID, feed.APIID, *user); !found {
+					entries = append(entries, entry)
+				}
+			}
+
+			_, err = database.NewEntries(entries, feed.APIID, *user)
+			if err != nil {
+				log.Error(err)
 			}
 		}
 
-		_, err = database.NewEntries(entries, feed.APIID, *user)
-		if err != nil {
-			log.Error(err)
+		if continuationID == "" {
+			break
 		}
 	}
-
 	database.DeleteOldEntries(time.Now().AddDate(0, 0, s.deleteAfterDays*-1), *user)
 
 	return nil

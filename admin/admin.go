@@ -22,8 +22,8 @@ import (
 	"net/rpc"
 	"os"
 
+	"github.com/jmartinezhern/syndication/usecases"
 	log "github.com/sirupsen/logrus"
-	"github.com/varddum/syndication/usecases"
 )
 
 type (

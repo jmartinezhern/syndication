@@ -2,9 +2,9 @@ package usecases
 
 import (
 	"errors"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 
-	"github.com/varddum/syndication/database"
+	"github.com/jmartinezhern/syndication/database"
 )
 
 type (
@@ -47,7 +47,11 @@ func (a *AdminUsecase) NewUser(username, password string) (models.User, error) {
 		return models.User{}, ErrUsernameConflicts
 	}
 
-	return database.NewUser(username, password), nil
+	user := database.NewUser(username, password)
+
+	database.NewCategory(models.Uncategorized, user)
+
+	return user, nil
 }
 
 // DeleteUser deletes a user with userID

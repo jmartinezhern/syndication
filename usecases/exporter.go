@@ -19,8 +19,8 @@ package usecases
 
 import (
 	"encoding/xml"
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 type (
@@ -37,43 +37,51 @@ type (
 
 // Export categories and feeds to data in OPML 2.0 format.
 func (i OPMLExporter) Export(user models.User) ([]byte, error) {
-	ctgs := database.Categories(user)
-
-	for idx, ctg := range ctgs {
-		ctg.Feeds = database.CategoryFeeds(ctg.APIID, user)
-		ctgs[idx] = ctg
-	}
+	var continuationID string
+	var ctgs []models.Category
 
 	b := models.OPML{
 		Body: models.OPMLBody{},
 	}
 
-	for _, ctg := range ctgs {
-		items := make([]models.OPMLOutline, len(ctg.Feeds))
+	for {
+		ctgs, continuationID = database.Categories(user, continuationID, 100)
 
-		for idx, feed := range ctg.Feeds {
-			items[idx] = models.OPMLOutline{
-				Title:   feed.Title,
-				Text:    feed.Title,
-				Type:    "rss",
-				XMLUrl:  feed.Subscription,
-				HTMLUrl: feed.Subscription,
-			}
-
+		for idx, ctg := range ctgs {
+			ctg.Feeds = database.CategoryFeeds(ctg.APIID, user)
+			ctgs[idx] = ctg
 		}
 
-		if ctg.Name != models.Uncategorized {
-			ctgOutline := models.OPMLOutline{
-				Text:  ctg.Name,
-				Title: ctg.Name,
-				Items: items,
+		for _, ctg := range ctgs {
+			items := make([]models.OPMLOutline, len(ctg.Feeds))
+
+			for idx, feed := range ctg.Feeds {
+				items[idx] = models.OPMLOutline{
+					Title:   feed.Title,
+					Text:    feed.Title,
+					Type:    "rss",
+					XMLUrl:  feed.Subscription,
+					HTMLUrl: feed.Subscription,
+				}
+
 			}
 
-			b.Body.Items = append(b.Body.Items, ctgOutline)
-		} else {
-			b.Body.Items = append(b.Body.Items, items...)
+			if ctg.Name != models.Uncategorized {
+				ctgOutline := models.OPMLOutline{
+					Text:  ctg.Name,
+					Title: ctg.Name,
+					Items: items,
+				}
+
+				b.Body.Items = append(b.Body.Items, ctgOutline)
+			} else {
+				b.Body.Items = append(b.Body.Items, items...)
+			}
+		}
+
+		if continuationID == "" {
+			break
 		}
 	}
-
 	return xml.Marshal(b)
 }

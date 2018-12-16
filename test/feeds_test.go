@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package server
+package test
 
 import (
 	"encoding/json"
@@ -26,8 +26,8 @@ import (
 
 	"github.com/labstack/echo"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (t *ServerTestSuite) TestNewFeed() {
@@ -42,7 +42,7 @@ func (t *ServerTestSuite) TestNewFeed() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/feeds")
 
@@ -57,7 +57,7 @@ func (t *ServerTestSuite) TestUnreachableNewFeed() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/feeds")
 
@@ -65,12 +65,13 @@ func (t *ServerTestSuite) TestUnreachableNewFeed() {
 }
 
 func (t *ServerTestSuite) TestGetFeeds() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/feeds")
 
@@ -89,12 +90,13 @@ func (t *ServerTestSuite) TestGetFeeds() {
 }
 
 func (t *ServerTestSuite) TestGetFeed() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues(feed.APIID)
 
@@ -113,7 +115,7 @@ func (t *ServerTestSuite) TestGetUnknownFeed() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues("bogus")
 
@@ -127,13 +129,14 @@ func (t *ServerTestSuite) TestGetUnknownFeed() {
 
 func (t *ServerTestSuite) TestEditFeed() {
 	newFeed := `{ "title": "NewName" }`
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(newFeed))
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues(feed.APIID)
 
@@ -155,7 +158,7 @@ func (t *ServerTestSuite) TestEditUnkownFeed() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues("bogus")
 
@@ -168,13 +171,17 @@ func (t *ServerTestSuite) TestEditUnkownFeed() {
 }
 
 func (t *ServerTestSuite) TestDeleteFeed() {
-	feed := database.NewFeed("Example", "example.com", t.user)
-	t.NotEmpty(database.Feeds(t.user))
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
+
+	feeds, _ := database.Feeds("", 5, t.user)
+
+	t.NotEmpty(feeds)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues(feed.APIID)
 
@@ -187,7 +194,7 @@ func (t *ServerTestSuite) TestDeleteUnknownFeed() {
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues("bogus")
 
@@ -200,21 +207,21 @@ func (t *ServerTestSuite) TestDeleteUnknownFeed() {
 }
 
 func (t *ServerTestSuite) TestMarkFeeed() {
-	feed := database.NewFeed(
-		"Example", "example.com", t.user,
-	)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	database.NewEntry(models.Entry{
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
 	}, feed.APIID, t.user)
 
-	t.Require().Len(database.Entries(true, models.MarkerRead, t.user), 0)
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Require().Len(entries, 0)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues(feed.APIID)
 
@@ -228,7 +235,7 @@ func (t *ServerTestSuite) TestMarkUnknownFeeed() {
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues("bogus")
 
@@ -241,7 +248,8 @@ func (t *ServerTestSuite) TestMarkUnknownFeeed() {
 }
 
 func (t *ServerTestSuite) TestGetFeedEntries() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -251,7 +259,7 @@ func (t *ServerTestSuite) TestGetFeedEntries() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetParamNames("feedID")
 	c.SetParamValues(feed.APIID)
@@ -274,7 +282,7 @@ func (t *ServerTestSuite) TestGetUnknownFeedEntries() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetParamNames("feedID")
 	c.SetParamValues("bogus")
@@ -287,12 +295,13 @@ func (t *ServerTestSuite) TestGetUnknownFeedEntries() {
 }
 
 func (t *ServerTestSuite) TestGetFeedStats() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues(feed.APIID)
 
@@ -308,7 +317,7 @@ func (t *ServerTestSuite) TestGetUnknownFeedStats() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("feedID")
 	c.SetParamValues("bogus")
 

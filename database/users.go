@@ -23,7 +23,7 @@ import (
 	"crypto/rand"
 	"io"
 
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -41,14 +41,6 @@ func AddAPIKey(key models.APIKey, user models.User) {
 func (db *DB) NewUser(username, password string) models.User {
 	user := models.User{}
 	hash, salt := createPasswordHashAndSalt(password)
-
-	// Construct the user system categories
-	unctgAPIID := createAPIID()
-	user.Categories = append(user.Categories, models.Category{
-		APIID: unctgAPIID,
-		Name:  models.Uncategorized,
-	})
-	user.UncategorizedCategoryAPIID = unctgAPIID
 
 	user.APIID = createAPIID()
 	user.PasswordHash = hash
@@ -163,7 +155,7 @@ func (db *DB) UserWithCredentials(username, password string) (models.User, bool)
 		return models.User{}, ok
 	}
 
-	hash, err := scrypt.Key([]byte(password), foundUser.PasswordSalt, 1<<14, 8, 1, PWHashBytes)
+	hash, err := scrypt.Key([]byte(password), foundUser.PasswordSalt, 1<<14, 8, 1, pwHashBytes)
 	if err != nil {
 		return models.User{}, false
 	}
@@ -208,13 +200,13 @@ func KeyBelongsToUser(key models.APIKey, user models.User) bool {
 func createPasswordHashAndSalt(password string) ([]byte, []byte) {
 	var err error
 
-	salt := make([]byte, PWSaltBytes)
+	salt := make([]byte, pwSaltBytes)
 	_, err = io.ReadFull(rand.Reader, salt)
 	if err != nil {
 		panic(err) // We must be able to read from random
 	}
 
-	hash, err := scrypt.Key([]byte(password), salt, 1<<14, 8, 1, PWHashBytes)
+	hash, err := scrypt.Key([]byte(password), salt, 1<<14, 8, 1, pwHashBytes)
 	if err != nil {
 		panic(err) // We must never get an error
 	}

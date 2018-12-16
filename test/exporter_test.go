@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package server
+package test
 
 import (
 	"encoding/xml"
@@ -25,14 +25,14 @@ import (
 
 	"github.com/labstack/echo"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (t *ServerTestSuite) TestOPMLExport() {
 	ctg := database.NewCategory("Test", t.user)
 
-	feed, err := database.NewFeedWithCategory(
+	feed, err := database.NewFeed(
 		"Example", "example.com", ctg.APIID, t.user,
 	)
 	t.Require().NoError(err)
@@ -41,7 +41,7 @@ func (t *ServerTestSuite) TestOPMLExport() {
 	req.Header.Set("Accept", "application/xml")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/export")
 

@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package admin
+package test
 
 import (
 	"net/rpc"
@@ -24,14 +24,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/varddum/syndication/database"
+
+	"github.com/jmartinezhern/syndication/admin"
+	"github.com/jmartinezhern/syndication/database"
 )
 
 type (
 	AdminTestSuite struct {
 		suite.Suite
 
-		serv *Service
+		serv *admin.Service
 
 		client *rpc.Client
 	}
@@ -46,7 +48,7 @@ func (s *AdminTestSuite) SetupTest() {
 	err := database.Init("sqlite3", TestDBPath)
 	s.Require().Nil(err)
 
-	s.serv, err = NewService(TestSocketPath)
+	s.serv, err = admin.NewService(TestSocketPath)
 	s.Require().NotNil(s.serv)
 	s.Require().Nil(err)
 
@@ -69,9 +71,9 @@ func (s *AdminTestSuite) TearDownTest() {
 }
 
 func (s *AdminTestSuite) TestNewUser() {
-	args := NewUserArgs{
-		"test",
-		"testtesttest",
+	args := admin.NewUserArgs{
+		Username: "test",
+		Password: "testtesttest",
 	}
 	var msg string
 	err := s.client.Call("Admin.NewUser", args, &msg)
@@ -84,9 +86,9 @@ func (s *AdminTestSuite) TestNewUser() {
 func (s *AdminTestSuite) TestNewConflictingUser() {
 	database.NewUser("test", "testtesttest")
 
-	args := NewUserArgs{
-		"test",
-		"testtesttest",
+	args := admin.NewUserArgs{
+		Username: "test",
+		Password: "testtesttest",
 	}
 
 	var msg string
@@ -116,7 +118,7 @@ func (s *AdminTestSuite) TestGetUsers() {
 	user1 := database.NewUser("test1", "testtesttest")
 	user2 := database.NewUser("test2", "testtesttest")
 
-	var users []User
+	var users []admin.User
 
 	err := s.client.Call("Admin.GetUsers", 2, &users)
 	s.Nil(err)
@@ -134,7 +136,7 @@ func (s *AdminTestSuite) TestChangeUserName() {
 	user := database.NewUser("test", "testtesttest")
 
 	var msg string
-	args := ChangeUserNameArgs{
+	args := admin.ChangeUserNameArgs{
 		UserID:  user.APIID,
 		NewName: "gopher",
 	}
@@ -152,7 +154,7 @@ func (s *AdminTestSuite) TestChangeUserPassword() {
 	user := database.NewUser("test", "testtesttest")
 
 	var msg string
-	args := ChangeUserPasswordArgs{
+	args := admin.ChangeUserPasswordArgs{
 		UserID:      user.APIID,
 		NewPassword: "gopherpass",
 	}

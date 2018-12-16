@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package server
+package test
 
 import (
 	"net/http"
@@ -54,7 +54,7 @@ func (t *ServerTestSuite) TestOPMLImport() {
 	req.Header.Set("Content-Type", "application/xml")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/import")
 

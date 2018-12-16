@@ -15,17 +15,18 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package server
+package test
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/varddum/syndication/models"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
-	"github.com/varddum/syndication/database"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/usecases"
 
 	"github.com/labstack/echo"
 )
@@ -76,7 +77,9 @@ func (t *ServerTestSuite) TestLogin() {
 }
 
 func (t *ServerTestSuite) TestRenew() {
-	keyPair, err := t.server.auth.Register("gopher", "testtesttest")
+	auth := usecases.AuthUsecase{AuthSecret: "secret_cat"}
+
+	keyPair, err := auth.Register("gopher", "testtesttest")
 	t.Require().NoError(err)
 
 	req := httptest.NewRequest(

@@ -18,11 +18,11 @@
 package server
 
 import (
-	"github.com/varddum/syndication/usecases"
+	"github.com/jmartinezhern/syndication/usecases"
 	"net/http"
 
+	"github.com/jmartinezhern/syndication/models"
 	"github.com/labstack/echo"
-	"github.com/varddum/syndication/models"
 )
 
 // NewTag creates a new Tag

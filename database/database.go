@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 
 	"github.com/jinzhu/gorm"
 	// GORM dialect packages
@@ -35,10 +35,9 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
-// Password salt and Hash byte sizes
 const (
-	PWSaltBytes = 32
-	PWHashBytes = 64
+	pwSaltBytes = 32
+	pwHashBytes = 64
 )
 
 type (

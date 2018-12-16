@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package server
+package test
 
 import (
 	"encoding/json"
@@ -24,12 +24,13 @@ import (
 
 	"github.com/labstack/echo"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (t *ServerTestSuite) TestGetEntry() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -40,7 +41,7 @@ func (t *ServerTestSuite) TestGetEntry() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetParamNames("entryID")
 	c.SetParamValues(entry.APIID)
@@ -59,7 +60,7 @@ func (t *ServerTestSuite) TestGetUnknownEntry() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetParamNames("entryID")
 	c.SetParamValues("bogus")
@@ -72,7 +73,8 @@ func (t *ServerTestSuite) TestGetUnknownEntry() {
 }
 
 func (t *ServerTestSuite) TestGetEntries() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -82,7 +84,7 @@ func (t *ServerTestSuite) TestGetEntries() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/entries")
 
@@ -100,7 +102,8 @@ func (t *ServerTestSuite) TestGetEntries() {
 }
 
 func (t *ServerTestSuite) TestMarkEntry() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -108,12 +111,13 @@ func (t *ServerTestSuite) TestMarkEntry() {
 	}, feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	t.Empty(database.Entries(true, models.MarkerRead, t.user))
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Empty(entries)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetParamNames("entryID")
 	c.SetParamValues(entry.APIID)
@@ -126,7 +130,7 @@ func (t *ServerTestSuite) TestMarkUnknownEntry() {
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetParamNames("entryID")
 	c.SetParamValues("bogus")
@@ -139,20 +143,22 @@ func (t *ServerTestSuite) TestMarkUnknownEntry() {
 }
 
 func (t *ServerTestSuite) TestMarkAllEntries() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
-	_, err := database.NewEntry(models.Entry{
+	_, err = database.NewEntry(models.Entry{
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
 	}, feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	t.Empty(database.Entries(true, models.MarkerRead, t.user))
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Empty(entries)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/entries/mark")
 
@@ -163,7 +169,7 @@ func (t *ServerTestSuite) TestGetEntryStats() {
 	req := httptest.NewRequest(echo.PUT, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/entries/stats")
 

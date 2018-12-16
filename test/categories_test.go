@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package server
+package test
 
 import (
 	"encoding/json"
@@ -26,8 +26,8 @@ import (
 
 	"github.com/labstack/echo"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (t *ServerTestSuite) TestNewCategory() {
@@ -37,7 +37,7 @@ func (t *ServerTestSuite) TestNewCategory() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/categories")
 
@@ -54,7 +54,7 @@ func (t *ServerTestSuite) TestNewConflictingCategory() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/categories")
 
@@ -71,7 +71,7 @@ func (t *ServerTestSuite) TestNewCategoryWithBadInput() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/categories")
 
@@ -87,7 +87,7 @@ func (t *ServerTestSuite) TestGetCategory() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/categories/:categoryID")
 	c.SetParamNames("categoryID")
@@ -105,7 +105,7 @@ func (t *ServerTestSuite) TestGetMissingCategory() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/categories/:categoryID")
 	c.SetParamNames("categoryID")
@@ -121,7 +121,7 @@ func (t *ServerTestSuite) TestGetCategories() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 
 	c.SetPath("/v1/categories")
 
@@ -129,23 +129,24 @@ func (t *ServerTestSuite) TestGetCategories() {
 	t.Equal(http.StatusOK, t.rec.Code)
 
 	type ctgs struct {
-		Categories []models.Category `json:"categories"`
+		Categories     []models.Category `json:"categories"`
+		ContinuationID string            `json:"continuationID"`
 	}
 
 	var categories ctgs
 	t.NoError(json.Unmarshal(t.rec.Body.Bytes(), &categories))
-	t.Len(categories.Categories, 1)
+	t.Require().Len(categories.Categories, 1)
 	t.Equal("uncategorized", categories.Categories[0].Name)
 }
 
 func (t *ServerTestSuite) TestGetCategoryFeeds() {
 	ctg := database.NewCategory("test", t.user)
-	database.NewFeedWithCategory("example", "example.com", ctg.APIID, t.user)
+	database.NewFeed("example", "example.com", ctg.APIID, t.user)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues(ctg.APIID)
 
@@ -173,7 +174,7 @@ func (t *ServerTestSuite) TestEditCategory() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues(ctg.APIID)
 
@@ -185,7 +186,8 @@ func (t *ServerTestSuite) TestEditCategory() {
 
 func (t *ServerTestSuite) TestAppendFeeds() {
 	ctg := database.NewCategory("test", t.user)
-	feed := database.NewFeed("example", "example.com", t.user)
+	feed, err := database.NewFeed("example", "example.com", ctg.APIID, t.user)
+	t.Require().NoError(err)
 
 	feeds := fmt.Sprintf(`{ "feeds": ["%s"] }`, feed.APIID)
 
@@ -193,7 +195,7 @@ func (t *ServerTestSuite) TestAppendFeeds() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues(ctg.APIID)
 
@@ -209,7 +211,7 @@ func (t *ServerTestSuite) TestDeleteCategory() {
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues(ctg.APIID)
 
@@ -222,7 +224,7 @@ func (t *ServerTestSuite) TestDeleteCategory() {
 func (t *ServerTestSuite) TestMarkCategory() {
 	ctg := database.NewCategory("test", t.user)
 
-	feed, err := database.NewFeedWithCategory(
+	feed, err := database.NewFeed(
 		"Example", "example.com", ctg.APIID, t.user,
 	)
 	t.Require().NoError(err)
@@ -232,12 +234,13 @@ func (t *ServerTestSuite) TestMarkCategory() {
 		Mark:  models.MarkerUnread,
 	}, feed.APIID, t.user)
 
-	t.Require().Len(database.Entries(true, models.MarkerRead, t.user), 0)
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Require().Len(entries, 0)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues(ctg.APIID)
 
@@ -251,7 +254,7 @@ func (t *ServerTestSuite) TestMarkUnknownCategory() {
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues("bogus")
 
@@ -267,7 +270,7 @@ func (t *ServerTestSuite) TestMarkCategoryWithBadMarker() {
 	req := httptest.NewRequest(echo.PUT, "/?as=bogus", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues("bogus")
 
@@ -282,7 +285,7 @@ func (t *ServerTestSuite) TestMarkCategoryWithBadMarker() {
 func (t *ServerTestSuite) TestGetCategoryEntries() {
 	ctg := database.NewCategory("test", t.user)
 
-	feed, err := database.NewFeedWithCategory(
+	feed, err := database.NewFeed(
 		"Example",
 		"example.com",
 		ctg.APIID,
@@ -298,7 +301,7 @@ func (t *ServerTestSuite) TestGetCategoryEntries() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues(ctg.APIID)
 
@@ -321,7 +324,7 @@ func (t *ServerTestSuite) TestGetUnknownCategoryEntries() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues("bogus")
 
@@ -339,7 +342,7 @@ func (t *ServerTestSuite) TestGetCategoryStats() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues(ctg.APIID)
 
@@ -355,7 +358,7 @@ func (t *ServerTestSuite) TestGetUnknownCategoryStats() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set("user", t.user)
 	c.SetParamNames("categoryID")
 	c.SetParamValues("bogus")
 

@@ -4,7 +4,8 @@ go:
   - 1.x
 
 before_install:
-  - curl -L https://git.io/vp6lP | sh
+  - go get github.com/alecthomas/gometalinter/...
+  - gometalinter --install
 
 script:
   - ./test.sh

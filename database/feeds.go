@@ -17,10 +17,10 @@
 
 package database
 
-import "github.com/varddum/syndication/models"
+import "github.com/jmartinezhern/syndication/models"
 
-// NewFeedWithCategory creates a new feed associated to a category with the given API ID
-func (db *DB) NewFeedWithCategory(title, subscription, ctgID string, user models.User) (models.Feed, error) {
+// NewFeed creates a new feed associated to a category with the given API ID
+func (db *DB) NewFeed(title, subscription, ctgID string, user models.User) (models.Feed, error) {
 	ctg, found := db.CategoryWithAPIID(ctgID, user)
 	if !found {
 		return models.Feed{}, ErrModelNotFound
@@ -36,40 +36,35 @@ func (db *DB) NewFeedWithCategory(title, subscription, ctgID string, user models
 	return feed, nil
 }
 
-// NewFeedWithCategory creates a new feed associated to a category with the given API ID
-func NewFeedWithCategory(title, subscription, ctgID string, user models.User) (models.Feed, error) {
-	return defaultInstance.NewFeedWithCategory(title, subscription, ctgID, user)
-}
-
-// NewFeed creates a new Feed object owned by user
-func (db *DB) NewFeed(title, subscription string, user models.User) models.Feed {
-	feed := models.Feed{
-		Title:        title,
-		Subscription: subscription,
-	}
-
-	ctg := models.Category{}
-	db.db.Model(&user).Where("name = ?", models.Uncategorized).Related(&ctg)
-
-	db.createFeed(&feed, &ctg, user)
-
-	return feed
-}
-
-// NewFeed creates a new Feed object owned by user
-func NewFeed(title, subscription string, user models.User) models.Feed {
-	return defaultInstance.NewFeed(title, subscription, user)
+// NewFeed creates a new feed associated to a category with the given API ID
+func NewFeed(title, subscription, ctgID string, user models.User) (models.Feed, error) {
+	return defaultInstance.NewFeed(title, subscription, ctgID, user)
 }
 
 // Feeds returns a list of all Feeds owned by a user
-func (db *DB) Feeds(user models.User) (feeds []models.Feed) {
-	db.db.Model(&user).Association("Feeds").Find(&feeds)
+func (db *DB) Feeds(continuationID string, count int, user models.User) (feeds []models.Feed, next string) {
+	query := db.db.Model(&user)
+
+	if continuationID != "" {
+		feed, found := FeedWithAPIID(continuationID, user)
+		if found {
+			query = query.Where("id >= ?", feed.ID)
+		}
+	}
+
+	query.Limit(count + 1).Association("Feeds").Find(&feeds)
+
+	if len(feeds) > count {
+		next = feeds[len(feeds)-1].APIID
+		feeds = feeds[:len(feeds)-1]
+	}
+
 	return
 }
 
 // Feeds returns a list of all Feeds owned by a user
-func Feeds(user models.User) []models.Feed {
-	return defaultInstance.Feeds(user)
+func Feeds(continuationID string, count int, user models.User) ([]models.Feed, string) {
+	return defaultInstance.Feeds(continuationID, count, user)
 }
 
 // FeedWithAPIID returns a Feed with id and owned by user

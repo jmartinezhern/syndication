@@ -26,8 +26,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 const (
@@ -50,8 +51,9 @@ type (
 	SyncTestSuite struct {
 		suite.Suite
 
-		user   models.User
-		server *http.Server
+		user     models.User
+		server   *http.Server
+		unctgCtg models.Category
 	}
 )
 
@@ -76,6 +78,7 @@ func (s *SyncTestSuite) SetupTest() {
 
 	randUserName := RandStringRunes(8)
 	s.user = database.NewUser(randUserName, "golang")
+	s.unctgCtg = database.NewCategory(models.Uncategorized, s.user)
 	s.Require().NotEmpty(s.user.APIID)
 }
 
@@ -94,7 +97,8 @@ func (s *SyncTestSuite) TestPullFeedWithBadSubscription() {
 }
 
 func (s *SyncTestSuite) TestSyncWithEtags() {
-	feed := database.NewFeed("Sync Test", rssURL, s.user)
+	feed, err := database.NewFeed("Sync Test", rssURL, s.unctgCtg.APIID, s.user)
+	s.Require().NoError(err)
 	s.Require().NotEmpty(feed.APIID)
 
 	_, entries, err := PullFeed(feed.Subscription, "")
@@ -114,11 +118,12 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 }
 
 func (s *SyncTestSuite) TestSyncUser() {
-	feed := database.NewFeed("Sync Test", rssMinimalURL, s.user)
+	feed, err := database.NewFeed("Sync Test", rssMinimalURL, s.unctgCtg.APIID, s.user)
+	s.Require().NoError(err)
 	s.Require().NotEmpty(feed.APIID)
 
 	serv := NewService(testSyncInterval, 1)
-	err := serv.SyncUser(&s.user)
+	err = serv.SyncUser(&s.user)
 	s.Require().Nil(err)
 
 	entries := database.FeedEntries(feed.APIID, true, models.MarkerAny, s.user)
@@ -133,7 +138,9 @@ func (s *SyncTestSuite) TestSyncUsers() {
 		_, found := database.UserWithName("test" + strconv.Itoa(i))
 		s.Require().True(found)
 
-		database.NewFeed("Sync Test", rssMinimalURL, user)
+		ctg := database.NewCategory(models.Uncategorized, user)
+		_, err := database.NewFeed("Sync Test", rssMinimalURL, ctg.APIID, user)
+		s.Require().NoError(err)
 	}
 
 	serv := NewService(testSyncInterval, 1)
@@ -145,7 +152,7 @@ func (s *SyncTestSuite) TestSyncUsers() {
 	users := database.Users()[1:]
 
 	for _, user := range users {
-		entries := database.Entries(true, models.MarkerAny, user)
+		entries, _ := database.Entries(true, models.MarkerAny, "", 100, user)
 		s.Len(entries, 5)
 	}
 }
@@ -157,7 +164,9 @@ func (s *SyncTestSuite) TestSyncService() {
 		_, found := database.UserWithName("test" + strconv.Itoa(i))
 		s.Require().True(found)
 
-		database.NewFeed("Sync Test", rssMinimalURL, user)
+		ctg := database.NewCategory(models.Uncategorized, user)
+		_, err := database.NewFeed("Sync Test", rssMinimalURL, ctg.APIID, user)
+		s.Require().NoError(err)
 	}
 
 	serv := NewService(time.Second, 1)
@@ -171,7 +180,7 @@ func (s *SyncTestSuite) TestSyncService() {
 	users := database.Users()[1:]
 
 	for _, user := range users {
-		entries := database.Entries(true, models.MarkerAny, user)
+		entries, _ := database.Entries(true, models.MarkerAny, "", 100, user)
 		s.Len(entries, 5)
 	}
 }
