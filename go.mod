@@ -13,7 +13,7 @@ require (
 	github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a
 	github.com/konsorten/go-windows-terminal-sequences v1.0.1
 	github.com/labstack/echo v0.0.0-20181123063703-c7eb8da9ec73
-	github.com/labstack/gommon v0.2.7
+	github.com/labstack/gommon v0.2.8
 	github.com/lib/pq v0.0.0-20180523175426-90697d60dd84
 	github.com/magiconair/properties v1.8.0
 	github.com/mattn/go-colorable v0.0.9
