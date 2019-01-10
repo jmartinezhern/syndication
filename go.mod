@@ -24,7 +24,7 @@ require (
 	github.com/mmcdole/goxpp v0.0.0-20170720115402-77e4a51a73ed
 	github.com/pelletier/go-toml v1.2.0
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/sirupsen/logrus v1.2.0
+	github.com/sirupsen/logrus v1.3.0
 	github.com/spf13/afero v1.1.2
 	github.com/spf13/cast v1.3.0
 	github.com/spf13/cobra v0.0.3
