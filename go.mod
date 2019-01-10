@@ -1,7 +1,7 @@
 module github.com/varddum/syndication
 
 require (
-	github.com/PuerkitoBio/goquery v1.4.1
+	github.com/PuerkitoBio/goquery v1.5.0
 	github.com/andybalholm/cascadia v1.0.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
