@@ -38,6 +38,6 @@ require (
 	golang.org/x/net v0.0.0-20180724234803-3673e40ba225
 	golang.org/x/sys v0.0.0-20181205085412-a5c9d58dba9a
 	golang.org/x/text v0.3.0
-	google.golang.org/appengine v1.1.0
+	google.golang.org/appengine v1.4.0
 	gopkg.in/yaml.v2 v2.2.2
 )
