@@ -52,7 +52,7 @@ func (s *AdminTestSuite) SetupTest() {
 
 	s.serv.Start()
 
-	s.client, err = rpc.Dial("unixpacket", TestSocketPath)
+	s.client, err = rpc.Dial("unix", TestSocketPath)
 	s.Require().Nil(err)
 }
 

@@ -146,9 +146,9 @@ func NewService(socketPath string) (*Service, error) {
 		}
 	}
 
-	s.ln, err = net.ListenUnix("unixpacket", &net.UnixAddr{
+	s.ln, err = net.ListenUnix("unix", &net.UnixAddr{
 		Name: s.socketPath,
-		Net:  "unixpacket"})
+		Net:  "unix"})
 
 	if err != nil {
 		return nil, err
