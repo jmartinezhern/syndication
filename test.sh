@@ -4,7 +4,6 @@ set -e
 
 test -z "$(gometalinter -j 4 --disable-all \
   --enable=gofmt \
-  --enable=gosimple \
   --enable=golint \
   --enable=vet \
   --vendor \
