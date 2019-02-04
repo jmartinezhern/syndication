@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (s *DatabaseTestSuite) TestNewFeedWithDefaults() {
@@ -189,7 +189,7 @@ func (s *DatabaseTestSuite) TestMarkFeed() {
 		if i <= 4 {
 			entry = models.Entry{
 				Title:     "First Feed Test Entry " + strconv.Itoa(i),
-				Author:    "varddum",
+				Author:    "John Doe",
 				Link:      "http://example.com",
 				Mark:      models.MarkerUnread,
 				Published: time.Now(),
@@ -200,7 +200,7 @@ func (s *DatabaseTestSuite) TestMarkFeed() {
 		} else {
 			entry = models.Entry{
 				Title:     "Second Feed Test Entry " + strconv.Itoa(i),
-				Author:    "varddum",
+				Author:    "John Doe",
 				Link:      "http://example.com",
 				Mark:      models.MarkerRead,
 				Published: time.Now(),

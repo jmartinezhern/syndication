@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/jmartinezhern/syndication.svg?branch=master)](https://travis-ci.org/jmartinezhern/syndication)
-[![codecov](https://codecov.io/gh/varddum/syndication/branch/master/graph/badge.svg)](https://codecov.io/gh/jmartinezhern/syndication)
+[![codecov](https://codecov.io/gh/jmartinezhern/syndication/branch/master/graph/badge.svg)](https://codecov.io/gh/jmartinezhern/syndication)
 [![Waffle.io - Columns and their card count](https://badge.waffle.io/jmartinezhern/syndication.svg?columns=all)](http://waffle.io/jmartinezhern/syndication)
 
 # Syndication - A simple news aggregation server

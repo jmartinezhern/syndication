@@ -17,7 +17,7 @@
 
 package database
 
-import "github.com/varddum/syndication/models"
+import "github.com/jmartinezhern/syndication/models"
 
 // NewFeedWithCategory creates a new feed associated to a category with the given API ID
 func (db *DB) NewFeedWithCategory(title, subscription, ctgID string, user models.User) (models.Feed, error) {

@@ -20,7 +20,7 @@ package database
 import (
 	"strconv"
 
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (s *DatabaseTestSuite) TestNewTag() {
@@ -42,7 +42,7 @@ func (s *DatabaseTestSuite) TestTagEntries() {
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
 			Title:  "Test Entry",
-			Author: "varddum",
+			Author: "John Doe",
 			Link:   "http://example.com",
 			Mark:   models.MarkerUnread,
 		}
@@ -96,7 +96,7 @@ func (s *DatabaseTestSuite) TestTagMultipleEntries() {
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
 			Title:  "Test Entry " + strconv.Itoa(i),
-			Author: "varddum",
+			Author: "John Doe",
 			Link:   "http://example.com",
 			Mark:   models.MarkerUnread,
 		}
@@ -146,13 +146,13 @@ func (s *DatabaseTestSuite) TestEntriesFromMultipleTags() {
 	entries := []models.Entry{
 		{
 			Title:  "Test Entry",
-			Author: "varddum",
+			Author: "John Doe",
 			Link:   "http://example.com",
 			Mark:   models.MarkerUnread,
 		},
 		{
 			Title:  "Test Entry",
-			Author: "varddum",
+			Author: "John Doe",
 			Link:   "http://example.com",
 			Mark:   models.MarkerUnread,
 		},

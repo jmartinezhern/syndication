@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 
 	"github.com/jinzhu/gorm"
 	// GORM dialect packages

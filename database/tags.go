@@ -18,7 +18,7 @@
 package database
 
 import (
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 // NewTag creates a new Tag object owned by user

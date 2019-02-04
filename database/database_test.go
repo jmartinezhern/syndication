@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 type (

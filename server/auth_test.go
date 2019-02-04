@@ -20,12 +20,12 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
-	"github.com/varddum/syndication/database"
+	"github.com/jmartinezhern/syndication/database"
 
 	"github.com/labstack/echo"
 )

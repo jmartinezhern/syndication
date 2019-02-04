@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/varddum/syndication/database"
+	"github.com/jmartinezhern/syndication/database"
 )
 
 type (

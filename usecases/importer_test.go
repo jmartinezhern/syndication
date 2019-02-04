@@ -20,7 +20,7 @@ package usecases
 import (
 	"sort"
 
-	"github.com/varddum/syndication/database"
+	"github.com/jmartinezhern/syndication/database"
 )
 
 const opml = `

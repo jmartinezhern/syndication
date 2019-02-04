@@ -20,7 +20,7 @@ package database
 import (
 	"time"
 
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (s *DatabaseTestSuite) TestNewEntry() {
@@ -30,7 +30,7 @@ func (s *DatabaseTestSuite) TestNewEntry() {
 
 	entry := models.Entry{
 		Title:     "Test Entry",
-		Author:    "varddum",
+		Author:    "John Doe",
 		Link:      "http://example.com",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
@@ -54,7 +54,7 @@ func (s *DatabaseTestSuite) TestNewEntryWithEmptyFeed() {
 	entry := models.Entry{
 		Title:     "Test Entry",
 		Link:      "http://example.com",
-		Author:    "varddum",
+		Author:    "John Doe",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
@@ -73,7 +73,7 @@ func (s *DatabaseTestSuite) TestNewEntryWithEmptyFeed() {
 func (s *DatabaseTestSuite) TestNewEntryWithBadFeed() {
 	entry := models.Entry{
 		Title:     "Test Entry",
-		Author:    "varddum",
+		Author:    "John Doe",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
@@ -97,7 +97,7 @@ func (s *DatabaseTestSuite) TestNewEntries() {
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
 			Title:     "Test Entry",
-			Author:    "varddum",
+			Author:    "John Doe",
 			Link:      "http://example.com",
 			Mark:      models.MarkerUnread,
 			Published: time.Now(),
@@ -139,7 +139,7 @@ func (s *DatabaseTestSuite) TestEntries() {
 
 	entry := models.Entry{
 		Title:     "Test Entry",
-		Author:    "varddum",
+		Author:    "John Doe",
 		Link:      "http://example.com",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
@@ -164,7 +164,7 @@ func (s *DatabaseTestSuite) TestEntriesFromFeed() {
 
 	entry := models.Entry{
 		Title:     "Test Entry",
-		Author:    "varddum",
+		Author:    "John Doe",
 		Link:      "http://example.com",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),

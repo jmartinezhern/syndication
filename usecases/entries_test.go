@@ -18,8 +18,8 @@
 package usecases
 
 import (
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (t *UsecasesTestSuite) TestEntry() {

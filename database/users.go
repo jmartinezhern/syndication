@@ -23,7 +23,7 @@ import (
 	"crypto/rand"
 	"io"
 
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 	"golang.org/x/crypto/scrypt"
 )
 

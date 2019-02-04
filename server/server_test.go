@@ -30,8 +30,8 @@ import (
 	"github.com/labstack/gommon/log"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 const (
@@ -93,7 +93,7 @@ func (t *ServerTestSuite) TearDownTest() {
 }
 
 func TestServerTestSuite(t *testing.T) {
-	dir := http.Dir(os.Getenv("GOPATH") + "/src/github.com/varddum/syndication/server/")
+	dir := http.Dir(os.Getenv("GOPATH") + "/src/github.com/jmartinezhern/syndication/server/")
 	mockRSSServer = httptest.NewServer(http.FileServer(dir))
 	defer mockRSSServer.Close()
 

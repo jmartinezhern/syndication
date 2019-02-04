@@ -20,10 +20,10 @@ package server
 import (
 	"net/http"
 
-	"github.com/varddum/syndication/usecases"
+	"github.com/jmartinezhern/syndication/usecases"
 
 	"github.com/labstack/echo"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 // NewCategory creates a new Category

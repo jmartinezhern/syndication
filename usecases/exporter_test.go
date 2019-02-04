@@ -21,8 +21,8 @@ import (
 	"encoding/xml"
 	"sort"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (t *UsecasesTestSuite) TestOPMLExporter() {

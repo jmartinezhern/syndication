@@ -21,8 +21,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/varddum/syndication/database"
-	"github.com/varddum/syndication/models"
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 
 	"github.com/dgrijalva/jwt-go"
 )
