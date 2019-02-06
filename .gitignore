@@ -18,3 +18,5 @@ coverage.txt
 syndication
 
 vendor
+
+**/.vscode
