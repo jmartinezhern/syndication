@@ -21,8 +21,8 @@ import (
 	"github.com/jmartinezhern/syndication/usecases"
 	"net/http"
 
-	"github.com/labstack/echo"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/labstack/echo"
 )
 
 type (

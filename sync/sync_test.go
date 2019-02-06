@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/suite"
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/stretchr/testify/suite"
 )
 
 const (

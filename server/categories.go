@@ -22,8 +22,8 @@ import (
 
 	"github.com/jmartinezhern/syndication/usecases"
 
-	"github.com/labstack/echo"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/labstack/echo"
 )
 
 // NewCategory creates a new Category

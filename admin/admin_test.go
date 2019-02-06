@@ -23,8 +23,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
 	"github.com/jmartinezhern/syndication/database"
+	"github.com/stretchr/testify/suite"
 )
 
 type (
