@@ -47,7 +47,11 @@ func (a *AdminUsecase) NewUser(username, password string) (models.User, error) {
 		return models.User{}, ErrUsernameConflicts
 	}
 
-	return database.NewUser(username, password), nil
+	user := database.NewUser(username, password)
+
+	database.NewCategory(models.Uncategorized, user)
+
+	return user, nil
 }
 
 // DeleteUser deletes a user with userID

@@ -24,36 +24,13 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 )
 
-func (s *DatabaseTestSuite) TestNewFeedWithDefaults() {
-	feed := NewFeed("Test site", "http://example.com", s.user)
-	s.Require().NotZero(feed.ID)
-
-	query, found := FeedWithAPIID(feed.APIID, s.user)
-	s.True(found)
-	s.NotEmpty(query.Title)
-	s.NotZero(query.ID)
-	s.NotZero(query.CreatedAt)
-	s.NotZero(query.UpdatedAt)
-	s.NotZero(query.UserID)
-
-	s.NotZero(query.Category.ID)
-	s.NotEmpty(query.Category.APIID)
-	s.Equal(query.Category.Name, models.Uncategorized)
-
-	feeds := CategoryFeeds(query.Category.APIID, s.user)
-	s.NotEmpty(feeds)
-	s.Equal(feeds[0].Title, feed.Title)
-	s.Equal(feeds[0].ID, feed.ID)
-	s.Equal(feeds[0].APIID, feed.APIID)
-}
-
-func (s *DatabaseTestSuite) TestNewFeedWithCategory() {
+func (s *DatabaseTestSuite) TestNewFeed() {
 	ctg := NewCategory("News", s.user)
 	s.NotEmpty(ctg.APIID)
 	s.NotZero(ctg.ID)
 	s.Empty(ctg.Feeds)
 
-	feed, err := NewFeedWithCategory("Test site", "http://example.com", ctg.APIID, s.user)
+	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
 	s.Require().Nil(err)
 
 	query, found := FeedWithAPIID(feed.APIID, s.user)
@@ -76,7 +53,7 @@ func (s *DatabaseTestSuite) TestNewFeedWithCategory() {
 }
 
 func (s *DatabaseTestSuite) TestNewFeedWithNonExistingCategory() {
-	_, err := NewFeedWithCategory("Test site", "http://example.com", createAPIID(), s.user)
+	_, err := NewFeed("Test site", "http://example.com", createAPIID(), s.user)
 	s.Equal(ErrModelNotFound, err)
 }
 
@@ -89,7 +66,7 @@ func (s *DatabaseTestSuite) TestChangeFeedCategory() {
 	firstCtg := NewCategory("News", s.user)
 	secondCtg := NewCategory("Tech", s.user)
 
-	feed, err := NewFeedWithCategory("Test site", "http://example.com", firstCtg.APIID, s.user)
+	feed, err := NewFeed("Test site", "http://example.com", firstCtg.APIID, s.user)
 	s.Require().Nil(err)
 
 	feeds := CategoryFeeds(firstCtg.APIID, s.user)
@@ -118,25 +95,42 @@ func (s *DatabaseTestSuite) TestChangeUnknownFeedCategory() {
 }
 
 func (s *DatabaseTestSuite) TestChangeFeedCategoryToUnknown() {
-	feed := NewFeed("Test site", "http://example.com", s.user)
+	ctg := NewCategory(models.Uncategorized, s.user)
+	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
+	s.Require().NoError(err)
 
-	err := ChangeFeedCategory(feed.APIID, "bogus", s.user)
-	s.NotNil(err)
+	err = ChangeFeedCategory(feed.APIID, "bogus", s.user)
+	s.Error(err)
 }
 
 func (s *DatabaseTestSuite) TestFeeds() {
+	ctg := NewCategory(models.Uncategorized, s.user)
+
+	var feeds []models.Feed
 	for i := 0; i < 5; i++ {
-		feed := NewFeed("Test site "+strconv.Itoa(i), "http://example.com", s.user)
-		s.Require().NotZero(feed.ID)
-		s.Require().NotEmpty(feed.APIID)
+		feed, err := NewFeed("Test site "+strconv.Itoa(i), "http://example.com", ctg.APIID, s.user)
+		s.Require().NoError(err)
+		feeds = append(feeds, feed)
 	}
 
-	feeds := Feeds(s.user)
-	s.Len(feeds, 5)
+	cFeeds, continuationID := Feeds("", 2, s.user)
+	s.Equal(feeds[2].APIID, continuationID)
+	s.Require().Len(cFeeds, 2)
+	s.Equal(feeds[0].Title, cFeeds[0].Title)
+	s.Equal(feeds[1].Title, cFeeds[1].Title)
+
+	cFeeds, continuationID = Feeds(continuationID, 3, s.user)
+	s.Len(continuationID, 0)
+	s.Require().Len(cFeeds, 3)
+	s.Equal(feeds[2].Title, cFeeds[0].Title)
+	s.Equal(feeds[3].Title, cFeeds[1].Title)
+	s.Equal(feeds[4].Title, cFeeds[2].Title)
 }
 
 func (s *DatabaseTestSuite) TestEditFeed() {
-	feed := NewFeed("Test site", "http://example.com", s.user)
+	ctg := NewCategory(models.Uncategorized, s.user)
+	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
+	s.Require().NoError(err)
 
 	mdfFeed, err := EditFeed(feed.APIID, models.Feed{Title: "Testing New Name", Subscription: "http://example.com/feed"}, s.user)
 	s.Nil(err)
@@ -154,13 +148,15 @@ func (s *DatabaseTestSuite) TestEditNonExistingFeed() {
 }
 
 func (s *DatabaseTestSuite) TestDeleteFeed() {
-	feed := NewFeed("Test site", "http://example.com", s.user)
+	ctg := NewCategory(models.Uncategorized, s.user)
+	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
+	s.Require().NoError(err)
 
 	query, found := FeedWithAPIID(feed.APIID, s.user)
 	s.True(found)
 	s.NotEmpty(query.APIID)
 
-	err := DeleteFeed(feed.APIID, s.user)
+	err = DeleteFeed(feed.APIID, s.user)
 	s.Nil(err)
 
 	_, found = FeedWithAPIID(feed.APIID, s.user)
@@ -178,10 +174,14 @@ func (s *DatabaseTestSuite) TestFeedEntriesFromNonExistenFeed() {
 }
 
 func (s *DatabaseTestSuite) TestMarkFeed() {
-	firstFeed := NewFeed("Test site", "http://example.com", s.user)
+	ctg := NewCategory(models.Uncategorized, s.user)
+
+	firstFeed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
+	s.Require().NoError(err)
 	s.NotEmpty(firstFeed.APIID)
 
-	secondFeed := NewFeed("Test site", "http://example.com", s.user)
+	secondFeed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
+	s.Require().NoError(err)
 	s.NotEmpty(secondFeed.APIID)
 
 	for i := 0; i < 10; i++ {
@@ -216,7 +216,7 @@ func (s *DatabaseTestSuite) TestMarkFeed() {
 	s.Require().Equal(defaultInstance.db.Model(&s.user).Where("mark = ?", models.MarkerRead).Association("Entries").Count(), 5)
 	s.Require().Equal(defaultInstance.db.Model(&s.user).Where("mark = ?", models.MarkerUnread).Association("Entries").Count(), 5)
 
-	err := MarkFeed(firstFeed.APIID, models.MarkerRead, s.user)
+	err = MarkFeed(firstFeed.APIID, models.MarkerRead, s.user)
 	s.Nil(err)
 
 	entries := FeedEntries(firstFeed.APIID, true, models.MarkerRead, s.user)
@@ -243,7 +243,9 @@ func (s *DatabaseTestSuite) TestMarkFeed() {
 }
 
 func (s *DatabaseTestSuite) TestFeedStats() {
-	feed := NewFeed("News", "http://example.com", s.user)
+	ctg := NewCategory(models.Uncategorized, s.user)
+	feed, err := NewFeed("News", "http://example.com", ctg.APIID, s.user)
+	s.Require().NoError(err)
 	s.Require().NotEmpty(feed.APIID)
 
 	for i := 0; i < 3; i++ {

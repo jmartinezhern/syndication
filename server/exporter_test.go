@@ -32,7 +32,7 @@ import (
 func (t *ServerTestSuite) TestOPMLExport() {
 	ctg := database.NewCategory("Test", t.user)
 
-	feed, err := database.NewFeedWithCategory(
+	feed, err := database.NewFeed(
 		"Example", "example.com", ctg.APIID, t.user,
 	)
 	t.Require().NoError(err)

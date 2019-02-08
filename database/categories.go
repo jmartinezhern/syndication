@@ -78,14 +78,29 @@ func CategoryWithAPIID(id string, user models.User) (models.Category, bool) {
 }
 
 // Categories returns a list of all Categories owned by user
-func (db *DB) Categories(user models.User) (categories []models.Category) {
-	db.db.Model(&user).Association("Categories").Find(&categories)
+func (db *DB) Categories(user models.User, continuationID string, count int) (categories []models.Category, next string) {
+	query := db.db.Model(&user)
+
+	if continuationID != "" {
+		ctg, found := CategoryWithAPIID(continuationID, user)
+		if found {
+			query = query.Where("id >= ?", ctg.ID)
+		}
+	}
+
+	query.Limit(count + 1).Association("Categories").Find(&categories)
+
+	if len(categories) > count {
+		next = categories[len(categories)-1].APIID
+		categories = categories[:len(categories)-1]
+	}
+
 	return
 }
 
 // Categories returns a list of all Categories owned by user
-func Categories(user models.User) []models.Category {
-	return defaultInstance.Categories(user)
+func Categories(user models.User, continuationID string, count int) ([]models.Category, string) {
+	return defaultInstance.Categories(user, continuationID, count)
 }
 
 // CategoryFeeds returns all Feeds that belong to a category with categoryID

@@ -65,7 +65,8 @@ func (t *ServerTestSuite) TestUnreachableNewFeed() {
 }
 
 func (t *ServerTestSuite) TestGetFeeds() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
@@ -89,7 +90,8 @@ func (t *ServerTestSuite) TestGetFeeds() {
 }
 
 func (t *ServerTestSuite) TestGetFeed() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
@@ -127,7 +129,8 @@ func (t *ServerTestSuite) TestGetUnknownFeed() {
 
 func (t *ServerTestSuite) TestEditFeed() {
 	newFeed := `{ "title": "NewName" }`
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(newFeed))
 	req.Header.Set("Content-Type", "application/json")
@@ -168,8 +171,12 @@ func (t *ServerTestSuite) TestEditUnkownFeed() {
 }
 
 func (t *ServerTestSuite) TestDeleteFeed() {
-	feed := database.NewFeed("Example", "example.com", t.user)
-	t.NotEmpty(database.Feeds(t.user))
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
+
+	feeds, _ := database.Feeds("", 5, t.user)
+
+	t.NotEmpty(feeds)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
@@ -200,16 +207,16 @@ func (t *ServerTestSuite) TestDeleteUnknownFeed() {
 }
 
 func (t *ServerTestSuite) TestMarkFeeed() {
-	feed := database.NewFeed(
-		"Example", "example.com", t.user,
-	)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	database.NewEntry(models.Entry{
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
 	}, feed.APIID, t.user)
 
-	t.Require().Len(database.Entries(true, models.MarkerRead, t.user), 0)
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Require().Len(entries, 0)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
@@ -241,7 +248,8 @@ func (t *ServerTestSuite) TestMarkUnknownFeeed() {
 }
 
 func (t *ServerTestSuite) TestGetFeedEntries() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -287,7 +295,8 @@ func (t *ServerTestSuite) TestGetUnknownFeedEntries() {
 }
 
 func (t *ServerTestSuite) TestGetFeedStats() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 

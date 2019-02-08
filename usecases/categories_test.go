@@ -47,7 +47,7 @@ func (t *UsecasesTestSuite) TestCategory() {
 func (t *UsecasesTestSuite) TestCategories() {
 	ctg := database.NewCategory("test", t.user)
 
-	ctgs := t.ctgs.Categories(t.user)
+	ctgs, _ := t.ctgs.Categories(t.user, "", 2)
 	t.Require().Len(ctgs, 2)
 	t.Equal(ctgs[1].Name, ctg.Name)
 	t.Equal(ctgs[1].APIID, ctg.APIID)
@@ -55,7 +55,7 @@ func (t *UsecasesTestSuite) TestCategories() {
 
 func (t *UsecasesTestSuite) TestCategoryFeeds() {
 	ctg := database.NewCategory("test", t.user)
-	feed, err := database.NewFeedWithCategory("example", "example.com", ctg.APIID, t.user)
+	feed, err := database.NewFeed("example", "example.com", ctg.APIID, t.user)
 	t.Require().NoError(err)
 
 	feeds, err := t.ctgs.Feeds(ctg.APIID, t.user)
@@ -83,8 +83,10 @@ func (t *UsecasesTestSuite) TestEditMissingCategory() {
 }
 
 func (t *UsecasesTestSuite) TestAddFeedsToCategory() {
+	unctgCtg := database.NewCategory(models.Uncategorized, t.user)
 	ctg := database.NewCategory("test", t.user)
-	feed := database.NewFeed("example", "example.com", t.user)
+	feed, err := database.NewFeed("example", "example.com", unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	feeds := database.CategoryFeeds(ctg.APIID, t.user)
 	t.Empty(feeds)
@@ -114,7 +116,7 @@ func (t *UsecasesTestSuite) TestDeleteMissingCategory() {
 func (t *UsecasesTestSuite) TestMarkCategory() {
 	ctg := database.NewCategory("test", t.user)
 
-	feed, err := database.NewFeedWithCategory(
+	feed, err := database.NewFeed(
 		"Example", "example.com", ctg.APIID, t.user,
 	)
 	t.Require().NoError(err)
@@ -124,11 +126,14 @@ func (t *UsecasesTestSuite) TestMarkCategory() {
 		Mark:  models.MarkerUnread,
 	}, feed.APIID, t.user)
 
-	t.Require().Empty(database.Entries(true, models.MarkerRead, t.user))
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Require().Empty(entries)
 
 	err = t.ctgs.Mark(ctg.APIID, models.MarkerRead, t.user)
 	t.NoError(err)
-	t.Len(database.Entries(true, models.MarkerRead, t.user), 1)
+
+	entries, _ = database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Len(entries, 1)
 }
 
 func (t *UsecasesTestSuite) TestMarkMissingCategory() {
@@ -139,7 +144,7 @@ func (t *UsecasesTestSuite) TestMarkMissingCategory() {
 func (t *UsecasesTestSuite) TestCategoryEntries() {
 	ctg := database.NewCategory("test", t.user)
 
-	feed, err := database.NewFeedWithCategory(
+	feed, err := database.NewFeed(
 		"Example", "example.com", ctg.APIID, t.user,
 	)
 	t.Require().NoError(err)

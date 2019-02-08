@@ -163,7 +163,8 @@ func (t *ServerTestSuite) TestEditUnknownTag() {
 func (t *ServerTestSuite) TestTagEntries() {
 	tag := database.NewTag("test", t.user)
 
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test",
@@ -251,7 +252,8 @@ func (t *ServerTestSuite) TestGetUnknownTag() {
 func (t *ServerTestSuite) TestGetEntriesFromTag() {
 	tag := database.NewTag("test", t.user)
 
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test",

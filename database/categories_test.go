@@ -43,13 +43,23 @@ func (s *DatabaseTestSuite) TestNewCategory() {
 }
 
 func (s *DatabaseTestSuite) TestCategories() {
+	var ctgs []models.Category
 	for i := 0; i < 5; i++ {
-		ctg := NewCategory("Test Category "+strconv.Itoa(i), s.user)
-		s.Require().NotZero(ctg.ID)
+		ctgs = append(ctgs, NewCategory("Test Category "+strconv.Itoa(i), s.user))
 	}
 
-	ctgs := Categories(s.user)
-	s.Len(ctgs, 6)
+	cCtgs, continuationID := Categories(s.user, "", 2)
+	s.Equal(ctgs[2].APIID, continuationID)
+	s.Require().Len(cCtgs, 2)
+	s.Equal(ctgs[0].Name, cCtgs[0].Name)
+	s.Equal(ctgs[1].Name, cCtgs[1].Name)
+
+	cCtgs, continuationID = Categories(s.user, continuationID, 3)
+	s.Len(continuationID, 0)
+	s.Require().Len(cCtgs, 3)
+	s.Equal(ctgs[2].Name, cCtgs[0].Name)
+	s.Equal(ctgs[3].Name, cCtgs[1].Name)
+	s.Equal(ctgs[4].Name, cCtgs[2].Name)
 }
 
 func (s *DatabaseTestSuite) TestCategoryWithName() {
@@ -101,13 +111,13 @@ func (s *DatabaseTestSuite) TestCategoryEntries() {
 	secondCtg := NewCategory("Tech", s.user)
 	s.NotEmpty(secondCtg.APIID)
 
-	firstFeed, err := NewFeedWithCategory("Test site", "http://example.com", firstCtg.APIID, s.user)
+	firstFeed, err := NewFeed("Test site", "http://example.com", firstCtg.APIID, s.user)
 	s.Nil(err)
 
-	secondFeed, err := NewFeedWithCategory("Test site", "http://example.com", secondCtg.APIID, s.user)
+	secondFeed, err := NewFeed("Test site", "http://example.com", secondCtg.APIID, s.user)
 	s.Nil(err)
 
-	thirdFeed, err := NewFeedWithCategory("Test site", "http://example.com", secondCtg.APIID, s.user)
+	thirdFeed, err := NewFeed("Test site", "http://example.com", secondCtg.APIID, s.user)
 	s.Nil(err)
 
 	for i := 0; i < 10; i++ {
@@ -174,7 +184,7 @@ func (s *DatabaseTestSuite) TestEntriesFromNonExistingCategory() {
 func (s *DatabaseTestSuite) TestMarkCategory() {
 	ctg := NewCategory("News", s.user)
 
-	feed, err := NewFeedWithCategory("Test site", "http://example.com", ctg.APIID, s.user)
+	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
 	s.Require().Nil(err)
 
 	for i := 0; i < 10; i++ {
@@ -221,7 +231,7 @@ func (s *DatabaseTestSuite) TestCategoryStats() {
 	ctg := NewCategory("World", s.user)
 	s.Require().NotEmpty(ctg.APIID)
 
-	feed, err := NewFeedWithCategory("News", "http://example.com", ctg.APIID, s.user)
+	feed, err := NewFeed("News", "http://example.com", ctg.APIID, s.user)
 	s.Require().Nil(err)
 	s.Require().NotEmpty(feed.APIID)
 

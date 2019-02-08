@@ -38,8 +38,8 @@ type (
 		// Category returns a category with ID that belongs to user
 		Category(id string, user models.User) (models.Category, bool)
 
-		// Categories returns all categories owned by user
-		Categories(user models.User) []models.Category
+		// Categories returns a page of categories owned by user and a continuation ID
+		Categories(user models.User, continuationID string, count int) ([]models.Category, string)
 
 		// Feeds returns all feeds associated to a category
 		Feeds(ctgID string, user models.User) ([]models.Feed, error)
@@ -96,8 +96,8 @@ func (c *CategoryUsecase) Category(id string, user models.User) (models.Category
 }
 
 // Categories returns all categories owned by user
-func (c *CategoryUsecase) Categories(user models.User) []models.Category {
-	return database.Categories(user)
+func (c *CategoryUsecase) Categories(user models.User, continuationID string, count int) ([]models.Category, string) {
+	return database.Categories(user, continuationID, count)
 }
 
 // Feeds returns all feeds associated to a category

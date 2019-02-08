@@ -31,18 +31,8 @@ func (s *DatabaseTestSuite) TestUsers() {
 	NewUser("test_one", "golang")
 	NewUser("test_two", "password")
 
-	users := Users()
+	users := Users("created_at")
 	s.Len(users, 3)
-}
-
-func (s *DatabaseTestSuite) TestUsersWithFields() {
-	NewUser("test_one", "golang")
-	NewUser("test_two", "password")
-
-	users := Users("uncategorized_category_api_id")
-	s.Len(users, 3)
-	s.NotEmpty(users[0].UncategorizedCategoryAPIID)
-
 }
 
 func (s *DatabaseTestSuite) TestDeleteUser() {

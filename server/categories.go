@@ -19,6 +19,7 @@ package server
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/jmartinezhern/syndication/usecases"
 
@@ -61,8 +62,23 @@ func (s *Server) GetCategory(c echo.Context) error {
 func (s *Server) GetCategories(c echo.Context) error {
 	user := c.Get(echoSyndUserKey).(models.User)
 
+	continuationID := c.QueryParam("continuationID")
+
+	count := 100
+	countParam := c.QueryParam("count")
+	if countParam != "" {
+		var err error
+		count, err = strconv.Atoi(countParam)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "count must be an integer")
+		}
+	}
+
+	ctgs, next := s.categories.Categories(user, continuationID, count)
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"categories": s.categories.Categories(user),
+		"categories":     ctgs,
+		"continuationID": next,
 	})
 }
 

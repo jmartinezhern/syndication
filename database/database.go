@@ -35,12 +35,6 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
-// Password salt and Hash byte sizes
-const (
-	PWSaltBytes = 32
-	PWHashBytes = 64
-)
-
 type (
 	// DB represents a connection to a SQL database
 	DB struct {

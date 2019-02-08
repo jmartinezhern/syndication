@@ -32,33 +32,37 @@ func (t *UsecasesTestSuite) TestNewFeed() {
 	}))
 	defer ts.Close()
 
-	feed, err := t.feed.New("Example", ts.URL, t.user)
+	feed, err := t.feed.New("Example", ts.URL, t.unctgCtg.APIID, t.user)
 	t.NoError(err)
 	_, found := database.FeedWithAPIID(feed.APIID, t.user)
 	t.True(found)
 }
 
 func (t *UsecasesTestSuite) TestUnreachableNewFeed() {
-	_, err := t.feed.New("Example", "bogus", t.user)
+	_, err := t.feed.New("Example", "bogus", t.unctgCtg.APIID, t.user)
 	t.EqualError(err, ErrFetchingFeed.Error())
 }
 
 func (t *UsecasesTestSuite) TestFeeds() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
-	feeds := t.feed.Feeds(t.user)
+	feeds, _ := t.feed.Feeds("", 2, t.user)
 	t.Len(feeds, 1)
 	t.Equal(feed.Title, feeds[0].Title)
 }
 
 func (t *UsecasesTestSuite) TestFeed() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 	_, found := t.feed.Feed(feed.APIID, t.user)
 	t.True(found)
 }
 
 func (t *UsecasesTestSuite) TestEditFeed() {
-	feed := database.NewFeed("Example", "'example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
+
 	newFeed, err := t.feed.Edit(feed.APIID, models.Feed{Title: "New Title"}, t.user)
 	t.NoError(err)
 	t.Equal("New Title", newFeed.Title)
@@ -70,8 +74,10 @@ func (t *UsecasesTestSuite) TestEditMissingFeed() {
 }
 
 func (t *UsecasesTestSuite) TestDeleteFeed() {
-	feed := database.NewFeed("Example", "example.com", t.user)
-	err := t.feed.Delete(feed.APIID, t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
+
+	err = t.feed.Delete(feed.APIID, t.user)
 	t.NoError(err)
 
 	_, found := database.FeedWithAPIID(feed.APIID, t.user)
@@ -84,9 +90,10 @@ func (t *UsecasesTestSuite) TestDeleteMissingFeed() {
 }
 
 func (t *UsecasesTestSuite) TestMarkFeed() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
-	_, err := database.NewEntry(models.Entry{
+	_, err = database.NewEntry(models.Entry{
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
 	}, feed.APIID, t.user)
@@ -105,7 +112,8 @@ func (t *UsecasesTestSuite) TestMarkMissingFeed() {
 }
 
 func (t *UsecasesTestSuite) TestFeedEntries() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -125,8 +133,10 @@ func (t *UsecasesTestSuite) TestMissingFeedEntries() {
 }
 
 func (t *UsecasesTestSuite) TestFeedStats() {
-	feed := database.NewFeed("Example", "example.com", t.user)
-	_, err := t.feed.Stats(feed.APIID, t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
+
+	_, err = t.feed.Stats(feed.APIID, t.user)
 	t.NoError(err)
 }
 
