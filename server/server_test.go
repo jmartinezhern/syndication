@@ -52,10 +52,11 @@ type (
 	ServerTestSuite struct {
 		suite.Suite
 
-		server *Server
-		user   models.User
-		rec    *httptest.ResponseRecorder
-		e      *echo.Echo
+		server   *Server
+		user     models.User
+		rec      *httptest.ResponseRecorder
+		e        *echo.Echo
+		unctgCtg models.Category
 	}
 )
 
@@ -83,6 +84,8 @@ func (t *ServerTestSuite) SetupTest() {
 
 	randUserName := RandStringRunes(8)
 	t.user = database.NewUser("123456", randUserName)
+
+	t.unctgCtg = database.NewCategory(models.Uncategorized, t.user)
 
 	t.rec = httptest.NewRecorder()
 	t.e = echo.New()

@@ -29,7 +29,8 @@ import (
 )
 
 func (t *ServerTestSuite) TestGetEntry() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -72,7 +73,8 @@ func (t *ServerTestSuite) TestGetUnknownEntry() {
 }
 
 func (t *ServerTestSuite) TestGetEntries() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -100,7 +102,8 @@ func (t *ServerTestSuite) TestGetEntries() {
 }
 
 func (t *ServerTestSuite) TestMarkEntry() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -108,7 +111,8 @@ func (t *ServerTestSuite) TestMarkEntry() {
 	}, feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	t.Empty(database.Entries(true, models.MarkerRead, t.user))
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Empty(entries)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
@@ -139,15 +143,17 @@ func (t *ServerTestSuite) TestMarkUnknownEntry() {
 }
 
 func (t *ServerTestSuite) TestMarkAllEntries() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
-	_, err := database.NewEntry(models.Entry{
+	_, err = database.NewEntry(models.Entry{
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
 	}, feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	t.Empty(database.Entries(true, models.MarkerRead, t.user))
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Empty(entries)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 

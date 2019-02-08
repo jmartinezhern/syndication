@@ -59,7 +59,7 @@ func (t *UsecasesTestSuite) TestOPMLImporter() {
 	t.Len(ctgFeeds, 1)
 	t.Equal(ctgFeeds[0].Title, "Example")
 
-	feeds := database.Feeds(t.user)
+	feeds, _ := database.Feeds("", 2, t.user)
 
 	t.NotZero(sort.Search(len(feeds), func(i int) bool {
 		return feeds[i].Title == "Empty"

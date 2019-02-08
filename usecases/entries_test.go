@@ -23,7 +23,8 @@ import (
 )
 
 func (t *UsecasesTestSuite) TestEntry() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -42,7 +43,8 @@ func (t *UsecasesTestSuite) TestMissingEntry() {
 }
 
 func (t *UsecasesTestSuite) TestEntries() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -50,13 +52,14 @@ func (t *UsecasesTestSuite) TestEntries() {
 	}, feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	entries := t.entry.Entries(true, models.MarkerAny, t.user)
+	entries, _ := t.entry.Entries(true, models.MarkerAny, "", 2, t.user)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
 
 func (t *UsecasesTestSuite) TestMarkEntry() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -64,12 +67,13 @@ func (t *UsecasesTestSuite) TestMarkEntry() {
 	}, feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	t.Require().Empty(database.Entries(true, models.MarkerRead, t.user))
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Require().Empty(entries)
 
 	err = t.entry.Mark(entry.APIID, models.MarkerRead, t.user)
 	t.NoError(err)
 
-	entries := database.Entries(true, models.MarkerRead, t.user)
+	entries, _ = database.Entries(true, models.MarkerRead, "", 2, t.user)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
@@ -80,7 +84,8 @@ func (t *UsecasesTestSuite) TestMarkMissingEntry() {
 }
 
 func (t *UsecasesTestSuite) TestMarkAll() {
-	feed := database.NewFeed("Example", "example.com", t.user)
+	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
 		Title: "Test Entry",
@@ -88,11 +93,12 @@ func (t *UsecasesTestSuite) TestMarkAll() {
 	}, feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	t.Require().Empty(database.Entries(true, models.MarkerRead, t.user))
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Require().Empty(entries)
 
 	t.entry.MarkAll(models.MarkerRead, t.user)
 
-	entries := database.Entries(true, models.MarkerRead, t.user)
+	entries, _ = database.Entries(true, models.MarkerRead, "", 2, t.user)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }

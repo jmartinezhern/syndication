@@ -36,7 +36,9 @@ func (s *DatabaseTestSuite) TestNewTag() {
 }
 
 func (s *DatabaseTestSuite) TestTagEntries() {
-	feed := NewFeed("Test site", "http://example.com", s.user)
+	ctg := NewCategory(models.Uncategorized, s.user)
+	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
+	s.Require().NoError(err)
 
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
@@ -50,7 +52,7 @@ func (s *DatabaseTestSuite) TestTagEntries() {
 		entries = append(entries, entry)
 	}
 
-	entries, err := NewEntries(entries, feed.APIID, s.user)
+	entries, err = NewEntries(entries, feed.APIID, s.user)
 	s.Require().NotEmpty(entries)
 	s.Require().Nil(err)
 
@@ -90,7 +92,9 @@ func (s *DatabaseTestSuite) TestTagNoEntries() {
 }
 
 func (s *DatabaseTestSuite) TestTagMultipleEntries() {
-	feed := NewFeed("Test site", "http://example.com", s.user)
+	ctg := NewCategory(models.Uncategorized, s.user)
+	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
+	s.Require().NoError(err)
 
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
@@ -104,7 +108,7 @@ func (s *DatabaseTestSuite) TestTagMultipleEntries() {
 		entries = append(entries, entry)
 	}
 
-	_, err := NewEntries(entries, feed.APIID, s.user)
+	_, err = NewEntries(entries, feed.APIID, s.user)
 	s.Require().Nil(err)
 
 	secondTag := models.Tag{
@@ -141,7 +145,8 @@ func (s *DatabaseTestSuite) TestTagMultipleEntries() {
 }
 
 func (s *DatabaseTestSuite) TestEntriesFromMultipleTags() {
-	feed := NewFeed("Test site", "http://example.com", s.user)
+	ctg := NewCategory(models.Uncategorized, s.user)
+	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
 
 	entries := []models.Entry{
 		{
@@ -158,7 +163,7 @@ func (s *DatabaseTestSuite) TestEntriesFromMultipleTags() {
 		},
 	}
 
-	entries, err := NewEntries(entries, feed.APIID, s.user)
+	entries, err = NewEntries(entries, feed.APIID, s.user)
 	s.Require().Nil(err)
 
 	firstTag := NewTag("First tag", s.user)

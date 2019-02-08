@@ -129,18 +129,19 @@ func (t *ServerTestSuite) TestGetCategories() {
 	t.Equal(http.StatusOK, t.rec.Code)
 
 	type ctgs struct {
-		Categories []models.Category `json:"categories"`
+		Categories     []models.Category `json:"categories"`
+		ContinuationID string            `json:"continuationID"`
 	}
 
 	var categories ctgs
 	t.NoError(json.Unmarshal(t.rec.Body.Bytes(), &categories))
-	t.Len(categories.Categories, 1)
+	t.Require().Len(categories.Categories, 1)
 	t.Equal("uncategorized", categories.Categories[0].Name)
 }
 
 func (t *ServerTestSuite) TestGetCategoryFeeds() {
 	ctg := database.NewCategory("test", t.user)
-	database.NewFeedWithCategory("example", "example.com", ctg.APIID, t.user)
+	database.NewFeed("example", "example.com", ctg.APIID, t.user)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
@@ -185,7 +186,8 @@ func (t *ServerTestSuite) TestEditCategory() {
 
 func (t *ServerTestSuite) TestAppendFeeds() {
 	ctg := database.NewCategory("test", t.user)
-	feed := database.NewFeed("example", "example.com", t.user)
+	feed, err := database.NewFeed("example", "example.com", ctg.APIID, t.user)
+	t.Require().NoError(err)
 
 	feeds := fmt.Sprintf(`{ "feeds": ["%s"] }`, feed.APIID)
 
@@ -222,7 +224,7 @@ func (t *ServerTestSuite) TestDeleteCategory() {
 func (t *ServerTestSuite) TestMarkCategory() {
 	ctg := database.NewCategory("test", t.user)
 
-	feed, err := database.NewFeedWithCategory(
+	feed, err := database.NewFeed(
 		"Example", "example.com", ctg.APIID, t.user,
 	)
 	t.Require().NoError(err)
@@ -232,7 +234,8 @@ func (t *ServerTestSuite) TestMarkCategory() {
 		Mark:  models.MarkerUnread,
 	}, feed.APIID, t.user)
 
-	t.Require().Len(database.Entries(true, models.MarkerRead, t.user), 0)
+	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
+	t.Require().Len(entries, 0)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
@@ -282,7 +285,7 @@ func (t *ServerTestSuite) TestMarkCategoryWithBadMarker() {
 func (t *ServerTestSuite) TestGetCategoryEntries() {
 	ctg := database.NewCategory("test", t.user)
 
-	feed, err := database.NewFeedWithCategory(
+	feed, err := database.NewFeed(
 		"Example",
 		"example.com",
 		ctg.APIID,

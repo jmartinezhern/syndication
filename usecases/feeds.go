@@ -29,10 +29,10 @@ type (
 	// Feed defines the Feed Usecase interface
 	Feed interface {
 		// New creates a new Feed
-		New(title, subscription string, user models.User) (models.Feed, error)
+		New(title, subscription string, ctgID string, user models.User) (models.Feed, error)
 
 		// Feeds returns all feeds owned by user
-		Feeds(user models.User) []models.Feed
+		Feeds(continuationID string, count int, user models.User) ([]models.Feed, string)
 
 		// Feed returns a feed with id owned by user
 		Feed(id string, user models.User) (models.Feed, bool)
@@ -58,6 +58,10 @@ type (
 )
 
 var (
+	// ErrFeedCategoryNotFound signals that a request category for a given feed
+	// was not found
+	ErrFeedCategoryNotFound = errors.New("Cannot find requested category for feed")
+
 	// ErrFeedNotFound signals that a feed could not be found
 	ErrFeedNotFound = errors.New("Feed not found")
 
@@ -67,8 +71,26 @@ var (
 )
 
 // New creates a new Feed
-func (f *FeedUsecase) New(title, subscription string, user models.User) (models.Feed, error) {
-	feed := database.NewFeed(title, subscription, user)
+func (f *FeedUsecase) New(title, subscription string, ctgID string, user models.User) (models.Feed, error) {
+	if ctgID == "" {
+		ctg, found := database.CategoryWithName(models.Uncategorized, user)
+		if !found {
+			panic("System category could not be found")
+		}
+
+		ctgID = ctg.APIID
+	} else {
+		_, found := database.CategoryWithAPIID(ctgID, user)
+		if !found {
+			return models.Feed{}, ErrFeedCategoryNotFound
+		}
+	}
+
+	feed, err := database.NewFeed(title, subscription, ctgID, user)
+	if err != nil {
+		return models.Feed{}, err
+	}
+
 	fetchedFeed, entries, err := sync.PullFeed(subscription, "")
 	if err != nil {
 		return models.Feed{}, ErrFetchingFeed
@@ -88,8 +110,8 @@ func (f *FeedUsecase) New(title, subscription string, user models.User) (models.
 }
 
 // Feeds returns all feeds owned by user
-func (f *FeedUsecase) Feeds(user models.User) []models.Feed {
-	return database.Feeds(user)
+func (f *FeedUsecase) Feeds(continuationID string, count int, user models.User) ([]models.Feed, string) {
+	return database.Feeds(continuationID, count, user)
 }
 
 // Feed returns a feed with id owned by user

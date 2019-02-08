@@ -85,11 +85,10 @@ type (
 		APIKeys    []APIKey   `json:"-"`
 		Tags       []Tag      `json:"tags,omitempty"`
 
-		Username                   string `json:"username,required"`
-		Email                      string `json:"email,optional"`
-		PasswordHash               []byte `json:"-"`
-		PasswordSalt               []byte `json:"-"`
-		UncategorizedCategoryAPIID string `json:"-"`
+		Username     string `json:"username,required"`
+		Email        string `json:"email,optional"`
+		PasswordHash []byte `json:"-"`
+		PasswordSalt []byte `json:"-"`
 	}
 
 	// Category represents a container for Feed entities.

@@ -31,12 +31,13 @@ type (
 	UsecasesTestSuite struct {
 		suite.Suite
 
-		user  models.User
-		entry Entry
-		ctgs  Category
-		feed  Feed
-		tag   Tag
-		auth  Auth
+		user     models.User
+		entry    Entry
+		ctgs     Category
+		feed     Feed
+		tag      Tag
+		auth     Auth
+		unctgCtg models.Category
 	}
 )
 
@@ -56,6 +57,7 @@ func (t *UsecasesTestSuite) SetupTest() {
 	t.Require().Nil(err)
 
 	t.user = database.NewUser("gopher", "testtesttest")
+	t.unctgCtg = database.NewCategory(models.Uncategorized, t.user)
 }
 
 func (t *UsecasesTestSuite) TearDownTest() {

@@ -29,8 +29,8 @@ func (t *UsecasesTestSuite) TestOPMLExporter() {
 	exporter := OPMLExporter{}
 
 	ctg := database.NewCategory("Test", t.user)
-	database.NewFeed("Empty", "empty.com", t.user)
-	feed, err := database.NewFeedWithCategory("Example", "example.com", ctg.APIID, t.user)
+	database.NewFeed("Empty", "empty.com", t.unctgCtg.APIID, t.user)
+	feed, err := database.NewFeed("Example", "example.com", ctg.APIID, t.user)
 	t.NoError(err)
 
 	data, err := exporter.Export(t.user)

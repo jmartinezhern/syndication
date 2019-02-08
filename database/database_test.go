@@ -68,7 +68,9 @@ func TestNewDBWithBadOptions(t *testing.T) {
 }
 
 func (s *DatabaseTestSuite) TestStats() {
-	feed := NewFeed("News", "http://example.com", s.user)
+	ctg := NewCategory(models.Uncategorized, s.user)
+	feed, err := NewFeed("News", "http://example.com", ctg.APIID, s.user)
+	s.Require().NoError(err)
 	s.Require().NotEmpty(feed.APIID)
 
 	for i := 0; i < 3; i++ {
