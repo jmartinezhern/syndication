@@ -18,32 +18,19 @@
 package server
 
 import (
-	"github.com/labstack/echo"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"strconv"
 	"testing"
 	"time"
 
+	"github.com/labstack/echo"
 	"github.com/labstack/gommon/log"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
-)
-
-const (
-	testDBPath = "/tmp/syndication-test-server.db"
-
-	testHost = "localhost"
-
-	testHTTPPort = 9876
-)
-
-var (
-	testBaseURL = "http://" + testHost + ":" + strconv.Itoa(testHTTPPort)
 )
 
 var mockRSSServer *httptest.Server
@@ -66,7 +53,7 @@ func init() {
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func RandStringRunes(n int) string {
+func randStringRunes(n int) string {
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
@@ -74,31 +61,51 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func (t *ServerTestSuite) SetupTest() {
-	err := database.Init("sqlite3", testDBPath)
-	t.Require().NoError(err)
-
-	t.server = NewServer("secret_cat")
-	t.server.handle.Logger.SetLevel(log.OFF)
-	t.server.handle.HideBanner = true
-
-	randUserName := RandStringRunes(8)
-	t.user = database.NewUser("123456", randUserName)
-
-	t.unctgCtg = database.NewCategory(models.Uncategorized, t.user)
-
-	t.rec = httptest.NewRecorder()
-	t.e = echo.New()
+func (s *ServerTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "<rss></rss>")
 }
 
-func (t *ServerTestSuite) TearDownTest() {
-	os.Remove(testDBPath)
+func (s *ServerTestSuite) SetupTest() {
+	err := database.Init("sqlite3", ":memory:")
+	s.Require().NoError(err)
+
+	s.server = NewServer("secret_cat")
+	s.server.handle.Logger.SetLevel(log.OFF)
+	s.server.handle.HideBanner = true
+
+	randUserName := randStringRunes(8)
+
+	_, err = s.server.auth.Register(randUserName, "1234546")
+	s.Require().NoError(err)
+
+	var found bool
+	s.user, found = database.UserWithName(randUserName)
+	s.Require().True(found)
+
+	s.unctgCtg, found = database.CategoryWithName(models.Uncategorized, s.user)
+	s.Require().True(found)
+
+	s.rec = httptest.NewRecorder()
+	s.e = echo.New()
+}
+
+func (s *ServerTestSuite) TearDownTest() {
+	err := database.Close()
+	s.NoError(err)
 }
 
 func TestServerTestSuite(t *testing.T) {
-	dir := http.Dir(os.Getenv("GOPATH") + "/src/github.com/jmartinezhern/syndication/server/")
-	mockRSSServer = httptest.NewServer(http.FileServer(dir))
-	defer mockRSSServer.Close()
+	s := &ServerTestSuite{}
+	server := &http.Server{
+		Addr:    ":9090",
+		Handler: s,
+	}
 
-	suite.Run(t, new(ServerTestSuite))
+	go server.ListenAndServe()
+
+	time.Sleep(time.Second)
+
+	defer server.Close()
+
+	suite.Run(t, s)
 }

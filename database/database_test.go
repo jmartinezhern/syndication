@@ -18,7 +18,6 @@
 package database
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 type (
@@ -36,42 +36,48 @@ type (
 	}
 )
 
-const TestDatabasePath = "/tmp/syndication-test-db.db"
-
 func (s *DatabaseTestSuite) SetupTest() {
-	err := Init("sqlite3", TestDatabasePath)
+	err := Init("sqlite3", ":memory:")
 
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
-	s.user = NewUser("test", "golang")
-	s.Require().NotZero(s.user.ID)
+	s.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: "test",
+	}
+	CreateUser(&s.user)
 }
 
 func (s *DatabaseTestSuite) TearDownTest() {
 	err := Close()
-	s.Nil(err)
-
-	err = os.Remove(TestDatabasePath)
-	s.Nil(err)
+	s.NoError(err)
 }
 
 func TestNewDB(t *testing.T) {
-	_, err := NewDB("sqlite3", TestDatabasePath)
-	assert.Nil(t, err)
-	err = os.Remove(TestDatabasePath)
-	assert.Nil(t, err)
+	_, err := NewDB("sqlite3", ":memory:")
+	assert.NoError(t, err)
 }
 
 func TestNewDBWithBadOptions(t *testing.T) {
-	_, err := NewDB("bogus", TestDatabasePath)
-	assert.NotNil(t, err)
+	_, err := NewDB("bogus", ":memory:")
+	assert.Error(t, err)
 }
 
 func (s *DatabaseTestSuite) TestStats() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("News", "http://example.com", ctg.APIID, s.user)
+	ctgID := utils.CreateAPIID()
+	CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  models.Uncategorized,
+	}, s.user)
+
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "News",
+		Subscription: "http://example.com",
+	}
+
+	err := CreateFeed(&feed, ctgID, s.user)
 	s.Require().NoError(err)
-	s.Require().NotEmpty(feed.APIID)
 
 	for i := 0; i < 3; i++ {
 		entry := models.Entry{
@@ -83,7 +89,7 @@ func (s *DatabaseTestSuite) TestStats() {
 		}
 
 		_, err := NewEntry(entry, feed.APIID, s.user)
-		s.Require().Nil(err)
+		s.Require().NoError(err)
 	}
 
 	for i := 0; i < 7; i++ {
@@ -95,7 +101,7 @@ func (s *DatabaseTestSuite) TestStats() {
 		}
 
 		_, err := NewEntry(entry, feed.APIID, s.user)
-		s.Require().Nil(err)
+		s.Require().NoError(err)
 	}
 
 	stats := Stats(s.user)

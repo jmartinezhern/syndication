@@ -21,7 +21,6 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/jmartinezhern/syndication/admin"
 	"github.com/jmartinezhern/syndication/cmd"
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/server"
@@ -49,17 +48,6 @@ func main() {
 	sync := sync.NewService(config.Sync.Interval, config.Sync.DeleteAfter)
 	sync.Start()
 	defer sync.Stop()
-
-	if config.Admin.Enable {
-		admin, err := admin.NewService(config.Admin.SocketPath)
-		if err != nil {
-			log.Error(err)
-			os.Exit(1)
-		}
-		admin.Start()
-
-		defer admin.Stop()
-	}
 
 	server := server.NewServer(config.AuthSecret)
 

@@ -9,7 +9,7 @@
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU Affero General Public License for more details.
+  GNU Affero General Public License for more detailt.
 
   You should have received a copy of the GNU Affero General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
@@ -17,100 +17,102 @@
 
 package database
 
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
+)
+
+type UsersSuite struct {
+	suite.Suite
+}
+
 // This tests take into account the user created in Test Setup
 
-func (s *DatabaseTestSuite) TestNewUser() {
-	NewUser("test", "testtesttest")
+func (t *UsersSuite) TestCreateUser() {
+	user := models.User{
+		Username: "test",
+	}
+
+	CreateUser(&user)
 
 	user, found := UserWithName("test")
-	s.True(found)
-	s.NotZero(user.ID)
+	t.True(found)
+	t.NotZero(user.ID)
 }
 
-func (s *DatabaseTestSuite) TestUsers() {
-	NewUser("test_one", "golang")
-	NewUser("test_two", "password")
-
-	users := Users("created_at")
-	s.Len(users, 3)
-}
-
-func (s *DatabaseTestSuite) TestDeleteUser() {
-	NewUser("first", "golang")
-	NewUser("second", "password")
+func (t *UsersSuite) TestUsers() {
+	CreateUser(&models.User{Username: "test_one"})
+	CreateUser(&models.User{Username: "test_two"})
 
 	users := Users()
-	s.Len(users, 3)
-
-	s.NoError(DeleteUser(users[0].APIID))
-
-	users = Users()
-	s.Len(users, 2)
-
+	t.Len(users, 2)
 }
 
-func (s *DatabaseTestSuite) TestDeleteUnknownUser() {
-	s.EqualError(DeleteUser("bogus"), ErrModelNotFound.Error())
+func (t *UsersSuite) TestUserWithAPIID() {
+	userID := utils.CreateAPIID()
+
+	CreateUser(&models.User{
+		APIID:    userID,
+		Username: "test",
+	})
+
+	user, found := UserWithAPIID(userID)
+	t.True(found)
+	t.Equal(userID, user.APIID)
+	t.Equal("test", user.Username)
 }
 
-func (s *DatabaseTestSuite) TestUserWithAPIID() {
-	user := NewUser("test", "testtesttest")
+func (t *UsersSuite) TestDeleteUser() {
+	user := models.User{
+		Username: "test",
+		APIID:    utils.CreateAPIID(),
+	}
+	CreateUser(&user)
 
-	userWithID, found := UserWithAPIID(user.APIID)
-	s.True(found)
-	s.Equal(user.ID, userWithID.ID)
-	s.Equal(user.APIID, userWithID.APIID)
-	s.Equal(user.Username, userWithID.Username)
+	t.NoError(DeleteUser(user.APIID))
+
+	_, found := UserWithAPIID(user.APIID)
+	t.False(found)
 }
 
-func (s *DatabaseTestSuite) TestUserWithUnknownAPIID() {
+func (t *UsersSuite) TestDeleteUnknownUser() {
+	t.EqualError(DeleteUser("bogus"), ErrModelNotFound.Error())
+}
+
+func (t *UsersSuite) TestUserWithUnknownAPIID() {
 	_, found := UserWithAPIID("bogus")
-	s.False(found)
+	t.False(found)
 }
 
-func (s *DatabaseTestSuite) TestUserWithName() {
-	user := NewUser("gopher", "testtesttest")
+func (t *UsersSuite) TestUserWithName() {
+	CreateUser(&models.User{
+		Username: "gopher",
+	})
 
-	userWithName, found := UserWithName("gopher")
-	s.True(found)
-	s.Equal(user.ID, userWithName.ID)
-	s.Equal(user.APIID, userWithName.APIID)
-	s.Equal(user.Username, userWithName.Username)
+	user, found := UserWithName("gopher")
+	t.True(found)
+	t.Equal("gopher", user.Username)
 }
 
-func (s *DatabaseTestSuite) TestUserWithUnknownName() {
+func (t *UsersSuite) TestUserWithUnknownName() {
 	_, found := UserWithName("bogus")
-	s.False(found)
+	t.False(found)
 }
 
-func (s *DatabaseTestSuite) TestChangeUserName() {
-	err := ChangeUserName(s.user.APIID, "new_name")
-	s.NoError(err)
-
-	_, found := UserWithName("test")
-	s.False(found)
-
-	_, found = UserWithName("new_name")
-	s.True(found)
+func (t *UsersSuite) SetupTest() {
+	err := Init("sqlite3", ":memory:")
+	t.Require().NoError(err)
 }
 
-func (s *DatabaseTestSuite) TestChangeUnknownUserName() {
-	err := ChangeUserName("bogus", "new_name")
-	s.EqualError(err, ErrModelNotFound.Error())
+func (t UsersSuite) TearDownTest() {
+	err := Close()
+	t.Require().NoError(err)
 }
 
-func (s *DatabaseTestSuite) TestChangeUserPassword() {
-	err := ChangeUserPassword(s.user.APIID, "new_password")
-	s.NoError(err)
-
-	_, found := UserWithCredentials("test", "golang")
-	s.False(found)
-
-	_, found = UserWithCredentials("test", "new_password")
-	s.True(found)
-}
-
-func (s *DatabaseTestSuite) TestChangeUnknownUserPassword() {
-	err := ChangeUserPassword("bogus", "gopher")
-	s.EqualError(err, ErrModelNotFound.Error())
+func TestUsersSuite(t *testing.T) {
+	suite.Run(t, new(UsersSuite))
 }

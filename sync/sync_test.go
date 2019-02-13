@@ -25,9 +25,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/stretchr/testify/suite"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 const (
@@ -73,11 +75,21 @@ func (s *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SyncTestSuite) SetupTest() {
-	_ = database.Init("sqlite3", testDatabasePath)
+	err := database.Init("sqlite3", ":memory:")
+	s.Require().NoError(err)
 
 	randUserName := RandStringRunes(8)
-	s.user = database.NewUser(randUserName, "golang")
-	s.unctgCtg = database.NewCategory(models.Uncategorized, s.user)
+	s.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: randUserName,
+	}
+	database.CreateUser(&s.user)
+
+	s.unctgCtg = models.Category{
+		APIID: utils.CreateAPIID(),
+		Name:  models.Uncategorized,
+	}
+	database.CreateCategory(&s.unctgCtg, s.user)
 	s.Require().NotEmpty(s.user.APIID)
 }
 
@@ -96,49 +108,68 @@ func (s *SyncTestSuite) TestPullFeedWithBadSubscription() {
 }
 
 func (s *SyncTestSuite) TestSyncWithEtags() {
-	feed, err := database.NewFeed("Sync Test", rssURL, s.unctgCtg.APIID, s.user)
+	feed := models.Feed{
+		Title:        "Sync Test",
+		Subscription: rssURL,
+	}
+	err := database.CreateFeed(&feed, s.unctgCtg.APIID, s.user)
 	s.Require().NoError(err)
-	s.Require().NotEmpty(feed.APIID)
 
 	_, entries, err := PullFeed(feed.Subscription, "")
 	s.Require().NoError(err)
 	s.Require().Len(entries, 5)
 
 	_, err = database.NewEntries(entries, feed.APIID, s.user)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
 	serv := NewService(testSyncInterval, 1)
 	err = serv.SyncUser(&s.user)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
 	entries = database.FeedEntries(feed.APIID, true, models.MarkerAny, s.user)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestSyncUser() {
-	feed, err := database.NewFeed("Sync Test", rssMinimalURL, s.unctgCtg.APIID, s.user)
+	feed := models.Feed{
+		Title:        "Sync Test",
+		Subscription: rssURL,
+	}
+	err := database.CreateFeed(&feed, s.unctgCtg.APIID, s.user)
 	s.Require().NoError(err)
-	s.Require().NotEmpty(feed.APIID)
 
 	serv := NewService(testSyncInterval, 1)
 	err = serv.SyncUser(&s.user)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
 	entries := database.FeedEntries(feed.APIID, true, models.MarkerAny, s.user)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestSyncUsers() {
 	for i := 0; i < 10; i++ {
-		user := database.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
+		user := models.User{
+			APIID:    utils.CreateAPIID(),
+			Username: "test" + strconv.Itoa(i),
+		}
+		database.CreateUser(&user)
 
 		_, found := database.UserWithName("test" + strconv.Itoa(i))
 		s.Require().True(found)
 
-		ctg := database.NewCategory(models.Uncategorized, user)
-		_, err := database.NewFeed("Sync Test", rssMinimalURL, ctg.APIID, user)
+		ctg := models.Category{
+			APIID: utils.CreateAPIID(),
+			Name:  models.Uncategorized,
+		}
+		database.CreateCategory(&ctg, user)
+
+		feed := models.Feed{
+			Title:        "Sync Test",
+			Subscription: rssMinimalURL,
+		}
+		err := database.CreateFeed(&feed, ctg.APIID, user)
 		s.Require().NoError(err)
 	}
 
@@ -158,13 +189,26 @@ func (s *SyncTestSuite) TestSyncUsers() {
 
 func (s *SyncTestSuite) TestSyncService() {
 	for i := 0; i < 10; i++ {
-		user := database.NewUser("test"+strconv.Itoa(i), "test"+strconv.Itoa(i))
+		user := models.User{
+			APIID:    utils.CreateAPIID(),
+			Username: "test" + strconv.Itoa(i),
+		}
+		database.CreateUser(&user)
 
 		_, found := database.UserWithName("test" + strconv.Itoa(i))
 		s.Require().True(found)
 
-		ctg := database.NewCategory(models.Uncategorized, user)
-		_, err := database.NewFeed("Sync Test", rssMinimalURL, ctg.APIID, user)
+		ctg := models.Category{
+			APIID: utils.CreateAPIID(),
+			Name:  models.Uncategorized,
+		}
+		database.CreateCategory(&ctg, user)
+
+		feed := models.Feed{
+			Title:        "Sync Test",
+			Subscription: rssMinimalURL,
+		}
+		err := database.CreateFeed(&feed, ctg.APIID, user)
 		s.Require().NoError(err)
 	}
 

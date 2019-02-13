@@ -20,17 +20,7 @@
 package database
 
 import (
-	"crypto/rand"
-	"io"
-
-	"golang.org/x/crypto/scrypt"
-
 	"github.com/jmartinezhern/syndication/models"
-)
-
-const (
-	pwSaltBytes = 32
-	pwHashBytes = 64
 )
 
 // AddAPIKey associates an API key with user
@@ -43,24 +33,14 @@ func AddAPIKey(key models.APIKey, user models.User) {
 	defaultInstance.AddAPIKey(key, user)
 }
 
-// NewUser creates a new user
-func (db *DB) NewUser(username, password string) models.User {
-	user := models.User{}
-	hash, salt := createPasswordHashAndSalt(password)
-
-	user.APIID = createAPIID()
-	user.PasswordHash = hash
-	user.PasswordSalt = salt
-	user.Username = username
-
-	db.db.Create(&user).Related(&user.Categories)
-
-	return user
+// CreateUser creates a new user
+func (db *DB) CreateUser(user *models.User) {
+	db.db.Create(user)
 }
 
-// NewUser creates a new user
-func NewUser(username, password string) models.User {
-	return defaultInstance.NewUser(username, password)
+// CreateUser creates a new user
+func CreateUser(user *models.User) {
+	defaultInstance.CreateUser(user)
 }
 
 // DeleteUser with API ID
@@ -79,66 +59,28 @@ func DeleteUser(apiID string) error {
 	return defaultInstance.DeleteUser(apiID)
 }
 
-// ChangeUserName for user with userID
-func (db *DB) ChangeUserName(id, newName string) error {
-	user, found := db.UserWithAPIID(id)
-	if !found {
-		return ErrModelNotFound
-	}
-
-	db.db.Model(&user).Update("username", newName)
-	return nil
+// UpdateUser object
+func (db *DB) UpdateUser(user *models.User) {
+	db.db.Save(user)
 }
 
-// ChangeUserName for user with id
-func ChangeUserName(id, newName string) error {
-	return defaultInstance.ChangeUserName(id, newName)
+// UpdateUser object
+func UpdateUser(user *models.User) {
+	defaultInstance.UpdateUser(user)
 }
 
-// ChangeUserPassword for user with id
-func (db *DB) ChangeUserPassword(id, newPassword string) error {
-	user, found := db.UserWithAPIID(id)
-	if !found {
-		return ErrModelNotFound
-	}
-
-	hash, salt := createPasswordHashAndSalt(newPassword)
-
-	db.db.Model(&user).Update(models.User{
-		PasswordHash: hash,
-		PasswordSalt: salt,
-	})
-
-	return nil
-}
-
-// ChangeUserPassword for user with id
-func ChangeUserPassword(id, newPassword string) error {
-	return defaultInstance.ChangeUserPassword(id, newPassword)
-}
-
-// Users returns a list of all User entries.
-// The parameter fields provides a way to select
-// which fields are populated in the returned models.
-func (db *DB) Users(fields ...string) []models.User {
+// Users returns a list of users
+func (db *DB) Users() []models.User {
 	users := []models.User{}
 
-	selectFields := "id,api_id"
-	if len(fields) != 0 {
-		for _, field := range fields {
-			selectFields = selectFields + "," + field
-		}
-	}
-	db.db.Select(selectFields).Find(&users)
+	db.db.Find(&users)
 
 	return users
 }
 
-// Users returns a list of all User entries.
-// The parameter fields provides a way to select
-// which fields are populated in the returned models.
-func Users(fields ...string) []models.User {
-	return defaultInstance.Users(fields...)
+// Users returns a list of users
+func Users() []models.User {
+	return defaultInstance.Users()
 }
 
 // UserWithName returns a User with username
@@ -150,36 +92,6 @@ func (db *DB) UserWithName(username string) (user models.User, found bool) {
 // UserWithName returns a User with username
 func UserWithName(username string) (models.User, bool) {
 	return defaultInstance.UserWithName(username)
-}
-
-// UserWithCredentials returns a user whose credentials matches the ones given.
-// Ok will be false if the user was not found or if the credentials did not match.
-// This function assumes that the password does not exceed scrypt's payload size.
-func (db *DB) UserWithCredentials(username, password string) (models.User, bool) {
-	foundUser, ok := db.UserWithName(username)
-	if !ok {
-		return models.User{}, ok
-	}
-
-	hash, err := scrypt.Key([]byte(password), foundUser.PasswordSalt, 1<<14, 8, 1, pwHashBytes)
-	if err != nil {
-		return models.User{}, false
-	}
-
-	for i, hashByte := range hash {
-		if hashByte != foundUser.PasswordHash[i] {
-			return models.User{}, false
-		}
-	}
-
-	return foundUser, true
-}
-
-// UserWithCredentials returns a user whose credentials matches the ones given.
-// Ok will be false if the user was not found or if the credentials did not match.
-// This function assumes that the password does not exceed scrypt's payload size.
-func UserWithCredentials(username, password string) (models.User, bool) {
-	return defaultInstance.UserWithCredentials(username, password)
 }
 
 // UserWithAPIID returns a User with id
@@ -201,21 +113,4 @@ func (db *DB) KeyBelongsToUser(key models.APIKey, user models.User) bool {
 // KeyBelongsToUser returns true if the given APIKey is owned by user
 func KeyBelongsToUser(key models.APIKey, user models.User) bool {
 	return defaultInstance.KeyBelongsToUser(key, user)
-}
-
-func createPasswordHashAndSalt(password string) ([]byte, []byte) {
-	var err error
-
-	salt := make([]byte, pwSaltBytes)
-	_, err = io.ReadFull(rand.Reader, salt)
-	if err != nil {
-		panic(err) // We must be able to read from random
-	}
-
-	hash, err := scrypt.Key([]byte(password), salt, 1<<14, 8, 1, pwHashBytes)
-	if err != nil {
-		panic(err) // We must never get an error
-	}
-
-	return hash, salt
 }

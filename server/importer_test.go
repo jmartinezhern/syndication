@@ -54,7 +54,7 @@ func (t *ServerTestSuite) TestOPMLImport() {
 	req.Header.Set("Content-Type", "application/xml")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetPath("/v1/import")
 

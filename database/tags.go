@@ -21,21 +21,14 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 )
 
-// NewTag creates a new Tag object owned by user
-func (db *DB) NewTag(name string, user models.User) models.Tag {
-	tag := models.Tag{}
-	if db.db.Model(&user).Where("name = ?", name).Related(&tag).RecordNotFound() {
-		tag.Name = name
-		tag.APIID = createAPIID()
-		db.db.Model(&user).Association("Tags").Append(&tag)
-	}
-
-	return tag
+// CreateTag creates a new Tag object owned by user
+func (db *DB) CreateTag(tag *models.Tag, user models.User) {
+	db.db.Model(&user).Association("Tags").Append(tag)
 }
 
-// NewTag creates a new Tag object owned by user
-func NewTag(name string, user models.User) models.Tag {
-	return defaultInstance.NewTag(name, user)
+// CreateTag creates a new Tag object owned by user
+func CreateTag(tag *models.Tag, user models.User) {
+	defaultInstance.CreateTag(tag, user)
 }
 
 // Tags returns a list of all Tags owned by user
@@ -97,12 +90,4 @@ func (db *DB) TagWithAPIID(apiID string, user models.User) (tag models.Tag, foun
 // TagWithAPIID returns a Tag with id that belongs to user
 func TagWithAPIID(apiID string, user models.User) (models.Tag, bool) {
 	return defaultInstance.TagWithAPIID(apiID, user)
-}
-
-func (db *DB) tagPrimaryKey(apiID string, user models.User) uint {
-	tag := &models.Tag{}
-	if db.db.Model(&user).Where("api_id = ?", apiID).Related(tag).RecordNotFound() {
-		return 0
-	}
-	return tag.ID
 }

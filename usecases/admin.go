@@ -2,9 +2,10 @@ package usecases
 
 import (
 	"errors"
-	"github.com/jmartinezhern/syndication/models"
 
 	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 type (
@@ -47,9 +48,21 @@ func (a *AdminUsecase) NewUser(username, password string) (models.User, error) {
 		return models.User{}, ErrUsernameConflicts
 	}
 
-	user := database.NewUser(username, password)
+	hash, salt := utils.CreatePasswordHashAndSalt(password)
 
-	database.NewCategory(models.Uncategorized, user)
+	user := models.User{
+		Username:     username,
+		PasswordHash: hash,
+		PasswordSalt: salt,
+	}
+
+	database.CreateUser(&user)
+
+	ctg := models.Category{
+		Name: models.Uncategorized,
+	}
+
+	database.CreateCategory(&ctg, user)
 
 	return user, nil
 }
@@ -66,15 +79,35 @@ func (a *AdminUsecase) User(id string) (models.User, bool) {
 
 // Users returns all users
 func (a *AdminUsecase) Users() []models.User {
-	return database.Users("username,id")
+	return database.Users()
 }
 
 // ChangeUserName for user with id
 func (a *AdminUsecase) ChangeUserName(id string, name string) error {
-	return database.ChangeUserName(id, name)
+	user, found := database.UserWithAPIID(id)
+	if !found {
+		return ErrUserNotFound
+	}
+
+	user.Username = name
+
+	database.UpdateUser(&user)
+
+	return nil
 }
 
 // ChangeUserPassword for user with id
 func (a *AdminUsecase) ChangeUserPassword(id string, password string) error {
-	return database.ChangeUserPassword(id, password)
+	user, found := database.UserWithAPIID(id)
+	if !found {
+		return ErrUserNotFound
+	}
+
+	hash, salt := utils.CreatePasswordHashAndSalt(password)
+	user.PasswordHash = hash
+	user.PasswordSalt = salt
+
+	database.UpdateUser(&user)
+
+	return nil
 }

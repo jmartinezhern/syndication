@@ -19,8 +19,10 @@ package usecases
 
 import (
 	"errors"
+
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 type (
@@ -65,7 +67,14 @@ func (t *TagUsecase) New(name string, user models.User) (models.Tag, error) {
 	if _, found := database.TagWithName(name, user); found {
 		return models.Tag{}, ErrTagConflicts
 	}
-	return database.NewTag(name, user), nil
+
+	tag := models.Tag{
+		APIID: utils.CreateAPIID(),
+		Name:  name,
+	}
+	database.CreateTag(&tag, user)
+
+	return tag, nil
 }
 
 // Tags returns all tags owned by user

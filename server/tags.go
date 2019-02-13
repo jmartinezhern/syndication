@@ -18,16 +18,17 @@
 package server
 
 import (
-	"github.com/jmartinezhern/syndication/usecases"
 	"net/http"
 
-	"github.com/jmartinezhern/syndication/models"
 	"github.com/labstack/echo"
+
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/usecases"
 )
 
 // NewTag creates a new Tag
 func (s *Server) NewTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	tag := models.Tag{}
 	if err := c.Bind(&tag); err != nil {
@@ -46,7 +47,7 @@ func (s *Server) NewTag(c echo.Context) error {
 
 // GetTags returns a list of Tags owned by a user
 func (s *Server) GetTags(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"tags": s.tags.Tags(user),
@@ -55,7 +56,7 @@ func (s *Server) GetTags(c echo.Context) error {
 
 // DeleteTag with id
 func (s *Server) DeleteTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	err := s.tags.Delete(c.Param("tagID"), user)
 	if err == usecases.ErrTagNotFound {
@@ -69,7 +70,7 @@ func (s *Server) DeleteTag(c echo.Context) error {
 
 // EditTag with id
 func (s *Server) EditTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	tag := models.Tag{}
 
@@ -89,7 +90,7 @@ func (s *Server) EditTag(c echo.Context) error {
 
 // TagEntries adds a Tag with tagID to a list of entries
 func (s *Server) TagEntries(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	type EntryIds struct {
 		Entries []string `json:"entries"`
@@ -112,7 +113,7 @@ func (s *Server) TagEntries(c echo.Context) error {
 
 // GetTag with id
 func (s *Server) GetTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	tag, found := s.tags.Tag(c.Param("tagID"), user)
 	if !found {
@@ -125,7 +126,7 @@ func (s *Server) GetTag(c echo.Context) error {
 // GetEntriesFromTag returns a list of Entries
 // that are tagged by a Tag with ID
 func (s *Server) GetEntriesFromTag(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {

@@ -21,15 +21,15 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/jmartinezhern/syndication/usecases"
+	"github.com/labstack/echo"
 
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/labstack/echo"
+	"github.com/jmartinezhern/syndication/usecases"
 )
 
 // NewCategory creates a new Category
 func (s *Server) NewCategory(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	ctg := models.Category{}
 	if err := c.Bind(&ctg); err != nil {
@@ -48,7 +48,7 @@ func (s *Server) NewCategory(c echo.Context) error {
 
 // GetCategory with id
 func (s *Server) GetCategory(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	ctg, found := s.categories.Category(c.Param("categoryID"), user)
 	if found {
@@ -60,7 +60,7 @@ func (s *Server) GetCategory(c echo.Context) error {
 
 // GetCategories returns a list of Categories owned by a user
 func (s *Server) GetCategories(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	continuationID := c.QueryParam("continuationID")
 
@@ -84,7 +84,7 @@ func (s *Server) GetCategories(c echo.Context) error {
 
 // GetCategoryFeeds returns a list of Feeds that belong to a Category
 func (s *Server) GetCategoryFeeds(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	feeds, err := s.categories.Feeds(c.Param("categoryID"), user)
 	if err == usecases.ErrCategoryNotFound {
@@ -100,7 +100,7 @@ func (s *Server) GetCategoryFeeds(c echo.Context) error {
 
 // EditCategory with id
 func (s *Server) EditCategory(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	ctg := models.Category{}
 	ctgID := c.Param("categoryID")
@@ -123,7 +123,7 @@ func (s *Server) EditCategory(c echo.Context) error {
 
 // AppendCategoryFeeds adds a Feed to a Category with id
 func (s *Server) AppendCategoryFeeds(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	ctgID := c.Param("categoryID")
 
@@ -143,7 +143,7 @@ func (s *Server) AppendCategoryFeeds(c echo.Context) error {
 
 // DeleteCategory with id
 func (s *Server) DeleteCategory(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	err := s.categories.Delete(c.Param("categoryID"), user)
 	if err == usecases.ErrCategoryNotFound {
@@ -159,7 +159,7 @@ func (s *Server) DeleteCategory(c echo.Context) error {
 
 // MarkCategory applies a Marker to a Category
 func (s *Server) MarkCategory(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	marker := models.MarkerFromString(c.FormValue("as"))
 	if marker == models.MarkerNone {
@@ -178,7 +178,7 @@ func (s *Server) MarkCategory(c echo.Context) error {
 // GetCategoryEntries returns a list of Entries
 // that belong to a Feed that belongs to a Category
 func (s *Server) GetCategoryEntries(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
@@ -208,7 +208,7 @@ func (s *Server) GetCategoryEntries(c echo.Context) error {
 
 // GetCategoryStats returns statistics related to a Category
 func (s *Server) GetCategoryStats(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	stats, err := s.categories.Stats(c.Param("categoryID"), user)
 	if err == usecases.ErrCategoryNotFound {

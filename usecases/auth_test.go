@@ -19,63 +19,75 @@ package usecases
 
 import (
 	"errors"
+	"testing"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
-
-	"github.com/dgrijalva/jwt-go"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
-func (t *UsecasesTestSuite) TestRegister() {
-	keys, err := t.auth.Register("newUser", "testtesttest")
+type AuthSuite struct {
+	suite.Suite
+
+	usecase Auth
+	user    models.User
+}
+
+func (t *AuthSuite) TestRegister() {
+	keys, err := t.usecase.Register("newUser", "testtesttest")
 	t.NoError(err)
 	t.NotEmpty(keys.AccessKey)
 	t.NotEmpty(keys.RefreshKey)
 
-	_, found := database.UserWithCredentials("newUser", "testtesttest")
+	user, found := database.UserWithName("newUser")
 	t.True(found)
+
+	t.True(utils.VerifyPasswordHash("testtesttest", user.PasswordHash, user.PasswordSalt))
 }
 
-func (t *UsecasesTestSuite) TestRegisterConflicting() {
-	_, err := t.auth.Register(t.user.Username, "testtesttest")
+func (t *AuthSuite) TestRegisterConflicting() {
+	_, err := t.usecase.Register(t.user.Username, "testtesttest")
 	t.EqualError(err, ErrUserConflicts.Error())
 }
 
-func (t *UsecasesTestSuite) TestLogin() {
-	keys, err := t.auth.Login(t.user.Username, "testtesttest")
+func (t *AuthSuite) TestLogin() {
+	keys, err := t.usecase.Login(t.user.Username, "testtesttest")
 	t.NoError(err)
 	t.NotEmpty(keys.AccessKey)
 	t.NotEmpty(keys.RefreshKey)
 }
 
-func (t *UsecasesTestSuite) TestBadLogin() {
-	_, err := t.auth.Login(t.user.Username, "bogus")
-	t.EqualError(err, ErrUserUnauthorized.Error())
+func (t *AuthSuite) TestBadLogin() {
+	_, err := t.usecase.Login(t.user.Username, "bogus")
+	t.Equal(ErrUserUnauthorized, err)
 }
 
-func (t *UsecasesTestSuite) TestRenew() {
-	keys, err := t.auth.Login(t.user.Username, "testtesttest")
+func (t *AuthSuite) TestRenew() {
+	keys, err := t.usecase.Login(t.user.Username, "testtesttest")
 	t.Require().NoError(err)
 
 	time.Sleep(time.Second)
 
-	key, err := t.auth.Renew(keys.RefreshKey)
+	key, err := t.usecase.Renew(keys.RefreshKey)
 	t.NoError(err)
 	t.NotEqual(key.Key, keys.AccessKey)
 }
 
-func (t *UsecasesTestSuite) TestRenewWithInvalidKey() {
+func (t *AuthSuite) TestRenewWithInvalidKey() {
 	key, err := newAPIKey("secret_cat", models.RefreshKey, t.user)
 	t.Require().NoError(err)
 
 	time.Sleep(time.Second)
 
-	_, err = t.auth.Renew(key.Key)
+	_, err = t.usecase.Renew(key.Key)
 	t.EqualError(err, ErrUserUnauthorized.Error())
 }
 
-func (t *UsecasesTestSuite) TestAuthenticate() {
+func (t *AuthSuite) TestAuthenticate() {
 	accessKey, err := newAPIKey("secret_cat", models.AccessKey, t.user)
 	t.NoError(err)
 
@@ -87,6 +99,32 @@ func (t *UsecasesTestSuite) TestAuthenticate() {
 	})
 	t.Require().NoError(err)
 
-	_, authed := t.auth.Authenticate(*jwtToken)
+	_, authed := t.usecase.Authenticate(*jwtToken)
 	t.True(authed)
+}
+
+func (t *AuthSuite) SetupTest() {
+	t.usecase = new(AuthUsecase)
+
+	err := database.Init("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
+
+	t.user = models.User{
+		APIID:        utils.CreateAPIID(),
+		Username:     "gopher",
+		PasswordHash: hash,
+		PasswordSalt: salt,
+	}
+	database.CreateUser(&t.user)
+}
+
+func (t *AuthSuite) TearDownTest() {
+	err := database.Close()
+	t.NoError(err)
+}
+
+func TestAuth(t *testing.T) {
+	suite.Run(t, new(AuthSuite))
 }

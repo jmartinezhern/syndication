@@ -21,126 +21,157 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
-func (t *UsecasesTestSuite) TestNewFeed() {
+type FeedsSuite struct {
+	suite.Suite
+
+	usecase  Feed
+	unctgCtg models.Category
+	user     models.User
+	feed     models.Feed
+}
+
+func (t *FeedsSuite) TestNewFeed() {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "<rss></rss>")
 	}))
 	defer ts.Close()
 
-	feed, err := t.feed.New("Example", ts.URL, t.unctgCtg.APIID, t.user)
+	feed, err := t.usecase.New("Example", ts.URL, t.unctgCtg.APIID, t.user)
 	t.NoError(err)
 	_, found := database.FeedWithAPIID(feed.APIID, t.user)
 	t.True(found)
 }
 
-func (t *UsecasesTestSuite) TestUnreachableNewFeed() {
-	_, err := t.feed.New("Example", "bogus", t.unctgCtg.APIID, t.user)
+func (t *FeedsSuite) TestUnreachableNewFeed() {
+	_, err := t.usecase.New("Example", "bogus", t.unctgCtg.APIID, t.user)
 	t.EqualError(err, ErrFetchingFeed.Error())
 }
 
-func (t *UsecasesTestSuite) TestFeeds() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-
-	feeds, _ := t.feed.Feeds("", 2, t.user)
+func (t *FeedsSuite) TestFeeds() {
+	feeds, _ := t.usecase.Feeds("", 2, t.user)
 	t.Len(feeds, 1)
-	t.Equal(feed.Title, feeds[0].Title)
+	t.Equal(t.feed.Title, feeds[0].Title)
 }
 
-func (t *UsecasesTestSuite) TestFeed() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-	_, found := t.feed.Feed(feed.APIID, t.user)
+func (t *FeedsSuite) TestFeed() {
+	_, found := t.usecase.Feed(t.feed.APIID, t.user)
 	t.True(found)
 }
 
-func (t *UsecasesTestSuite) TestEditFeed() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-
-	newFeed, err := t.feed.Edit(feed.APIID, models.Feed{Title: "New Title"}, t.user)
+func (t *FeedsSuite) TestEditFeed() {
+	newFeed, err := t.usecase.Edit(t.feed.APIID, models.Feed{Title: "New Title"}, t.user)
 	t.NoError(err)
 	t.Equal("New Title", newFeed.Title)
 }
 
-func (t *UsecasesTestSuite) TestEditMissingFeed() {
-	_, err := t.feed.Edit("bogus", models.Feed{}, t.user)
+func (t *FeedsSuite) TestEditMissingFeed() {
+	_, err := t.usecase.Edit("bogus", models.Feed{}, t.user)
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestDeleteFeed() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-
-	err = t.feed.Delete(feed.APIID, t.user)
+func (t *FeedsSuite) TestDeleteFeed() {
+	err := t.usecase.Delete(t.feed.APIID, t.user)
 	t.NoError(err)
 
-	_, found := database.FeedWithAPIID(feed.APIID, t.user)
+	_, found := database.FeedWithAPIID(t.feed.APIID, t.user)
 	t.False(found)
 }
 
-func (t *UsecasesTestSuite) TestDeleteMissingFeed() {
-	err := t.feed.Delete("bogus", t.user)
+func (t *FeedsSuite) TestDeleteMissingFeed() {
+	err := t.usecase.Delete("bogus", t.user)
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestMarkFeed() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-
-	_, err = database.NewEntry(models.Entry{
+func (t *FeedsSuite) TestMarkFeed() {
+	_, err := database.NewEntry(models.Entry{
+		APIID: utils.CreateAPIID(),
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
-	}, feed.APIID, t.user)
+	}, t.feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	t.Require().Empty(database.FeedEntries(feed.APIID, true, models.MarkerRead, t.user))
+	t.Require().Empty(database.FeedEntries(t.feed.APIID, true, models.MarkerRead, t.user))
 
-	t.feed.Mark(feed.APIID, models.MarkerRead, t.user)
+	t.usecase.Mark(t.feed.APIID, models.MarkerRead, t.user)
 
-	t.NotEmpty(database.FeedEntries(feed.APIID, true, models.MarkerRead, t.user))
+	t.NotEmpty(database.FeedEntries(t.feed.APIID, true, models.MarkerRead, t.user))
 }
 
-func (t *UsecasesTestSuite) TestMarkMissingFeed() {
-	err := t.feed.Mark("bogus", models.MarkerRead, t.user)
+func (t *FeedsSuite) TestMarkMissingFeed() {
+	err := t.usecase.Mark("bogus", models.MarkerRead, t.user)
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestFeedEntries() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-
+func (t *FeedsSuite) TestFeedEntries() {
 	entry, err := database.NewEntry(models.Entry{
+		APIID: utils.CreateAPIID(),
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
-	}, feed.APIID, t.user)
+	}, t.feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	entries, err := t.feed.Entries(feed.APIID, true, models.MarkerAny, t.user)
+	entries, err := t.usecase.Entries(t.feed.APIID, true, models.MarkerAny, t.user)
 	t.NoError(err)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
 
-func (t *UsecasesTestSuite) TestMissingFeedEntries() {
-	_, err := t.feed.Entries("bogus", true, models.MarkerAny, t.user)
+func (t *FeedsSuite) TestMissingFeedEntries() {
+	_, err := t.usecase.Entries("bogus", true, models.MarkerAny, t.user)
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestFeedStats() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-
-	_, err = t.feed.Stats(feed.APIID, t.user)
+func (t *FeedsSuite) TestFeedStats() {
+	_, err := t.usecase.Stats(t.feed.APIID, t.user)
 	t.NoError(err)
 }
 
-func (t *UsecasesTestSuite) TestMissingFeedStats() {
-	_, err := t.feed.Stats("bogus", t.user)
+func (t *FeedsSuite) TestMissingFeedStats() {
+	_, err := t.usecase.Stats("bogus", t.user)
 	t.EqualError(err, ErrFeedNotFound.Error())
+}
+
+func (t *FeedsSuite) SetupTest() {
+	t.usecase = new(FeedUsecase)
+
+	err := database.Init("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	t.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: "gopher",
+	}
+	database.CreateUser(&t.user)
+
+	t.unctgCtg = models.Category{
+		APIID: utils.CreateAPIID(),
+		Name:  models.Uncategorized,
+	}
+	database.CreateCategory(&t.unctgCtg, t.user)
+
+	t.feed = models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "Example",
+		Subscription: "example.com",
+	}
+	err = database.CreateFeed(&t.feed, t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
+}
+
+func (t *FeedsSuite) TearDownTest() {
+	err := database.Close()
+	t.NoError(err)
+}
+
+func TestFeeds(t *testing.T) {
+	suite.Run(t, new(FeedsSuite))
 }

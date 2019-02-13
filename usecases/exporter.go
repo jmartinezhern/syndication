@@ -19,6 +19,7 @@ package usecases
 
 import (
 	"encoding/xml"
+
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
 )

@@ -25,23 +25,21 @@ import (
 
 	"github.com/labstack/echo"
 
-	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
 )
 
 func (t *ServerTestSuite) TestOPMLExport() {
-	ctg := database.NewCategory("Test", t.user)
+	ctg, err := t.server.categories.New("Test", t.user)
+	t.Require().NoError(err)
 
-	feed, err := database.NewFeed(
-		"Example", "example.com", ctg.APIID, t.user,
-	)
+	feed, err := t.server.feeds.New("example", "http://localhost:9090", ctg.APIID, t.user)
 	t.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 	req.Header.Set("Accept", "application/xml")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetPath("/v1/export")
 

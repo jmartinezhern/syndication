@@ -19,8 +19,13 @@ package usecases
 
 import (
 	"sort"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 const opml = `
@@ -47,16 +52,22 @@ const opml = `
 </opml>
 `
 
-func (t *UsecasesTestSuite) TestOPMLImporter() {
+type ImporterSuite struct {
+	suite.Suite
+
+	user models.User
+}
+
+func (t *ImporterSuite) TestOPMLImporter() {
 	importer := OPMLImporter{}
 
 	importer.Import([]byte(opml), t.user)
 
 	ctg, found := database.CategoryWithName("Test", t.user)
-	t.True(found)
+	t.Require().True(found)
 
 	ctgFeeds := database.CategoryFeeds(ctg.APIID, t.user)
-	t.Len(ctgFeeds, 1)
+	t.Require().Len(ctgFeeds, 1)
 	t.Equal(ctgFeeds[0].Title, "Example")
 
 	feeds, _ := database.Feeds("", 2, t.user)
@@ -64,4 +75,29 @@ func (t *UsecasesTestSuite) TestOPMLImporter() {
 	t.NotZero(sort.Search(len(feeds), func(i int) bool {
 		return feeds[i].Title == "Empty"
 	}))
+}
+
+func (t *ImporterSuite) SetupTest() {
+	err := database.Init("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	t.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: "gopher",
+	}
+	database.CreateUser(&t.user)
+
+	database.CreateCategory(&models.Category{
+		APIID: utils.CreateAPIID(),
+		Name:  models.Uncategorized,
+	}, t.user)
+}
+
+func (t *ImporterSuite) TearDownTest() {
+	err := database.Close()
+	t.NoError(err)
+}
+
+func TestImporter(t *testing.T) {
+	suite.Run(t, new(ImporterSuite))
 }

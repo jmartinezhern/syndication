@@ -19,19 +19,26 @@ package database
 
 import (
 	"strconv"
+	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
-func (s *DatabaseTestSuite) TestNewEntry() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-	s.Require().NoError(err)
-	s.NotZero(feed.ID)
-	s.NotEmpty(feed.APIID)
+type EntriesSuite struct {
+	suite.Suite
 
+	ctg  models.Category
+	feed models.Feed
+	user models.User
+}
+
+func (s *EntriesSuite) TestNewEntry() {
 	entry := models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Test Entry",
 		Author:    "John Doe",
 		Link:      "http://example.com",
@@ -39,22 +46,23 @@ func (s *DatabaseTestSuite) TestNewEntry() {
 		Published: time.Now(),
 	}
 
-	entry, err = NewEntry(entry, feed.APIID, s.user)
-	s.Require().Nil(err)
+	entry, err := NewEntry(entry, s.feed.APIID, s.user)
+	s.Require().NoError(err)
 	s.NotEmpty(entry.APIID)
 
 	query, found := EntryWithAPIID(entry.APIID, s.user)
 	s.True(found)
 	s.NotZero(query.FeedID)
 
-	entries := FeedEntries(feed.APIID, true, models.MarkerUnread, s.user)
+	entries := FeedEntries(s.feed.APIID, true, models.MarkerUnread, s.user)
 	s.NotEmpty(entries)
 	s.Len(entries, 1)
 	s.Equal(entries[0].Title, entry.Title)
 }
 
-func (s *DatabaseTestSuite) TestNewEntryWithEmptyFeed() {
+func (s *EntriesSuite) TestNewEntryWithEmptyFeed() {
 	entry := models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Test Entry",
 		Link:      "http://example.com",
 		Author:    "John Doe",
@@ -62,8 +70,8 @@ func (s *DatabaseTestSuite) TestNewEntryWithEmptyFeed() {
 		Published: time.Now(),
 	}
 
-	entry, err := NewEntry(entry, createAPIID(), s.user)
-	s.NotNil(err)
+	entry, err := NewEntry(entry, utils.CreateAPIID(), s.user)
+	s.Error(err)
 	s.Equal(ErrModelNotFound, err)
 	s.Zero(entry.ID)
 	s.Empty(entry.APIID)
@@ -73,16 +81,17 @@ func (s *DatabaseTestSuite) TestNewEntryWithEmptyFeed() {
 	s.Zero(query.FeedID)
 }
 
-func (s *DatabaseTestSuite) TestNewEntryWithBadFeed() {
+func (s *EntriesSuite) TestNewEntryWithBadFeed() {
 	entry := models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Test Entry",
 		Author:    "John Doe",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
-	entry, err := NewEntry(entry, createAPIID(), s.user)
-	s.NotNil(err)
+	entry, err := NewEntry(entry, utils.CreateAPIID(), s.user)
+	s.Error(err)
 	s.Zero(entry.ID)
 	s.Empty(entry.APIID)
 
@@ -91,16 +100,11 @@ func (s *DatabaseTestSuite) TestNewEntryWithBadFeed() {
 	s.Zero(query.FeedID)
 }
 
-func (s *DatabaseTestSuite) TestNewEntries() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-	s.Require().NoError(err)
-	s.NotZero(feed.ID)
-	s.NotEmpty(feed.APIID)
-
+func (s *EntriesSuite) TestNewEntries() {
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
+			APIID:     utils.CreateAPIID(),
 			Title:     "Test Entry",
 			Author:    "John Doe",
 			Link:      "http://example.com",
@@ -111,11 +115,11 @@ func (s *DatabaseTestSuite) TestNewEntries() {
 		entries = append(entries, entry)
 	}
 
-	entries, err = NewEntries(entries, feed.APIID, s.user)
+	entries, err := NewEntries(entries, s.feed.APIID, s.user)
 	s.Require().Len(entries, 5)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
-	entries = FeedEntries(feed.APIID, true, models.MarkerUnread, s.user)
+	entries = FeedEntries(s.feed.APIID, true, models.MarkerUnread, s.user)
 	s.Len(entries, 5)
 	for _, entry := range entries {
 		s.NotZero(entry.ID)
@@ -123,33 +127,25 @@ func (s *DatabaseTestSuite) TestNewEntries() {
 	}
 }
 
-func (s *DatabaseTestSuite) TestNewEntriesWithEmpty() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-	s.Require().NoError(err)
-
-	entries, err := NewEntries([]models.Entry{}, feed.APIID, s.user)
+func (s *EntriesSuite) TestNewEntriesWithEmpty() {
+	entries, err := NewEntries([]models.Entry{}, s.feed.APIID, s.user)
 	s.NoError(err)
 	s.Empty(entries)
 }
 
-func (s *DatabaseTestSuite) TestNewEntriesWithBadFeed() {
+func (s *EntriesSuite) TestNewEntriesWithBadFeed() {
 	entries := []models.Entry{
 		{},
 	}
 	_, err := NewEntries(entries, "", s.user)
-	s.NotNil(err)
+	s.Error(err)
 }
 
-func (s *DatabaseTestSuite) TestEntries() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-	s.Require().NoError(err)
-	s.NotEmpty(feed.APIID)
-
+func (s *EntriesSuite) TestEntries() {
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
+			APIID:     utils.CreateAPIID(),
 			Title:     "Test Entry " + strconv.Itoa(i),
 			Author:    "John Doe",
 			Link:      "http://example.com",
@@ -157,7 +153,7 @@ func (s *DatabaseTestSuite) TestEntries() {
 			Published: time.Now(),
 		}
 
-		entry, err := NewEntry(entry, feed.APIID, s.user)
+		entry, err := NewEntry(entry, s.feed.APIID, s.user)
 		s.Require().NoError(err)
 
 		entries = append(entries, entry)
@@ -177,19 +173,15 @@ func (s *DatabaseTestSuite) TestEntries() {
 	s.Equal(entries[4].Title, cEntries[2].Title)
 }
 
-func (s *DatabaseTestSuite) TestEntriesWithNoneMarker() {
+func (s *EntriesSuite) TestEntriesWithNoneMarker() {
 	entries, continuationID := Entries(false, models.MarkerNone, "", 1, s.user)
 	s.Empty(continuationID)
 	s.Empty(entries)
 }
 
-func (s *DatabaseTestSuite) TestEntriesFromFeed() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-	s.Require().NoError(err)
-	s.NotEmpty(feed.APIID)
-
+func (s *EntriesSuite) TestEntriesFromFeed() {
 	entry := models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Test Entry",
 		Author:    "John Doe",
 		Link:      "http://example.com",
@@ -197,94 +189,85 @@ func (s *DatabaseTestSuite) TestEntriesFromFeed() {
 		Published: time.Now(),
 	}
 
-	entry, err = NewEntry(entry, feed.APIID, s.user)
-	s.Require().Nil(err)
+	entry, err := NewEntry(entry, s.feed.APIID, s.user)
+	s.Require().NoError(err)
 
-	entries := FeedEntries(feed.APIID, true, models.MarkerUnread, s.user)
+	entries := FeedEntries(s.feed.APIID, true, models.MarkerUnread, s.user)
 	s.Require().NotEmpty(entries)
 	s.Equal(entries[0].Title, entry.Title)
 
-	entries = FeedEntries(feed.APIID, true, models.MarkerRead, s.user)
+	entries = FeedEntries(s.feed.APIID, true, models.MarkerRead, s.user)
 	s.Empty(entries)
 }
 
-func (s *DatabaseTestSuite) TestEntriesFromFeedWithNoneMarker() {
+func (s *EntriesSuite) TestEntriesFromFeedWithNoneMarker() {
 	entries := FeedEntries("bogus", true, models.MarkerNone, s.user)
 	s.Empty(entries)
 }
 
-func (s *DatabaseTestSuite) TestEntryWithGUIDExists() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-
+func (s *EntriesSuite) TestEntryWithGUIDExists() {
 	entry := models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Test Entry",
 		GUID:      "entry@test",
 		Published: time.Now(),
 	}
 
-	entry, err = NewEntry(entry, feed.APIID, s.user)
-	s.Nil(err)
-	s.True(EntryWithGUIDExists(entry.GUID, feed.APIID, s.user))
+	entry, err := NewEntry(entry, s.feed.APIID, s.user)
+	s.NoError(err)
+	s.True(EntryWithGUIDExists(entry.GUID, s.feed.APIID, s.user))
 }
 
-func (s *DatabaseTestSuite) TestEntryWithGUIDDoesNotExists() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-
+func (s *EntriesSuite) TestEntryWithGUIDDoesNotExists() {
 	entry := models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Test Entry",
 		Published: time.Now(),
 	}
 
-	_, err = NewEntry(entry, feed.APIID, s.user)
-	s.Nil(err)
-	s.False(EntryWithGUIDExists("item@test", feed.APIID, s.user))
+	_, err := NewEntry(entry, s.feed.APIID, s.user)
+	s.NoError(err)
+	s.False(EntryWithGUIDExists("item@test", s.feed.APIID, s.user))
 }
 
-func (s *DatabaseTestSuite) TestMarkEntry() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("News", "http://localhost/news", ctg.APIID, s.user)
-	s.Require().NoError(err)
-
+func (s *EntriesSuite) TestMarkEntry() {
 	entry := models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Article",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
-	entry, err = NewEntry(entry, feed.APIID, s.user)
-	s.Require().Nil(err)
+	entry, err := NewEntry(entry, s.feed.APIID, s.user)
+	s.Require().NoError(err)
 
-	entries := FeedEntries(feed.APIID, true, models.MarkerUnread, s.user)
+	entries := FeedEntries(s.feed.APIID, true, models.MarkerUnread, s.user)
 	s.Require().Len(entries, 1)
 
 	err = MarkEntry(entry.APIID, models.MarkerRead, s.user)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
-	entries = FeedEntries(feed.APIID, true, models.MarkerUnread, s.user)
+	entries = FeedEntries(s.feed.APIID, true, models.MarkerUnread, s.user)
 	s.Require().Len(entries, 0)
 
-	entries = FeedEntries(feed.APIID, true, models.MarkerRead, s.user)
+	entries = FeedEntries(s.feed.APIID, true, models.MarkerRead, s.user)
 	s.Require().Len(entries, 1)
 }
 
-func (s *DatabaseTestSuite) TestMarkUnknownEntry() {
+func (s *EntriesSuite) TestMarkUnknownEntry() {
 	err := MarkEntry("bogus", models.MarkerRead, s.user)
-	s.EqualError(err, ErrModelNotFound.Error())
+	s.Equal(ErrModelNotFound, err)
 }
 
-func (s *DatabaseTestSuite) TestMarkAll() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("News", "http://localhost/news", ctg.APIID, s.user)
-
+func (s *EntriesSuite) TestMarkAll() {
 	entry := models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Article",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
-	_, err = NewEntry(entry, feed.APIID, s.user)
+	_, err := NewEntry(entry, s.feed.APIID, s.user)
 	s.Require().NoError(err)
 
 	entries, _ := Entries(true, models.MarkerRead, "", 1, s.user)
@@ -296,23 +279,22 @@ func (s *DatabaseTestSuite) TestMarkAll() {
 	s.Require().Len(entries, 1)
 }
 
-func (s *DatabaseTestSuite) TestDeleteOldEntries() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("News", "http://localhost/news", ctg.APIID, s.user)
-
+func (s *EntriesSuite) TestDeleteOldEntries() {
 	entry, err := NewEntry(models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Article 1",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
-	}, feed.APIID, s.user)
+	}, s.feed.APIID, s.user)
 	s.Require().NoError(err)
 
 	savedEntry, err := NewEntry(models.Entry{
+		APIID:     utils.CreateAPIID(),
 		Title:     "Article 2",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 		Saved:     true,
-	}, feed.APIID, s.user)
+	}, s.feed.APIID, s.user)
 	s.Require().NoError(err)
 
 	s.Require().WithinDuration(time.Now(), entry.CreatedAt, time.Second)
@@ -324,4 +306,39 @@ func (s *DatabaseTestSuite) TestDeleteOldEntries() {
 
 	_, found = EntryWithAPIID(savedEntry.APIID, s.user)
 	s.True(found)
+}
+
+func (s *EntriesSuite) SetupTest() {
+	err := Init("sqlite3", ":memory:")
+
+	s.Require().NoError(err)
+
+	s.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: "test",
+	}
+
+	CreateUser(&s.user)
+	s.ctg = models.Category{
+		APIID: utils.CreateAPIID(),
+		Name:  "test",
+	}
+	CreateCategory(&s.ctg, s.user)
+
+	s.feed = models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+	err = CreateFeed(&s.feed, s.ctg.APIID, s.user)
+	s.Require().NoError(err)
+}
+
+func (s *EntriesSuite) TearDownTest() {
+	err := Close()
+	s.NoError(err)
+}
+
+func TestEntriesSuite(t *testing.T) {
+	suite.Run(t, new(EntriesSuite))
 }

@@ -17,28 +17,30 @@
 
 package database
 
-import "github.com/jmartinezhern/syndication/models"
+import (
+	"github.com/jmartinezhern/syndication/models"
+)
 
-// NewFeed creates a new feed associated to a category with the given API ID
-func (db *DB) NewFeed(title, subscription, ctgID string, user models.User) (models.Feed, error) {
+// CreateFeed creates a new feed associated to a category with the given API ID
+func (db *DB) CreateFeed(feed *models.Feed, ctgID string, user models.User) error {
 	ctg, found := db.CategoryWithAPIID(ctgID, user)
 	if !found {
-		return models.Feed{}, ErrModelNotFound
+		return ErrModelNotFound
 	}
 
-	feed := models.Feed{
-		Title:        title,
-		Subscription: subscription,
-	}
+	feed.Category = ctg
+	feed.CategoryID = ctg.ID
+	feed.Category.APIID = ctg.APIID
 
-	db.createFeed(&feed, &ctg, user)
+	db.db.Model(&user).Association("Feeds").Append(feed)
+	db.db.Model(&ctg).Association("Feeds").Append(feed)
 
-	return feed, nil
+	return nil
 }
 
-// NewFeed creates a new feed associated to a category with the given API ID
-func NewFeed(title, subscription, ctgID string, user models.User) (models.Feed, error) {
-	return defaultInstance.NewFeed(title, subscription, ctgID, user)
+// CreateFeed creates a new feed associated to a category with the given API ID
+func CreateFeed(feed *models.Feed, ctgID string, user models.User) error {
+	return defaultInstance.CreateFeed(feed, ctgID, user)
 }
 
 // Feeds returns a list of all Feeds owned by a user
@@ -213,19 +215,4 @@ func (db *DB) FeedStats(id string, user models.User) models.Stats {
 // FeedStats returns all Stats for a Feed with the given id and that is owned by user
 func FeedStats(id string, user models.User) models.Stats {
 	return defaultInstance.FeedStats(id, user)
-}
-
-func (db *DB) createFeed(feed *models.Feed, ctg *models.Category, user models.User) {
-	feed.APIID = createAPIID()
-
-	if ctg != nil {
-		feed.Category = *ctg
-		feed.CategoryID = ctg.ID
-		feed.Category.APIID = ctg.APIID
-
-		db.db.Model(&user).Association("Feeds").Append(feed)
-		db.db.Model(ctg).Association("Feeds").Append(feed)
-	} else {
-		db.db.Model(&user).Association("Feeds").Append(feed)
-	}
 }

@@ -25,6 +25,7 @@ import (
 
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 type (
@@ -87,7 +88,13 @@ func (c *CategoryUsecase) New(name string, user models.User) (models.Category, e
 		return models.Category{}, ErrCategoryConflicts
 	}
 
-	return database.NewCategory(name, user), nil
+	ctg := models.Category{
+		APIID: utils.CreateAPIID(),
+		Name:  name,
+	}
+	database.CreateCategory(&ctg, user)
+
+	return ctg, nil
 }
 
 // Category returns a category with ID that belongs to user

@@ -20,19 +20,15 @@
 package database
 
 import (
-	"encoding/base64"
 	"errors"
-	mathRand "math/rand"
-	"strconv"
-	"time"
-
-	"github.com/jmartinezhern/syndication/models"
 
 	"github.com/jinzhu/gorm"
 	// GORM dialect packages
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+
+	"github.com/jmartinezhern/syndication/models"
 )
 
 type (
@@ -55,10 +51,9 @@ var (
 )
 
 // Init initializes a database instance
-func Init(dbType, connection string) error {
-	var err error
+func Init(dbType, connection string) (err error) {
 	defaultInstance, err = NewDB(dbType, connection)
-	return err
+	return
 }
 
 // NewDB creates a new DB instance
@@ -107,19 +102,4 @@ func (db *DB) Stats(user models.User) models.Stats {
 // Stats returns all Stats for the given user
 func Stats(user models.User) models.Stats {
 	return defaultInstance.Stats(user)
-}
-
-func createAPIID() string {
-	currentTime := time.Now().Unix()
-	duplicateTime := (lastTimeIDWasCreated == currentTime)
-	lastTimeIDWasCreated = currentTime
-
-	if !duplicateTime {
-		random32Int = mathRand.Uint32() % 16
-	} else {
-		random32Int++
-	}
-
-	idStr := strconv.FormatInt(currentTime+int64(random32Int), 10)
-	return base64.StdEncoding.EncodeToString([]byte(idStr))
 }

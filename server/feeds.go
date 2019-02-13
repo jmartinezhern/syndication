@@ -29,7 +29,7 @@ import (
 
 // NewFeed creates a new feed
 func (s *Server) NewFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	newFeed := new(models.Feed)
 	if err := c.Bind(newFeed); err != nil {
@@ -50,7 +50,7 @@ func (s *Server) NewFeed(c echo.Context) error {
 
 // GetFeeds returns a list of subscribed feeds
 func (s *Server) GetFeeds(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	continuationID := c.QueryParam("continuationID")
 
@@ -73,7 +73,7 @@ func (s *Server) GetFeeds(c echo.Context) error {
 
 // GetFeed with id
 func (s *Server) GetFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	feed, found := s.feeds.Feed(c.Param("feedID"), user)
 	if !found {
@@ -85,7 +85,7 @@ func (s *Server) GetFeed(c echo.Context) error {
 
 // EditFeed with id
 func (s *Server) EditFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	feed := new(models.Feed)
 	if err := c.Bind(feed); err != nil {
@@ -104,7 +104,7 @@ func (s *Server) EditFeed(c echo.Context) error {
 
 // DeleteFeed with id
 func (s *Server) DeleteFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	err := s.feeds.Delete(c.Param("feedID"), user)
 	if err == usecases.ErrFeedNotFound {
@@ -118,7 +118,7 @@ func (s *Server) DeleteFeed(c echo.Context) error {
 
 // MarkFeed applies a Marker to a Feed
 func (s *Server) MarkFeed(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	marker := models.MarkerFromString(c.FormValue("as"))
 	if marker == models.MarkerNone {
@@ -137,7 +137,7 @@ func (s *Server) MarkFeed(c echo.Context) error {
 
 // GetFeedEntries returns a list of entries provided from a feed
 func (s *Server) GetFeedEntries(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
@@ -168,7 +168,7 @@ func (s *Server) GetFeedEntries(c echo.Context) error {
 
 // GetFeedStats provides statistics related to a Feed
 func (s *Server) GetFeedStats(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	stats, err := s.feeds.Stats(c.Param("feedID"), user)
 	if err == usecases.ErrFeedNotFound {

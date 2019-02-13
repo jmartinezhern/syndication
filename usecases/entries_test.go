@@ -18,18 +18,30 @@
 package usecases
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
-func (t *UsecasesTestSuite) TestEntry() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
+type EntriesSuite struct {
+	suite.Suite
 
+	entry    Entry
+	unctgCtg models.Category
+	user     models.User
+	feed     models.Feed
+}
+
+func (t *EntriesSuite) TestEntry() {
 	entry, err := database.NewEntry(models.Entry{
+		APIID: utils.CreateAPIID(),
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
-	}, feed.APIID, t.user)
+	}, t.feed.APIID, t.user)
 	t.Require().NoError(err)
 
 	uEntry, err := t.entry.Entry(entry.APIID, t.user)
@@ -37,19 +49,17 @@ func (t *UsecasesTestSuite) TestEntry() {
 	t.Equal(entry.Title, uEntry.Title)
 }
 
-func (t *UsecasesTestSuite) TestMissingEntry() {
+func (t *EntriesSuite) TestMissingEntry() {
 	_, err := t.entry.Entry("bogus", t.user)
 	t.EqualError(err, ErrEntryNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestEntries() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-
+func (t *EntriesSuite) TestEntries() {
 	entry, err := database.NewEntry(models.Entry{
+		APIID: utils.CreateAPIID(),
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
-	}, feed.APIID, t.user)
+	}, t.feed.APIID, t.user)
 	t.Require().NoError(err)
 
 	entries, _ := t.entry.Entries(true, models.MarkerAny, "", 2, t.user)
@@ -57,14 +67,12 @@ func (t *UsecasesTestSuite) TestEntries() {
 	t.Equal(entry.Title, entries[0].Title)
 }
 
-func (t *UsecasesTestSuite) TestMarkEntry() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-
+func (t *EntriesSuite) TestMarkEntry() {
 	entry, err := database.NewEntry(models.Entry{
+		APIID: utils.CreateAPIID(),
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
-	}, feed.APIID, t.user)
+	}, t.feed.APIID, t.user)
 	t.Require().NoError(err)
 
 	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
@@ -78,19 +86,17 @@ func (t *UsecasesTestSuite) TestMarkEntry() {
 	t.Equal(entry.Title, entries[0].Title)
 }
 
-func (t *UsecasesTestSuite) TestMarkMissingEntry() {
+func (t *EntriesSuite) TestMarkMissingEntry() {
 	err := t.entry.Mark("bogus", models.MarkerRead, t.user)
 	t.EqualError(err, ErrEntryNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestMarkAll() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
-	t.Require().NoError(err)
-
+func (t *EntriesSuite) TestMarkAll() {
 	entry, err := database.NewEntry(models.Entry{
+		APIID: utils.CreateAPIID(),
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
-	}, feed.APIID, t.user)
+	}, t.feed.APIID, t.user)
 	t.Require().NoError(err)
 
 	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
@@ -101,4 +107,40 @@ func (t *UsecasesTestSuite) TestMarkAll() {
 	entries, _ = database.Entries(true, models.MarkerRead, "", 2, t.user)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
+}
+
+func (t *EntriesSuite) SetupTest() {
+	t.entry = new(EntryUsecase)
+
+	err := database.Init("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	t.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: "gopher",
+	}
+	database.CreateUser(&t.user)
+
+	t.unctgCtg = models.Category{
+		APIID: utils.CreateAPIID(),
+		Name:  models.Uncategorized,
+	}
+	database.CreateCategory(&t.unctgCtg, t.user)
+
+	t.feed = models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "Example",
+		Subscription: "example.com",
+	}
+	err = database.CreateFeed(&t.feed, t.unctgCtg.APIID, t.user)
+	t.Require().NoError(err)
+}
+
+func (t *EntriesSuite) TearDownTest() {
+	err := database.Close()
+	t.NoError(err)
+}
+
+func TestEntries(t *testing.T) {
+	suite.Run(t, new(EntriesSuite))
 }

@@ -21,19 +21,14 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 )
 
-// NewCategory creates a new Category object owned by user
-func (db *DB) NewCategory(name string, user models.User) models.Category {
-	ctg := models.Category{
-		Name:  name,
-		APIID: createAPIID(),
-	}
-	db.db.Model(&user).Association("Categories").Append(&ctg)
-	return ctg
+// CreateCategory creates a new Category object owned by user
+func (db *DB) CreateCategory(ctg *models.Category, user models.User) {
+	db.db.Model(&user).Association("Categories").Append(ctg)
 }
 
-// NewCategory creates a new Category object owned by user
-func NewCategory(name string, user models.User) models.Category {
-	return defaultInstance.NewCategory(name, user)
+// CreateCategory creates a new Category object owned by user
+func CreateCategory(ctg *models.Category, user models.User) {
+	defaultInstance.CreateCategory(ctg, user)
 }
 
 // EditCategory owned by user
@@ -42,6 +37,7 @@ func (db *DB) EditCategory(id string, newCtg models.Category, user models.User) 
 		db.db.Model(&ctg).Updates(newCtg)
 		return ctg, nil
 	}
+
 	return models.Category{}, ErrModelNotFound
 }
 

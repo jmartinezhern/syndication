@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	echoSyndUserKey = "syndUser"
+	userContextKey = "user"
 )
 
 var (
@@ -146,6 +146,7 @@ func (s *Server) registerMiddleware() {
 		Skipper:       isPathUnauthorized,
 		SigningKey:    []byte(s.authSecret),
 		SigningMethod: "HS256",
+		ContextKey:    "token",
 	}))
 
 	s.handle.Use(s.checkAuth)

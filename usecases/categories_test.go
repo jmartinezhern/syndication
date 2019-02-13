@@ -18,11 +18,23 @@
 package usecases
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
-func (t *UsecasesTestSuite) TestNewCategory() {
+type CategoriesSuite struct {
+	suite.Suite
+
+	ctgs Category
+	user models.User
+}
+
+func (t *CategoriesSuite) TestNewCategory() {
 	_, err := t.ctgs.New("test", t.user)
 	t.NoError(err)
 
@@ -30,95 +42,144 @@ func (t *UsecasesTestSuite) TestNewCategory() {
 	t.True(found)
 }
 
-func (t *UsecasesTestSuite) TestNewConflictingCategory() {
-	database.NewCategory("test", t.user)
+func (t *CategoriesSuite) TestNewConflictingCategory() {
+	database.CreateCategory(&models.Category{
+		Name: "test",
+	}, t.user)
 
 	_, err := t.ctgs.New("test", t.user)
 	t.Equal(ErrCategoryConflicts, err)
 }
 
-func (t *UsecasesTestSuite) TestCategory() {
-	ctg := database.NewCategory("test", t.user)
+func (t *CategoriesSuite) TestCategory() {
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
 
-	_, found := t.ctgs.Category(ctg.APIID, t.user)
+	_, found := t.ctgs.Category(ctgID, t.user)
 	t.True(found)
 }
 
-func (t *UsecasesTestSuite) TestCategories() {
-	ctg := database.NewCategory("test", t.user)
+func (t *CategoriesSuite) TestCategories() {
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
 
 	ctgs, _ := t.ctgs.Categories(t.user, "", 2)
-	t.Require().Len(ctgs, 2)
-	t.Equal(ctgs[1].Name, ctg.Name)
-	t.Equal(ctgs[1].APIID, ctg.APIID)
+	t.Require().Len(ctgs, 1)
+	t.Equal("test", ctgs[0].Name)
+	t.Equal(ctgID, ctgs[0].APIID)
 }
 
-func (t *UsecasesTestSuite) TestCategoryFeeds() {
-	ctg := database.NewCategory("test", t.user)
-	feed, err := database.NewFeed("example", "example.com", ctg.APIID, t.user)
+func (t *CategoriesSuite) TestCategoryFeeds() {
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
+
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "example",
+		Subscription: "example.com",
+	}
+	err := database.CreateFeed(&feed, ctgID, t.user)
 	t.Require().NoError(err)
 
-	feeds, err := t.ctgs.Feeds(ctg.APIID, t.user)
+	feeds, err := t.ctgs.Feeds(ctgID, t.user)
 	t.NoError(err)
 	t.Len(feeds, 1)
 	t.Equal(feeds[0].Title, feed.Title)
 }
 
-func (t *UsecasesTestSuite) TestMissingCategoryFeeds() {
+func (t *CategoriesSuite) TestMissingCategoryFeeds() {
 	_, err := t.ctgs.Feeds("bogus", t.user)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestEditCategory() {
-	ctg := database.NewCategory("test", t.user)
+func (t *CategoriesSuite) TestEditCategory() {
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
 
-	newCtg, err := t.ctgs.Edit("newName", ctg.APIID, t.user)
+	newCtg, err := t.ctgs.Edit("newName", ctgID, t.user)
 	t.NoError(err)
 	t.Equal("newName", newCtg.Name)
 }
 
-func (t *UsecasesTestSuite) TestEditMissingCategory() {
+func (t *CategoriesSuite) TestEditMissingCategory() {
 	_, err := t.ctgs.Edit("bogus", "bogus", t.user)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestAddFeedsToCategory() {
-	unctgCtg := database.NewCategory(models.Uncategorized, t.user)
-	ctg := database.NewCategory("test", t.user)
-	feed, err := database.NewFeed("example", "example.com", unctgCtg.APIID, t.user)
+func (t *CategoriesSuite) TestAddFeedsToCategory() {
+	unctgCtgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: unctgCtgID,
+		Name:  models.Uncategorized,
+	}, t.user)
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
+
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "example",
+		Subscription: "example.com",
+	}
+	err := database.CreateFeed(&feed, unctgCtgID, t.user)
 	t.Require().NoError(err)
 
-	feeds := database.CategoryFeeds(ctg.APIID, t.user)
+	feeds := database.CategoryFeeds(ctgID, t.user)
 	t.Empty(feeds)
 
-	t.ctgs.AddFeeds(ctg.APIID, []string{feed.APIID}, t.user)
+	t.ctgs.AddFeeds(ctgID, []string{feed.APIID}, t.user)
 
-	feeds = database.CategoryFeeds(ctg.APIID, t.user)
+	feeds = database.CategoryFeeds(ctgID, t.user)
 	t.Require().Len(feeds, 1)
 	t.Equal(feeds[0].Title, feed.Title)
 }
 
-func (t *UsecasesTestSuite) TestDeleteCategory() {
-	ctg := database.NewCategory("test", t.user)
+func (t *CategoriesSuite) TestDeleteCategory() {
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
 
-	err := t.ctgs.Delete(ctg.APIID, t.user)
+	err := t.ctgs.Delete(ctgID, t.user)
 	t.NoError(err)
 
-	_, found := database.CategoryWithAPIID(ctg.APIID, t.user)
+	_, found := database.CategoryWithAPIID(ctgID, t.user)
 	t.False(found)
 }
 
-func (t *UsecasesTestSuite) TestDeleteMissingCategory() {
+func (t *CategoriesSuite) TestDeleteMissingCategory() {
 	err := t.ctgs.Delete("bogus", t.user)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestMarkCategory() {
-	ctg := database.NewCategory("test", t.user)
+func (t *CategoriesSuite) TestMarkCategory() {
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
 
-	feed, err := database.NewFeed(
-		"Example", "example.com", ctg.APIID, t.user,
-	)
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "example",
+		Subscription: "example.com",
+	}
+	err := database.CreateFeed(&feed, ctgID, t.user)
 	t.Require().NoError(err)
 
 	database.NewEntry(models.Entry{
@@ -129,24 +190,31 @@ func (t *UsecasesTestSuite) TestMarkCategory() {
 	entries, _ := database.Entries(true, models.MarkerRead, "", 2, t.user)
 	t.Require().Empty(entries)
 
-	err = t.ctgs.Mark(ctg.APIID, models.MarkerRead, t.user)
+	err = t.ctgs.Mark(ctgID, models.MarkerRead, t.user)
 	t.NoError(err)
 
 	entries, _ = database.Entries(true, models.MarkerRead, "", 2, t.user)
 	t.Len(entries, 1)
 }
 
-func (t *UsecasesTestSuite) TestMarkMissingCategory() {
+func (t *CategoriesSuite) TestMarkMissingCategory() {
 	err := t.ctgs.Mark("bogus", models.MarkerRead, t.user)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestCategoryEntries() {
-	ctg := database.NewCategory("test", t.user)
+func (t *CategoriesSuite) TestCategoryEntries() {
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
 
-	feed, err := database.NewFeed(
-		"Example", "example.com", ctg.APIID, t.user,
-	)
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "example",
+		Subscription: "example.com",
+	}
+	err := database.CreateFeed(&feed, ctgID, t.user)
 	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
@@ -155,24 +223,51 @@ func (t *UsecasesTestSuite) TestCategoryEntries() {
 	}, feed.APIID, t.user)
 	t.Require().NoError(err)
 
-	entries, err := t.ctgs.Entries(ctg.APIID, true, models.MarkerUnread, t.user)
+	entries, err := t.ctgs.Entries(ctgID, true, models.MarkerUnread, t.user)
 	t.NoError(err)
 	t.Len(entries, 1)
 	t.Equal(entries[0].Title, entry.Title)
 }
 
-func (t *UsecasesTestSuite) TestEntriesForMissingCategory() {
+func (t *CategoriesSuite) TestEntriesForMissingCategory() {
 	_, err := t.ctgs.Entries("bogus", true, models.MarkerAny, t.user)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
-func (t *UsecasesTestSuite) TestCategoryStats() {
-	ctg := database.NewCategory("test", t.user)
-	_, err := t.ctgs.Stats(ctg.APIID, t.user)
+func (t *CategoriesSuite) TestCategoryStats() {
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
+
+	_, err := t.ctgs.Stats(ctgID, t.user)
 	t.NoError(err)
 }
 
-func (t *UsecasesTestSuite) TestMissingCategoryStats() {
+func (t *CategoriesSuite) TestMissingCategoryStats() {
 	_, err := t.ctgs.Stats("bogus", t.user)
 	t.EqualError(err, ErrCategoryNotFound.Error())
+}
+
+func (t *CategoriesSuite) SetupTest() {
+	t.ctgs = new(CategoryUsecase)
+
+	err := database.Init("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	t.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: "gopher",
+	}
+	database.CreateUser(&t.user)
+}
+
+func (t *CategoriesSuite) TearDownTest() {
+	err := database.Close()
+	t.NoError(err)
+}
+
+func TestCategories(t *testing.T) {
+	suite.Run(t, new(CategoriesSuite))
 }

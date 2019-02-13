@@ -19,30 +19,39 @@ package database
 
 import (
 	"strconv"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
-func (s *DatabaseTestSuite) TestNewTag() {
-	tag := NewTag("tech", s.user)
+type TagsSuite struct {
+	suite.Suite
 
-	query, found := TagWithAPIID(tag.APIID, s.user)
-	s.True(found)
-	s.NotEmpty(query.Name)
-	s.NotZero(query.ID)
-	s.NotZero(query.CreatedAt)
-	s.NotZero(query.UpdatedAt)
-	s.NotZero(query.UserID)
+	user models.User
+	ctg  models.Category
+	feed models.Feed
 }
 
-func (s *DatabaseTestSuite) TestTagEntries() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-	s.Require().NoError(err)
+func (s *TagsSuite) TestNewTag() {
+	tagID := utils.CreateAPIID()
+	CreateTag(&models.Tag{
+		APIID: tagID,
+		Name:  "tech",
+	}, s.user)
 
+	tag, found := TagWithAPIID(tagID, s.user)
+	s.True(found)
+	s.Equal("tech", tag.Name)
+}
+
+func (s *TagsSuite) TestTagEntries() {
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
+			APIID:  utils.CreateAPIID(),
 			Title:  "Test Entry",
 			Author: "John Doe",
 			Link:   "http://example.com",
@@ -52,53 +61,49 @@ func (s *DatabaseTestSuite) TestTagEntries() {
 		entries = append(entries, entry)
 	}
 
-	entries, err = NewEntries(entries, feed.APIID, s.user)
+	entries, err := NewEntries(entries, s.feed.APIID, s.user)
 	s.Require().NotEmpty(entries)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
-	entries = FeedEntries(feed.APIID, true, models.MarkerAny, s.user)
+	entries = FeedEntries(s.feed.APIID, true, models.MarkerAny, s.user)
 
 	entryAPIIDs := make([]string, len(entries))
 	for i, entry := range entries {
 		entryAPIIDs[i] = entry.APIID
 	}
 
-	tag := NewTag("Tech", s.user)
-	s.Nil(err)
-	s.NotZero(tag.ID)
+	tagID := utils.CreateAPIID()
+	CreateTag(&models.Tag{
+		APIID: tagID,
+		Name:  "tech",
+	}, s.user)
 
-	dbTag, found := TagWithAPIID(tag.APIID, s.user)
+	tag, found := TagWithAPIID(tagID, s.user)
 	s.True(found)
-	s.Equal(tag.APIID, dbTag.APIID)
-	s.Equal(tag.Name, dbTag.Name)
-	s.NotZero(dbTag.ID)
+	s.Equal("tech", tag.Name)
 
 	err = TagEntries(tag.APIID, entryAPIIDs, s.user)
-	s.Nil(err)
+	s.NoError(err)
 
 	taggedEntries := EntriesFromTag(tag.APIID, models.MarkerAny, true, s.user)
-	s.Nil(err)
 	s.Len(taggedEntries, 5)
 }
 
-func (s *DatabaseTestSuite) TestTagUnknownEntries() {
+func (s *TagsSuite) TestTagUnknownEntries() {
 	err := TagEntries("bogus", make([]string, 1), s.user)
-	s.EqualError(err, ErrModelNotFound.Error())
+	s.Equal(ErrModelNotFound, err)
 }
 
-func (s *DatabaseTestSuite) TestTagNoEntries() {
+func (s *TagsSuite) TestTagNoEntries() {
 	err := TagEntries("bogus", nil, s.user)
 	s.NoError(err)
 }
 
-func (s *DatabaseTestSuite) TestTagMultipleEntries() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-	s.Require().NoError(err)
-
+func (s *TagsSuite) TestTagMultipleEntries() {
 	var entries []models.Entry
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
+			APIID:  utils.CreateAPIID(),
 			Title:  "Test Entry " + strconv.Itoa(i),
 			Author: "John Doe",
 			Link:   "http://example.com",
@@ -108,54 +113,53 @@ func (s *DatabaseTestSuite) TestTagMultipleEntries() {
 		entries = append(entries, entry)
 	}
 
-	_, err = NewEntries(entries, feed.APIID, s.user)
-	s.Require().Nil(err)
+	_, err := NewEntries(entries, s.feed.APIID, s.user)
+	s.Require().NoError(err)
 
-	secondTag := models.Tag{
-		Name: "Second tag",
-	}
+	firstTagID := utils.CreateAPIID()
+	CreateTag(&models.Tag{
+		APIID: firstTagID,
+		Name:  "first",
+	}, s.user)
 
-	firstTag := NewTag("First tag", s.user)
-	s.NotZero(firstTag.ID)
+	secondTagID := utils.CreateAPIID()
+	CreateTag(&models.Tag{
+		APIID: secondTagID,
+		Name:  "second",
+	}, s.user)
 
-	secondTag = NewTag("Second Tag", s.user)
-	s.NotZero(secondTag.ID)
-
-	s.Require().NotEqual(firstTag.APIID, secondTag.APIID)
-
-	entries = FeedEntries(feed.APIID, true, models.MarkerAny, s.user)
-	s.Require().Nil(err)
+	entries = FeedEntries(s.feed.APIID, true, models.MarkerAny, s.user)
+	s.Require().NoError(err)
 
 	entryAPIIDs := make([]string, len(entries))
 	for i, entry := range entries {
 		entryAPIIDs[i] = entry.APIID
 	}
 
-	err = TagEntries(firstTag.APIID, entryAPIIDs, s.user)
-	s.Nil(err)
+	err = TagEntries(firstTagID, entryAPIIDs, s.user)
+	s.NoError(err)
 
-	err = TagEntries(secondTag.APIID, entryAPIIDs, s.user)
-	s.Nil(err)
+	err = TagEntries(secondTagID, entryAPIIDs, s.user)
+	s.NoError(err)
 
-	taggedEntries := EntriesFromTag(firstTag.APIID, models.MarkerAny, true, s.user)
+	taggedEntries := EntriesFromTag(firstTagID, models.MarkerAny, true, s.user)
 	s.Len(taggedEntries, 5)
 
-	taggedEntries = EntriesFromTag(secondTag.APIID, models.MarkerAny, true, s.user)
+	taggedEntries = EntriesFromTag(secondTagID, models.MarkerAny, true, s.user)
 	s.Len(taggedEntries, 5)
 }
 
-func (s *DatabaseTestSuite) TestEntriesFromMultipleTags() {
-	ctg := NewCategory(models.Uncategorized, s.user)
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-
+func (s *TagsSuite) TestEntriesFromMultipleTags() {
 	entries := []models.Entry{
 		{
+			APIID:  utils.CreateAPIID(),
 			Title:  "Test Entry",
 			Author: "John Doe",
 			Link:   "http://example.com",
 			Mark:   models.MarkerUnread,
 		},
 		{
+			APIID:  utils.CreateAPIID(),
 			Title:  "Test Entry",
 			Author: "John Doe",
 			Link:   "http://example.com",
@@ -163,44 +167,85 @@ func (s *DatabaseTestSuite) TestEntriesFromMultipleTags() {
 		},
 	}
 
-	entries, err = NewEntries(entries, feed.APIID, s.user)
-	s.Require().Nil(err)
+	entries, err := NewEntries(entries, s.feed.APIID, s.user)
+	s.Require().NoError(err)
 
-	firstTag := NewTag("First tag", s.user)
-	s.NotZero(firstTag.ID)
+	firstTagID := utils.CreateAPIID()
+	CreateTag(&models.Tag{
+		APIID: firstTagID,
+		Name:  "first",
+	}, s.user)
 
-	secondTag := NewTag("Second tag", s.user)
-	s.NotZero(secondTag.ID)
+	secondTagID := utils.CreateAPIID()
+	CreateTag(&models.Tag{
+		APIID: secondTagID,
+		Name:  "second",
+	}, s.user)
 
-	s.NoError(TagEntries(firstTag.APIID, []string{entries[0].APIID}, s.user))
+	s.NoError(TagEntries(firstTagID, []string{entries[0].APIID}, s.user))
+	s.NoError(TagEntries(secondTagID, []string{entries[1].APIID}, s.user))
 
-	s.NoError(TagEntries(secondTag.APIID, []string{entries[1].APIID}, s.user))
-
-	s.Require().NotEqual(firstTag.APIID, secondTag.APIID)
-
-	taggedEntries := EntriesFromMultipleTags([]string{firstTag.APIID, secondTag.APIID}, true, models.MarkerAny, s.user)
+	taggedEntries := EntriesFromMultipleTags([]string{firstTagID, secondTagID}, true, models.MarkerAny, s.user)
 	s.Len(taggedEntries, 2)
 }
 
-func (s *DatabaseTestSuite) TestDeleteTag() {
-	tag := NewTag("News", s.user)
+func (s *TagsSuite) TestDeleteTag() {
+	tagID := utils.CreateAPIID()
+	CreateTag(&models.Tag{
+		APIID: tagID,
+		Name:  "news",
+	}, s.user)
 
-	query, found := TagWithAPIID(tag.APIID, s.user)
-	s.True(found)
-	s.NotEmpty(query.APIID)
+	err := DeleteTag(tagID, s.user)
+	s.NoError(err)
 
-	err := DeleteTag(tag.APIID, s.user)
-	s.Nil(err)
-
-	_, found = TagWithAPIID(tag.APIID, s.user)
+	_, found := TagWithAPIID(tagID, s.user)
 	s.False(found)
 }
 
-func (s *DatabaseTestSuite) TestEditTag() {
-	tag := NewTag("News", s.user)
+func (s *TagsSuite) TestEditTag() {
+	tagID := utils.CreateAPIID()
+	CreateTag(&models.Tag{
+		APIID: tagID,
+		Name:  "news",
+	}, s.user)
 
-	mdfTag, err := EditTag(tag.APIID, models.Tag{Name: "World News"}, s.user)
-	s.Nil(err)
-	s.Equal("World News", mdfTag.Name)
-	s.NotEqual(tag.Name, mdfTag.Name)
+	tag, err := EditTag(tagID, models.Tag{Name: "World News"}, s.user)
+	s.NoError(err)
+	s.Equal("World News", tag.Name)
+}
+
+func (s *TagsSuite) SetupTest() {
+	err := Init("sqlite3", ":memory:")
+
+	s.Require().NoError(err)
+
+	s.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: "test",
+	}
+
+	CreateUser(&s.user)
+	s.ctg = models.Category{
+		APIID: utils.CreateAPIID(),
+		Name:  models.Uncategorized,
+	}
+	CreateCategory(&s.ctg, s.user)
+
+	s.feed = models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+	err = CreateFeed(&s.feed, s.ctg.APIID, s.user)
+	s.Require().NoError(err)
+}
+
+func (s *TagsSuite) TearDownTest() {
+	err := Close()
+	s.NoError(err)
+}
+
+func TestTagsSuite(t *testing.T) {
+	suite.Run(t, new(TagsSuite))
 }

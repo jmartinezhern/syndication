@@ -20,23 +20,19 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/jmartinezhern/syndication/models"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
-	"github.com/jmartinezhern/syndication/database"
-
 	"github.com/labstack/echo"
+
+	"github.com/jmartinezhern/syndication/models"
 )
 
 func (t *ServerTestSuite) TestRegister() {
-	username := "test"
-	password := "testtesttest"
-
 	req := httptest.NewRequest(
 		echo.POST,
-		fmt.Sprintf("/?username=%s&password=%s", username, password),
+		fmt.Sprintf("/?username=%s&password=%s", "test", "testtesttest"),
 		nil,
 	)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -53,7 +49,7 @@ func (t *ServerTestSuite) TestLogin() {
 	username := "test"
 	password := "testtesttest"
 
-	database.NewUser(username, password)
+	t.server.auth.Register(username, password)
 
 	req := httptest.NewRequest(
 		echo.POST,

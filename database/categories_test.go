@@ -19,33 +19,43 @@ package database
 
 import (
 	"strconv"
+	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
-func (s *DatabaseTestSuite) TestNewCategory() {
-	ctg := NewCategory("News", s.user)
-	s.NotEmpty(ctg.APIID)
-	s.NotZero(ctg.ID)
-	s.NotZero(ctg.UserID)
-	s.NotZero(ctg.CreatedAt)
-	s.NotZero(ctg.UpdatedAt)
-	s.NotZero(ctg.UserID)
+type CategoriesSuite struct {
+	suite.Suite
 
-	query, found := CategoryWithAPIID(ctg.APIID, s.user)
+	user models.User
+}
+
+func (s *DatabaseTestSuite) TestNewCategory() {
+	ctgID := utils.CreateAPIID()
+	CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "news",
+	}, s.user)
+
+	ctg, found := CategoryWithAPIID(ctgID, s.user)
 	s.True(found)
-	s.NotEmpty(query.Name)
-	s.NotZero(query.ID)
-	s.NotZero(query.CreatedAt)
-	s.NotZero(query.UpdatedAt)
-	s.NotZero(query.UserID)
+	s.Equal(ctgID, ctg.APIID)
+	s.Equal("news", ctg.Name)
 }
 
 func (s *DatabaseTestSuite) TestCategories() {
 	var ctgs []models.Category
 	for i := 0; i < 5; i++ {
-		ctgs = append(ctgs, NewCategory("Test Category "+strconv.Itoa(i), s.user))
+		ctg := models.Category{
+			APIID: utils.CreateAPIID(),
+			Name:  "Test Category " + strconv.Itoa(i),
+		}
+		CreateCategory(&ctg, s.user)
+		ctgs = append(ctgs, ctg)
 	}
 
 	cCtgs, continuationID := Categories(s.user, "", 2)
@@ -63,20 +73,25 @@ func (s *DatabaseTestSuite) TestCategories() {
 }
 
 func (s *DatabaseTestSuite) TestCategoryWithName() {
-	ctg := NewCategory("Test", s.user)
-	dbCtg, found := CategoryWithName("Test", s.user)
+	CreateCategory(&models.Category{
+		Name: "test",
+	}, s.user)
+
+	ctg, found := CategoryWithName("test", s.user)
 	s.True(found)
-	s.Equal(ctg.Name, dbCtg.Name)
+	s.Equal("test", ctg.Name)
 }
 
 func (s *DatabaseTestSuite) TestEditCategory() {
-	ctg := NewCategory("News", s.user)
-	s.Require().NotZero(ctg.ID)
+	ctgID := utils.CreateAPIID()
+	CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "news",
+	}, s.user)
 
-	mdfCtg, err := EditCategory(ctg.APIID, models.Category{Name: "World News"}, s.user)
-	s.Nil(err)
-	s.Equal("World News", mdfCtg.Name)
-	s.NotEqual(ctg.Name, mdfCtg.Name)
+	ctg, err := EditCategory(ctgID, models.Category{Name: "World News"}, s.user)
+	s.NoError(err)
+	s.Equal("World News", ctg.Name)
 }
 
 func (s *DatabaseTestSuite) TestEditNonExistingCategory() {
@@ -85,90 +100,58 @@ func (s *DatabaseTestSuite) TestEditNonExistingCategory() {
 }
 
 func (s *DatabaseTestSuite) TestDeleteCategory() {
-	ctg := NewCategory("News", s.user)
-	s.Require().NotZero(ctg.ID)
+	ctgID := utils.CreateAPIID()
+	CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "news",
+	}, s.user)
 
-	query, found := CategoryWithAPIID(ctg.APIID, s.user)
-	s.True(found)
-	s.NotEmpty(query.APIID)
+	err := DeleteCategory(ctgID, s.user)
+	s.NoError(err)
 
-	err := DeleteCategory(ctg.APIID, s.user)
-	s.Nil(err)
-
-	_, found = CategoryWithAPIID(ctg.APIID, s.user)
+	_, found := CategoryWithAPIID(ctgID, s.user)
 	s.False(found)
 }
 
 func (s *DatabaseTestSuite) TestDeleteNonExistingCategory() {
-	err := DeleteCategory(createAPIID(), s.user)
+	err := DeleteCategory("bogus", s.user)
 	s.Equal(ErrModelNotFound, err)
 }
 
 func (s *DatabaseTestSuite) TestCategoryEntries() {
-	firstCtg := NewCategory("News", s.user)
-	s.NotEmpty(firstCtg.APIID)
+	ctgID := utils.CreateAPIID()
+	CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "news",
+	}, s.user)
 
-	secondCtg := NewCategory("Tech", s.user)
-	s.NotEmpty(secondCtg.APIID)
-
-	firstFeed, err := NewFeed("Test site", "http://example.com", firstCtg.APIID, s.user)
-	s.Nil(err)
-
-	secondFeed, err := NewFeed("Test site", "http://example.com", secondCtg.APIID, s.user)
-	s.Nil(err)
-
-	thirdFeed, err := NewFeed("Test site", "http://example.com", secondCtg.APIID, s.user)
-	s.Nil(err)
-
-	for i := 0; i < 10; i++ {
-		var entry models.Entry
-		if i <= 4 {
-			entry = models.Entry{
-				Title:     "First Feed Test Entry " + strconv.Itoa(i),
-				Author:    "John Doe",
-				Link:      "http://example.com",
-				Mark:      models.MarkerUnread,
-				Published: time.Now(),
-			}
-
-			_, err = NewEntry(entry, firstFeed.APIID, s.user)
-			s.Require().Nil(err)
-		} else if i < 7 {
-			entry = models.Entry{
-				Title:     "Second Feed Test Entry " + strconv.Itoa(i),
-				Author:    "John Doe",
-				Link:      "http://example.com",
-				Mark:      models.MarkerUnread,
-				Published: time.Now(),
-			}
-
-			_, err = NewEntry(entry, secondFeed.APIID, s.user)
-			s.Require().Nil(err)
-		} else {
-			entry = models.Entry{
-				Title:     "Third Feed Test Entry " + strconv.Itoa(i),
-				Author:    "John Doe",
-				Link:      "http://example.com",
-				Mark:      models.MarkerUnread,
-				Published: time.Now(),
-			}
-
-			_, err = NewEntry(entry, thirdFeed.APIID, s.user)
-			s.Require().Nil(err)
-		}
-
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "Test site",
+		Subscription: "http://example.com",
 	}
 
-	entries := CategoryEntries(firstCtg.APIID, false, models.MarkerUnread, s.user)
-	s.NotEmpty(entries)
-	s.Len(entries, 5)
-	s.Equal(entries[0].Title, "First Feed Test Entry 0")
+	err := CreateFeed(&feed, ctgID, s.user)
+	s.Require().NoError(err)
 
-	entries = CategoryEntries(secondCtg.APIID, true, models.MarkerUnread, s.user)
+	for i := 0; i < 5; i++ {
+		var entry models.Entry
+		entry = models.Entry{
+			Title:     "Entry " + strconv.Itoa(i),
+			Author:    "John Doe",
+			Link:      "http://example.com",
+			Mark:      models.MarkerUnread,
+			Published: time.Now(),
+		}
+
+		_, err = NewEntry(entry, feed.APIID, s.user)
+		s.Require().NoError(err)
+	}
+
+	entries := CategoryEntries(ctgID, false, models.MarkerUnread, s.user)
 	s.NotEmpty(entries)
 	s.Len(entries, 5)
-	s.Equal(entries[0].Title, "Third Feed Test Entry 9")
-	s.Equal(entries[len(entries)-1].Title, "Second Feed Test Entry 5")
+	s.Equal(entries[0].Title, "Entry 0")
 }
 
 func (s *DatabaseTestSuite) TestCategoryEntriesWithtNoneMarker() {
@@ -177,17 +160,27 @@ func (s *DatabaseTestSuite) TestCategoryEntriesWithtNoneMarker() {
 }
 
 func (s *DatabaseTestSuite) TestEntriesFromNonExistingCategory() {
-	entries := CategoryEntries(createAPIID(), true, models.MarkerUnread, s.user)
+	entries := CategoryEntries("bogus", true, models.MarkerUnread, s.user)
 	s.Empty(entries)
 }
 
 func (s *DatabaseTestSuite) TestMarkCategory() {
-	ctg := NewCategory("News", s.user)
+	ctgID := utils.CreateAPIID()
+	CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "news",
+	}, s.user)
 
-	feed, err := NewFeed("Test site", "http://example.com", ctg.APIID, s.user)
-	s.Require().Nil(err)
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
 
-	for i := 0; i < 10; i++ {
+	err := CreateFeed(&feed, ctgID, s.user)
+	s.Require().NoError(err)
+
+	for i := 0; i < 5; i++ {
 		entry := models.Entry{
 			Title:     "Test Entry",
 			Author:    "John Doe",
@@ -197,43 +190,51 @@ func (s *DatabaseTestSuite) TestMarkCategory() {
 		}
 
 		_, err = NewEntry(entry, feed.APIID, s.user)
-		s.Require().Nil(err)
+		s.Require().NoError(err)
 	}
 
-	entries := CategoryEntries(ctg.APIID, false, models.MarkerUnread, s.user)
-	s.Len(entries, 10)
+	entries := CategoryEntries(ctgID, false, models.MarkerUnread, s.user)
+	s.Len(entries, 5)
 
-	err = MarkCategory(ctg.APIID, models.MarkerRead, s.user)
-	s.Nil(err)
+	err = MarkCategory(ctgID, models.MarkerRead, s.user)
+	s.NoError(err)
 
-	entries = CategoryEntries(ctg.APIID, false, models.MarkerRead, s.user)
-	s.Len(entries, 10)
+	entries = CategoryEntries(ctgID, false, models.MarkerRead, s.user)
+	s.Len(entries, 5)
 
-	entries = CategoryEntries(ctg.APIID, true, models.MarkerUnread, s.user)
+	entries = CategoryEntries(ctgID, true, models.MarkerUnread, s.user)
 	s.Empty(entries)
 
-	err = MarkCategory(ctg.APIID, models.MarkerUnread, s.user)
-	s.Nil(err)
+	err = MarkCategory(ctgID, models.MarkerUnread, s.user)
+	s.NoError(err)
 
-	entries = CategoryEntries(ctg.APIID, false, models.MarkerRead, s.user)
+	entries = CategoryEntries(ctgID, false, models.MarkerRead, s.user)
 	s.Empty(entries)
 
-	entries = CategoryEntries(ctg.APIID, true, models.MarkerUnread, s.user)
-	s.Len(entries, 10)
+	entries = CategoryEntries(ctgID, true, models.MarkerUnread, s.user)
+	s.Len(entries, 5)
 }
 
 func (s *DatabaseTestSuite) TestMarkUnknownCategory() {
 	err := MarkCategory("bogus", models.MarkerRead, s.user)
-	s.EqualError(err, ErrModelNotFound.Error())
+	s.Equal(ErrModelNotFound, err)
 }
 
 func (s *DatabaseTestSuite) TestCategoryStats() {
-	ctg := NewCategory("World", s.user)
-	s.Require().NotEmpty(ctg.APIID)
+	ctgID := utils.CreateAPIID()
+	CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "news",
+	}, s.user)
 
-	feed, err := NewFeed("News", "http://example.com", ctg.APIID, s.user)
-	s.Require().Nil(err)
-	s.Require().NotEmpty(feed.APIID)
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "Test site",
+		Subscription: "http://example.com",
+	}
+
+	err := CreateFeed(&feed, ctgID, s.user)
+	s.Require().NoError(err)
 
 	for i := 0; i < 3; i++ {
 		entry := models.Entry{
@@ -245,7 +246,7 @@ func (s *DatabaseTestSuite) TestCategoryStats() {
 		}
 
 		_, err = NewEntry(entry, feed.APIID, s.user)
-		s.Require().Nil(err)
+		s.Require().NoError(err)
 	}
 
 	for i := 0; i < 7; i++ {
@@ -257,12 +258,33 @@ func (s *DatabaseTestSuite) TestCategoryStats() {
 		}
 
 		_, err = NewEntry(entry, feed.APIID, s.user)
-		s.Require().Nil(err)
+		s.Require().NoError(err)
 	}
 
-	stats := CategoryStats(ctg.APIID, s.user)
+	stats := CategoryStats(ctgID, s.user)
 	s.Equal(7, stats.Unread)
 	s.Equal(3, stats.Read)
 	s.Equal(3, stats.Saved)
 	s.Equal(10, stats.Total)
+}
+
+func (s *CategoriesSuite) SetupTest() {
+	err := Init("sqlite3", ":memory:")
+
+	s.Require().NoError(err)
+
+	s.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: "test",
+	}
+	CreateUser(&s.user)
+}
+
+func (s *CategoriesSuite) TearDownTest() {
+	err := Close()
+	s.NoError(err)
+}
+
+func TestCategoriesSuite(t *testing.T) {
+	suite.Run(t, new(CategoriesSuite))
 }

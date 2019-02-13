@@ -21,10 +21,11 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
+
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
-
-	"github.com/dgrijalva/jwt-go"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 type (
@@ -42,7 +43,9 @@ type (
 )
 
 const (
-	signingMethod = "HS256"
+	signingMethod                = "HS256"
+	refreshKeyExpirationInterval = time.Hour * 24 * 7
+	accessKeyExpirationInterval  = time.Hour * 24 * 3
 )
 
 var (
@@ -77,15 +80,14 @@ func (a AuthUsecase) Authenticate(token jwt.Token) (models.User, bool) {
 	return user, true
 }
 
-const (
-	refreshKeyExpirationInterval = time.Hour * 24 * 7
-	accessKeyExpirationInterval  = time.Hour * 24 * 3
-)
-
 // Login a user
 func (a AuthUsecase) Login(username, password string) (models.APIKeyPair, error) {
-	user, found := database.UserWithCredentials(username, password)
+	user, found := database.UserWithName(username)
 	if !found {
+		return models.APIKeyPair{}, ErrUserUnauthorized
+	}
+
+	if !utils.VerifyPasswordHash(password, user.PasswordHash, user.PasswordSalt) {
 		return models.APIKeyPair{}, ErrUserUnauthorized
 	}
 
@@ -98,7 +100,20 @@ func (a AuthUsecase) Register(username, password string) (models.APIKeyPair, err
 		return models.APIKeyPair{}, ErrUserConflicts
 	}
 
-	user := database.NewUser(username, password)
+	hash, salt := utils.CreatePasswordHashAndSalt(password)
+
+	user := models.User{
+		APIID:        utils.CreateAPIID(),
+		Username:     username,
+		PasswordHash: hash,
+		PasswordSalt: salt,
+	}
+
+	database.CreateUser(&user)
+	database.CreateCategory(&models.Category{
+		APIID: utils.CreateAPIID(),
+		Name:  models.Uncategorized,
+	}, user)
 
 	return a.createNewKeyPair(user)
 }

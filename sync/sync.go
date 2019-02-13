@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jmartinezhern/syndication/database"
-	"github.com/jmartinezhern/syndication/models"
-
 	"github.com/mmcdole/gofeed"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
 )
 
 const maxThreads = 100

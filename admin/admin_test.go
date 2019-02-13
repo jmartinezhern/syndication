@@ -23,8 +23,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/jmartinezhern/syndication/database"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/jmartinezhern/syndication/database"
+	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 type (
@@ -82,7 +85,15 @@ func (s *AdminTestSuite) TestNewUser() {
 }
 
 func (s *AdminTestSuite) TestNewConflictingUser() {
-	database.NewUser("test", "testtesttest")
+	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
+
+	user := models.User{
+		Username:     "test",
+		PasswordHash: hash,
+		PasswordSalt: salt,
+	}
+
+	database.CreateUser(&user)
 
 	args := NewUserArgs{
 		"test",
@@ -95,7 +106,15 @@ func (s *AdminTestSuite) TestNewConflictingUser() {
 }
 
 func (s *AdminTestSuite) TestDeleteUser() {
-	user := database.NewUser("test", "testtesttest")
+	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
+
+	user := models.User{
+		Username:     "test",
+		PasswordHash: hash,
+		PasswordSalt: salt,
+	}
+
+	database.CreateUser(&user)
 
 	var msg string
 	err := s.client.Call("Admin.DeleteUser", user.APIID, &msg)
@@ -113,8 +132,22 @@ func (s *AdminTestSuite) TestGetNonExistentUserID() {
 }
 
 func (s *AdminTestSuite) TestGetUsers() {
-	user1 := database.NewUser("test1", "testtesttest")
-	user2 := database.NewUser("test2", "testtesttest")
+	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
+
+	user1 := models.User{
+		Username:     "test1",
+		PasswordHash: hash,
+		PasswordSalt: salt,
+	}
+
+	user2 := models.User{
+		Username:     "test2",
+		PasswordHash: hash,
+		PasswordSalt: salt,
+	}
+
+	database.CreateUser(&user1)
+	database.CreateUser(&user2)
 
 	var users []User
 
@@ -131,7 +164,15 @@ func (s *AdminTestSuite) TestGetUsers() {
 }
 
 func (s *AdminTestSuite) TestChangeUserName() {
-	user := database.NewUser("test", "testtesttest")
+	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
+
+	user := models.User{
+		Username:     "test",
+		PasswordHash: hash,
+		PasswordSalt: salt,
+	}
+
+	database.CreateUser(&user)
 
 	var msg string
 	args := ChangeUserNameArgs{
@@ -149,7 +190,15 @@ func (s *AdminTestSuite) TestChangeUserName() {
 }
 
 func (s *AdminTestSuite) TestChangeUserPassword() {
-	user := database.NewUser("test", "testtesttest")
+	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
+
+	user := models.User{
+		Username:     "test",
+		PasswordHash: hash,
+		PasswordSalt: salt,
+	}
+
+	database.CreateUser(&user)
 
 	var msg string
 	args := ChangeUserPasswordArgs{
@@ -160,8 +209,8 @@ func (s *AdminTestSuite) TestChangeUserPassword() {
 	err := s.client.Call("Admin.ChangeUserPassword", args, &msg)
 	s.Nil(err)
 
-	_, ok := database.UserWithCredentials(user.Username, "gopherpass")
-	s.True(ok)
+	user, _ = database.UserWithName("test")
+	s.True(utils.VerifyPasswordHash("gopherpass", user.PasswordHash, user.PasswordSalt))
 }
 
 func TestAdminTestSuite(t *testing.T) {

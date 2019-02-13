@@ -32,7 +32,7 @@ import (
 // The current supported formats are:
 //    - OPML (application/xml)
 func (s *Server) Import(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	contLength := c.Request().ContentLength
 	if contLength <= 0 {

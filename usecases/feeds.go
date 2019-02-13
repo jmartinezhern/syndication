@@ -23,6 +23,7 @@ import (
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/sync"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 type (
@@ -86,7 +87,11 @@ func (f *FeedUsecase) New(title, subscription string, ctgID string, user models.
 		}
 	}
 
-	feed, err := database.NewFeed(title, subscription, ctgID, user)
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Subscription: subscription,
+	}
+	err := database.CreateFeed(&feed, ctgID, user)
 	if err != nil {
 		return models.Feed{}, err
 	}

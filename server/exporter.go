@@ -31,7 +31,7 @@ import (
 // The current supported formats are:
 //    - OPML (application/xml)
 func (s *Server) Export(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	contType := c.Request().Header.Get("Accept")
 

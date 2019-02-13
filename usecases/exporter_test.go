@@ -20,17 +20,44 @@ package usecases
 import (
 	"encoding/xml"
 	"sort"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
-func (t *UsecasesTestSuite) TestOPMLExporter() {
+type ExporterSuite struct {
+	suite.Suite
+
+	user     models.User
+	unctgCtg models.Category
+}
+
+func (t *ExporterSuite) TestOPMLExporter() {
 	exporter := OPMLExporter{}
 
-	ctg := database.NewCategory("Test", t.user)
-	database.NewFeed("Empty", "empty.com", t.unctgCtg.APIID, t.user)
-	feed, err := database.NewFeed("Example", "example.com", ctg.APIID, t.user)
+	ctgID := utils.CreateAPIID()
+	database.CreateCategory(&models.Category{
+		APIID: ctgID,
+		Name:  "test",
+	}, t.user)
+
+	err := database.CreateFeed(&models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "Empty",
+		Subscription: "example.com",
+	}, t.unctgCtg.APIID, t.user)
+	t.NoError(err)
+
+	feed := models.Feed{
+		APIID:        utils.CreateAPIID(),
+		Title:        "Empty",
+		Subscription: "example.com",
+	}
+	err = database.CreateFeed(&feed, ctgID, t.user)
 	t.NoError(err)
 
 	data, err := exporter.Export(t.user)
@@ -39,12 +66,38 @@ func (t *UsecasesTestSuite) TestOPMLExporter() {
 	b := models.OPML{}
 	t.NoError(xml.Unmarshal(data, &b))
 
-	t.Len(b.Body.Items, 2)
-	t.Len(b.Body.Items[1].Items, 1)
+	t.Require().Len(b.Body.Items, 2)
+	t.Require().Len(b.Body.Items[1].Items, 1)
 	t.NotZero(sort.Search(len(b.Body.Items), func(i int) bool {
 		return b.Body.Items[i].Title == "Empty"
 	}))
 	t.NotZero(sort.Search(len(b.Body.Items), func(i int) bool {
-		return b.Body.Items[i].Title == ctg.Name && b.Body.Items[i].Items[0].Title == feed.Title
+		return b.Body.Items[i].Title == "test" && b.Body.Items[i].Items[0].Title == feed.Title
 	}))
+}
+
+func (t *ExporterSuite) SetupTest() {
+	err := database.Init("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	t.user = models.User{
+		APIID:    utils.CreateAPIID(),
+		Username: "gopher",
+	}
+	database.CreateUser(&t.user)
+
+	t.unctgCtg = models.Category{
+		APIID: utils.CreateAPIID(),
+		Name:  models.Uncategorized,
+	}
+	database.CreateCategory(&t.unctgCtg, t.user)
+}
+
+func (t *ExporterSuite) TearDownTest() {
+	err := database.Close()
+	t.NoError(err)
+}
+
+func TestExporter(t *testing.T) {
+	suite.Run(t, new(ExporterSuite))
 }

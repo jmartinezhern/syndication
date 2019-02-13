@@ -38,7 +38,7 @@ type (
 
 // GetEntry with id
 func (s *Server) GetEntry(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	entry, err := s.entries.Entry(c.Param("entryID"), user)
 	if err == usecases.ErrEntryNotFound {
@@ -52,7 +52,7 @@ func (s *Server) GetEntry(c echo.Context) error {
 
 // GetEntries returns a list of entries that belong to a user
 func (s *Server) GetEntries(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	params := new(EntryQueryParams)
 	if err := c.Bind(params); err != nil {
@@ -92,7 +92,7 @@ func (s *Server) GetEntries(c echo.Context) error {
 
 // MarkEntry applies a Marker to an Entry
 func (s *Server) MarkEntry(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	marker := models.MarkerFromString(c.FormValue("as"))
 	if marker == models.MarkerNone {
@@ -111,7 +111,7 @@ func (s *Server) MarkEntry(c echo.Context) error {
 
 // MarkAllEntries applies a Marker to all Entries
 func (s *Server) MarkAllEntries(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	marker := models.MarkerFromString(c.FormValue("as"))
 	if marker == models.MarkerNone {
@@ -125,7 +125,7 @@ func (s *Server) MarkAllEntries(c echo.Context) error {
 
 // GetEntryStats provides statistics related to Entries
 func (s *Server) GetEntryStats(c echo.Context) error {
-	user := c.Get(echoSyndUserKey).(models.User)
+	user := c.Get(userContextKey).(models.User)
 
 	return c.JSON(http.StatusOK, s.entries.Stats(user))
 }

@@ -29,7 +29,7 @@ import (
 )
 
 func (t *ServerTestSuite) TestGetEntry() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	feed, err := t.server.feeds.New("example", "http://localhost:9090", t.unctgCtg.APIID, t.user)
 	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
@@ -41,7 +41,7 @@ func (t *ServerTestSuite) TestGetEntry() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetParamNames("entryID")
 	c.SetParamValues(entry.APIID)
@@ -60,7 +60,7 @@ func (t *ServerTestSuite) TestGetUnknownEntry() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetParamNames("entryID")
 	c.SetParamValues("bogus")
@@ -73,7 +73,7 @@ func (t *ServerTestSuite) TestGetUnknownEntry() {
 }
 
 func (t *ServerTestSuite) TestGetEntries() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	feed, err := t.server.feeds.New("example", "http://localhost:9090", t.unctgCtg.APIID, t.user)
 	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
@@ -84,7 +84,7 @@ func (t *ServerTestSuite) TestGetEntries() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetPath("/v1/entries")
 
@@ -102,7 +102,7 @@ func (t *ServerTestSuite) TestGetEntries() {
 }
 
 func (t *ServerTestSuite) TestMarkEntry() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	feed, err := t.server.feeds.New("example", "http://localhost:9090", t.unctgCtg.APIID, t.user)
 	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
@@ -117,7 +117,7 @@ func (t *ServerTestSuite) TestMarkEntry() {
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetParamNames("entryID")
 	c.SetParamValues(entry.APIID)
@@ -130,7 +130,7 @@ func (t *ServerTestSuite) TestMarkUnknownEntry() {
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetParamNames("entryID")
 	c.SetParamValues("bogus")
@@ -143,7 +143,7 @@ func (t *ServerTestSuite) TestMarkUnknownEntry() {
 }
 
 func (t *ServerTestSuite) TestMarkAllEntries() {
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	feed, err := t.server.feeds.New("example", "http://localhost:9090", t.unctgCtg.APIID, t.user)
 	t.Require().NoError(err)
 
 	_, err = database.NewEntry(models.Entry{
@@ -158,7 +158,7 @@ func (t *ServerTestSuite) TestMarkAllEntries() {
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetPath("/v1/entries/mark")
 
@@ -169,7 +169,7 @@ func (t *ServerTestSuite) TestGetEntryStats() {
 	req := httptest.NewRequest(echo.PUT, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetPath("/v1/entries/stats")
 

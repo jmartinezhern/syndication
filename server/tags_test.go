@@ -28,6 +28,7 @@ import (
 
 	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/utils"
 )
 
 func (t *ServerTestSuite) TestNewTag() {
@@ -37,7 +38,7 @@ func (t *ServerTestSuite) TestNewTag() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetPath("/v1/tags")
 
@@ -46,7 +47,10 @@ func (t *ServerTestSuite) TestNewTag() {
 }
 
 func (t *ServerTestSuite) TestNewConflictingTag() {
-	database.NewTag("Test", t.user)
+	database.CreateTag(&models.Tag{
+		APIID: utils.CreateAPIID(),
+		Name:  "Test",
+	}, t.user)
 
 	tag := `{ "name": "Test" }`
 
@@ -54,7 +58,7 @@ func (t *ServerTestSuite) TestNewConflictingTag() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetPath("/v1/tags")
 
@@ -65,12 +69,16 @@ func (t *ServerTestSuite) TestNewConflictingTag() {
 }
 
 func (t *ServerTestSuite) TestGetTags() {
-	tag := database.NewTag("Test", t.user)
+	tag := models.Tag{
+		APIID: utils.CreateAPIID(),
+		Name:  "Test",
+	}
+	database.CreateTag(&tag, t.user)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 
 	c.SetPath("/v1/tags")
 
@@ -89,12 +97,16 @@ func (t *ServerTestSuite) TestGetTags() {
 }
 
 func (t *ServerTestSuite) TestDeleteTag() {
-	tag := database.NewTag("Test", t.user)
+	tag := models.Tag{
+		APIID: utils.CreateAPIID(),
+		Name:  "Test",
+	}
+	database.CreateTag(&tag, t.user)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues(tag.APIID)
 
@@ -108,7 +120,7 @@ func (t *ServerTestSuite) TestDeleteUnknownTag() {
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues("bogus")
 
@@ -121,7 +133,11 @@ func (t *ServerTestSuite) TestDeleteUnknownTag() {
 }
 
 func (t *ServerTestSuite) TestEditTag() {
-	tag := database.NewTag("test", t.user)
+	tag := models.Tag{
+		APIID: utils.CreateAPIID(),
+		Name:  "Test",
+	}
+	database.CreateTag(&tag, t.user)
 
 	mdfTagJSON := `{"name": "gopher"}`
 
@@ -129,7 +145,7 @@ func (t *ServerTestSuite) TestEditTag() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues(tag.APIID)
 
@@ -148,7 +164,7 @@ func (t *ServerTestSuite) TestEditUnknownTag() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues("bogus")
 
@@ -161,9 +177,13 @@ func (t *ServerTestSuite) TestEditUnknownTag() {
 }
 
 func (t *ServerTestSuite) TestTagEntries() {
-	tag := database.NewTag("test", t.user)
+	tag := models.Tag{
+		APIID: utils.CreateAPIID(),
+		Name:  "Test",
+	}
+	database.CreateTag(&tag, t.user)
 
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	feed, err := t.server.feeds.New("example", "http://localhost:9090", t.unctgCtg.APIID, t.user)
 	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
@@ -181,7 +201,7 @@ func (t *ServerTestSuite) TestTagEntries() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues(tag.APIID)
 
@@ -202,7 +222,7 @@ func (t *ServerTestSuite) TestTagEntriesWithUnknownTag() {
 	req.Header.Set("Content-Type", "application/json")
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues("bogus")
 
@@ -215,12 +235,16 @@ func (t *ServerTestSuite) TestTagEntriesWithUnknownTag() {
 }
 
 func (t *ServerTestSuite) TestGetTag() {
-	tag := database.NewTag("test", t.user)
+	tag := models.Tag{
+		APIID: utils.CreateAPIID(),
+		Name:  "Test",
+	}
+	database.CreateTag(&tag, t.user)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues(tag.APIID)
 
@@ -237,7 +261,7 @@ func (t *ServerTestSuite) TestGetUnknownTag() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues("bogus")
 
@@ -250,9 +274,13 @@ func (t *ServerTestSuite) TestGetUnknownTag() {
 }
 
 func (t *ServerTestSuite) TestGetEntriesFromTag() {
-	tag := database.NewTag("test", t.user)
+	tag := models.Tag{
+		APIID: utils.CreateAPIID(),
+		Name:  "Test",
+	}
+	database.CreateTag(&tag, t.user)
 
-	feed, err := database.NewFeed("Example", "example.com", t.unctgCtg.APIID, t.user)
+	feed, err := t.server.feeds.New("example", "http://localhost:9090", t.unctgCtg.APIID, t.user)
 	t.Require().NoError(err)
 
 	entry, err := database.NewEntry(models.Entry{
@@ -265,7 +293,7 @@ func (t *ServerTestSuite) TestGetEntriesFromTag() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues(tag.APIID)
 
@@ -289,7 +317,7 @@ func (t *ServerTestSuite) TestGetEntriesFromUnknownTag() {
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	c := t.e.NewContext(req, t.rec)
-	c.Set(echoSyndUserKey, t.user)
+	c.Set(userContextKey, t.user)
 	c.SetParamNames("tagID")
 	c.SetParamValues("bogus")
 

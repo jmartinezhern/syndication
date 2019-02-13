@@ -18,8 +18,9 @@
 package database
 
 import (
-	"github.com/jmartinezhern/syndication/models"
 	"time"
+
+	"github.com/jmartinezhern/syndication/models"
 )
 
 // NewEntry creates a new Entry object owned by user
@@ -29,7 +30,6 @@ func (db *DB) NewEntry(entry models.Entry, feedID string, user models.User) (mod
 		return models.Entry{}, ErrModelNotFound
 	}
 
-	entry.APIID = createAPIID()
 	entry.Feed = feed
 	entry.FeedID = feed.ID
 
@@ -58,8 +58,6 @@ func (db *DB) NewEntries(entries []models.Entry, feedID string, user models.User
 	}
 
 	for i, entry := range entries {
-		entry.APIID = createAPIID()
-
 		db.db.Model(&user).Association("Entries").Append(&entry)
 		db.db.Model(&feed).Association("Entries").Append(&entry)
 
@@ -239,9 +237,17 @@ func (db *DB) EntriesFromMultipleTags(tagIDs []string, orderByNewest bool, marke
 		order = order.Where("mark = ?", marker)
 	}
 
+	tagPrimaryKey := func(apiID string, user models.User) uint {
+		tag := &models.Tag{}
+		if db.db.Model(&user).Where("api_id = ?", apiID).Related(tag).RecordNotFound() {
+			return 0
+		}
+		return tag.ID
+	}
+
 	var tagPrimaryKeys []uint
 	for _, tag := range tagIDs {
-		key := db.tagPrimaryKey(tag, user)
+		key := tagPrimaryKey(tag, user)
 		if key != 0 {
 			tagPrimaryKeys = append(tagPrimaryKeys, key)
 		}

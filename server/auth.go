@@ -40,7 +40,7 @@ func (s *Server) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusUnauthorized)
 		}
 
-		c.Set(echoSyndUserKey, user)
+		c.Set(userContextKey, user)
 
 		return next(c)
 	}
