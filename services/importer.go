@@ -85,7 +85,6 @@ func (i OPMLImporter) Import(data []byte, user *models.User) error {
 	b := models.OPML{}
 
 	err := xml.Unmarshal(data, &b)
-	// TODO: return specific error
 	if err != nil {
 		return nil
 	}

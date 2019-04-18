@@ -31,7 +31,6 @@ import (
 type TagsSuite struct {
 	suite.Suite
 
-	// TODO: should be interface, not struct
 	service  Tag
 	tagsRepo repo.Tags
 	db       *sql.DB

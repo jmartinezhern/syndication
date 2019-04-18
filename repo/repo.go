@@ -118,6 +118,5 @@ type (
 		TagWithID(user *models.User, id string) (models.Tag, bool)
 		TagWithName(user *models.User, name string) (models.Tag, bool)
 		List(user *models.User, continuationID string, count int) ([]models.Tag, string)
-		// TODO: entries
 	}
 )

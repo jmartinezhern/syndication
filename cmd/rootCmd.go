@@ -66,12 +66,13 @@ type (
 
 	// Config represents a complete configuration
 	Config struct {
-		Sync       Sync
-		EnableTLS  bool   `mapstructure:"enable_tls"`
-		AuthSecret string `mapstructure:"auth_secret"`
-		Database   Database
-		Host       Host
-		Admin      Admin
+		Sync               Sync
+		EnableTLS          bool   `mapstructure:"enable_tls"`
+		AuthSecret         string `mapstructure:"auth_secret"`
+		AllowRegistrations bool   `mapstructure:"allow_registrations"`
+		Database           Database
+		Host               Host
+		Admin              Admin
 	}
 )
 
@@ -92,8 +93,9 @@ func Execute() error {
 	viper.SetDefault("sync.delete_after", 30)
 	viper.SetDefault("host.port", 8080)
 	viper.SetDefault("host.address", "localhost")
-	viper.SetDefault("repo.type", "sqlite3")
-	viper.SetDefault("repo.connection", "/var/lib/syndication.db")
+	viper.SetDefault("database.type", "sqlite3")
+	viper.SetDefault("database.connection", "/var/lib/syndication.db")
+	viper.SetDefault("allow_registrations", true)
 
 	if err := rootCmd.Execute(); err != nil {
 		return err

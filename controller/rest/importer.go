@@ -80,7 +80,7 @@ func (s *ImporterController) Import(c echo.Context) error {
 	}
 
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError)
+		return echo.NewHTTPError(http.StatusBadRequest, "could not parse input")
 	}
 
 	return c.NoContent(http.StatusNoContent)

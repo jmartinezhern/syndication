@@ -66,8 +66,12 @@ func (s *ExporterController) Export(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
 
-		// TODO: Encapsulate this as part of service such that we do not need to specify a concrete blob
-		return c.XMLBlob(http.StatusOK, data)
+		switch contType {
+		case "application/xml":
+			return c.XMLBlob(http.StatusOK, data)
+		case "application/json":
+			return c.JSONBlob(http.StatusOK, data)
+		}
 	}
 
 	return echo.NewHTTPError(http.StatusNotAcceptable)

@@ -57,8 +57,7 @@ func main() {
 	entriesService := services.NewEntriesService(entriesRepo)
 	tagsService := services.NewTagsService(tagsRepo, entriesRepo)
 
-	// TODO: add config for allow registrations
-	server.RegisterAuthService(authService, config.AuthSecret, true)
+	server.RegisterAuthService(authService, config.AuthSecret, config.AllowRegistrations)
 	server.RegisterCategoriesService(ctgsService)
 	server.RegisterFeedsService(feedsService)
 	server.RegisterEntriesService(entriesService)

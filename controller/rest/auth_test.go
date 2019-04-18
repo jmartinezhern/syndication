@@ -60,6 +60,22 @@ func (c *AuthControllerSuite) TestRegister() {
 	c.Equal(http.StatusOK, rec.Code)
 }
 
+func (c *AuthControllerSuite) TestDisallowedRegistrations() {
+	c.controller.allowRegistrations = false
+
+	req := httptest.NewRequest(
+		echo.POST,
+		fmt.Sprintf("/"),
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.SetPath("/v1/auth/register")
+
+	c.EqualError(c.controller.Register(ctx), echo.NewHTTPError(http.StatusNotFound).Error())
+}
+
 func (c *AuthControllerSuite) TestLogin() {
 	username := "test"
 	password := "testtesttest"

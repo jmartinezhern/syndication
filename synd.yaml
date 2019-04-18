@@ -1,3 +1,5 @@
+allow_registrations: true
+auth_secret: secret
 database:
   connection: /tmp/syndication.db
   type: sqlite3
@@ -6,4 +8,3 @@ host:
   port: 8080
 sync:
   interval: 15m0s
-  delete_after: 30
