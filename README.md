@@ -7,7 +7,6 @@
 ## Features
 
 - JSON REST API
-- Unix socket based Administration API
 - Let's Encrypt through Echo framework (experimental)
 - Support for SQLite, MySQL and PostgreSQL
 
