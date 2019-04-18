@@ -19,14 +19,20 @@
 package utils
 
 import (
+	"crypto/md5"
 	"crypto/rand"
 	"encoding/base64"
 	"io"
 	mathRand "math/rand"
+	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/labstack/gommon/log"
+	"github.com/mmcdole/gofeed"
 	"golang.org/x/crypto/scrypt"
+
+	"github.com/jmartinezhern/syndication/models"
 )
 
 const (
@@ -39,22 +45,109 @@ var (
 	random32Int          uint32
 )
 
+var (
+// ErrParsingFeed Signals that an error occurred while processing
+// a RSS or Atom feed
+)
+
+func fetchFeed(url, etag string) (gofeed.Feed, error) {
+	client := &http.Client{
+		CheckRedirect: func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse },
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return gofeed.Feed{}, err
+	}
+
+	req.Header.Add("If-None-Match", etag)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return gofeed.Feed{}, err
+	}
+
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Warn(err)
+		}
+	}()
+
+	fetchedFeed, err := gofeed.NewParser().Parse(resp.Body)
+	if err != nil {
+		return gofeed.Feed{}, err
+	}
+
+	return *fetchedFeed, nil
+}
+
+func convertItemToEntry(item *gofeed.Item) models.Entry {
+	entry := models.Entry{
+		Title: item.Title,
+		Link:  item.Link,
+		Mark:  models.MarkerUnread,
+	}
+
+	if item.Author != nil {
+		entry.Author = item.Author.Name
+	}
+
+	if item.PublishedParsed != nil {
+		entry.Published = *item.PublishedParsed
+	} else {
+		entry.Published = time.Now()
+	}
+
+	if item.GUID != "" {
+		entry.GUID = item.GUID
+	} else {
+		itemHash := md5.Sum([]byte(item.Title + item.Link))
+		entry.GUID = string(itemHash[:md5.Size])
+	}
+
+	return entry
+}
+
+// PullFeed and return all entries for that feed. If getting the
+// subscription source or parsing the response fails, this function
+// will error.
+func PullFeed(url, etag string) (models.Feed, []models.Entry, error) {
+	fetchedFeed, err := fetchFeed(url, etag)
+	if err != nil {
+		return models.Feed{}, nil, err
+	}
+
+	feed := models.Feed{
+		Title:       fetchedFeed.Title,
+		Description: fetchedFeed.Description,
+		Source:      fetchedFeed.Link,
+		LastUpdated: time.Now(),
+	}
+
+	entries := make([]models.Entry, len(fetchedFeed.Items))
+	for idx, item := range fetchedFeed.Items {
+		entries[idx] = convertItemToEntry(item)
+	}
+
+	return feed, entries, nil
+}
+
 // CreatePasswordHashAndSalt for a given password
-func CreatePasswordHashAndSalt(password string) ([]byte, []byte) {
+func CreatePasswordHashAndSalt(password string) (hash, salt []byte) {
 	var err error
 
-	salt := make([]byte, pwSaltBytes)
+	salt = make([]byte, pwSaltBytes)
 	_, err = io.ReadFull(rand.Reader, salt)
 	if err != nil {
 		panic(err) // We must be able to read from random
 	}
 
-	hash, err := scrypt.Key([]byte(password), salt, 1<<14, 8, 1, pwHashBytes)
+	hash, err = scrypt.Key([]byte(password), salt, 1<<14, 8, 1, pwHashBytes)
 	if err != nil {
 		panic(err) // We must never get an error
 	}
 
-	return hash, salt
+	return
 }
 
 // VerifyPasswordHash with a given salt

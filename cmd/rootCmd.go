@@ -86,6 +86,15 @@ var EffectiveConfig Config
 
 // Execute the root command
 func Execute() error {
+	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file")
+
+	viper.SetDefault("sync.interval", time.Minute*15)
+	viper.SetDefault("sync.delete_after", 30)
+	viper.SetDefault("host.port", 8080)
+	viper.SetDefault("host.address", "localhost")
+	viper.SetDefault("repo.type", "sqlite3")
+	viper.SetDefault("repo.connection", "/var/lib/syndication.db")
+
 	if err := rootCmd.Execute(); err != nil {
 		return err
 	}
@@ -120,17 +129,6 @@ func generateSecret() string {
 	}
 
 	return base64.URLEncoding.EncodeToString(b)[0:generatedSecretLength]
-}
-
-func init() {
-	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file")
-
-	viper.SetDefault("sync.interval", time.Minute*15)
-	viper.SetDefault("sync.delete_after", 30)
-	viper.SetDefault("host.port", 8080)
-	viper.SetDefault("host.address", "localhost")
-	viper.SetDefault("database.type", "sqlite3")
-	viper.SetDefault("database.connection", "/var/lib/syndication.db")
 }
 
 func initConfig() {

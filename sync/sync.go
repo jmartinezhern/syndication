@@ -18,34 +18,19 @@
 package sync
 
 import (
-	"crypto/md5"
-	"errors"
-	"net/http"
 	"sync"
 	"time"
 
-	"github.com/mmcdole/gofeed"
-	log "github.com/sirupsen/logrus"
+	"github.com/labstack/gommon/log"
 
-	"github.com/jmartinezhern/syndication/database"
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/repo"
+	"github.com/jmartinezhern/syndication/utils"
 )
-
-const maxThreads = 100
-
-var (
-	// ErrParsingFeed Signals that an error occurred while processing
-	// a RSS or Atom feed
-	ErrParsingFeed = errors.New("Could not parse feed")
-)
-
-type userPool struct {
-	users []models.User
-	lock  sync.Mutex
-}
 
 const (
-	stopping = iota
+	maxThreads = 100
+	stopping   = iota
 	stopped
 )
 
@@ -55,182 +40,77 @@ type syncStatus = int
 // Service will update all feeds for all users periodically.
 type Service struct {
 	ticker          *time.Ticker
-	userPool        userPool
 	userWaitGroup   sync.WaitGroup
 	status          chan syncStatus
 	interval        time.Duration
 	deleteAfterDays int
 	dbLock          sync.Mutex
-}
-
-func (p *userPool) get() models.User {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	if len(p.users) == 0 {
-		return models.User{}
-	}
-
-	user := p.users[0]
-	p.users = p.users[1:]
-	return user
-}
-
-func (p *userPool) put(user models.User) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.users = append(p.users, user)
-}
-
-func fetchFeed(url, etag string) (gofeed.Feed, error) {
-	client := &http.Client{
-		CheckRedirect: (func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse }),
-	}
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return gofeed.Feed{}, err
-	}
-
-	req.Header.Add("If-None-Match", etag)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return gofeed.Feed{}, err
-	}
-
-	defer func() {
-		if err = resp.Body.Close(); err != nil {
-			log.Warn(err)
-		}
-	}()
-
-	fetchedFeed, err := gofeed.NewParser().Parse(resp.Body)
-	if err != nil {
-		return gofeed.Feed{}, err
-	}
-
-	return *fetchedFeed, nil
-}
-
-func convertItemToEntry(item *gofeed.Item) models.Entry {
-	entry := models.Entry{
-		Title: item.Title,
-		Link:  item.Link,
-		Mark:  models.MarkerUnread,
-	}
-
-	if item.Author != nil {
-		entry.Author = item.Author.Name
-	}
-
-	if item.PublishedParsed != nil {
-		entry.Published = *item.PublishedParsed
-	} else {
-		entry.Published = time.Now()
-	}
-
-	if item.GUID != "" {
-		entry.GUID = item.GUID
-	} else {
-		itemHash := md5.Sum([]byte(item.Title + item.Link))
-		entry.GUID = string(itemHash[:md5.Size])
-	}
-
-	return entry
+	usersRepo       repo.Users
+	feedsRepo       repo.Feeds
+	entriesRepo     repo.Entries
 }
 
 // SyncUsers sync's all user's feeds.
 func (s *Service) SyncUsers() {
-	s.dbLock.Lock()
-	users := database.Users()
-	s.dbLock.Unlock()
+	var continuationID string
+	var users []models.User
+	for {
+		users, continuationID = s.usersRepo.List(continuationID, maxThreads)
+		if len(users) == 0 {
+			break
+		}
 
-	for _, user := range users {
-		s.userPool.put(user)
+		s.userWaitGroup.Add(len(users))
+
+		for idx := range users {
+			go func(user models.User) {
+				s.SyncUser(&user)
+				s.userWaitGroup.Done()
+			}(users[idx])
+		}
+
+		s.userWaitGroup.Wait()
+
+		if continuationID == "" {
+			break
+		}
 	}
-
-	var numThreads int
-	if len(users) > maxThreads {
-		numThreads = maxThreads
-	} else {
-		numThreads = len(users)
-	}
-
-	for i := 0; i < numThreads; i++ {
-		s.userWaitGroup.Add(1)
-		go func() {
-			user := s.userPool.get()
-			for user.ID != 0 {
-				if err := s.SyncUser(&user); err != nil {
-					log.Error(err)
-				}
-				user = s.userPool.get()
-			}
-
-			s.userWaitGroup.Done()
-		}()
-	}
-}
-
-// PullFeed and return all entries for that feed. If getting the
-// subscription source or parsing the response fails, this function
-// will error.
-func PullFeed(url, etag string) (models.Feed, []models.Entry, error) {
-	fetchedFeed, err := fetchFeed(url, etag)
-	if err != nil {
-		return models.Feed{}, nil, err
-	}
-
-	feed := models.Feed{
-		Title:       fetchedFeed.Title,
-		Description: fetchedFeed.Description,
-		Source:      fetchedFeed.Link,
-		LastUpdated: time.Now(),
-	}
-
-	entries := make([]models.Entry, len(fetchedFeed.Items))
-	for idx, item := range fetchedFeed.Items {
-		entries[idx] = convertItemToEntry(item)
-	}
-
-	return feed, entries, nil
 }
 
 // SyncUser sync's all feeds owned by user
-func (s *Service) SyncUser(user *models.User) error {
+func (s *Service) SyncUser(user *models.User) {
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
 	continuationID := ""
 	for {
-		feeds, continuationID := database.Feeds(continuationID, 100, *user)
-		for _, feed := range feeds {
+		var feeds []models.Feed
+		feeds, continuationID = s.feedsRepo.List(user, continuationID, 100)
+		for idx := range feeds {
+			feed := feeds[idx]
 			if !time.Now().After(feed.LastUpdated.Add(s.interval)) {
 				continue
 			}
 
-			fetchedFeed, fetchedEntries, err := PullFeed(feed.Subscription, feed.Etag)
+			fetchedFeed, fetchedEntries, err := utils.PullFeed(feed.Subscription, feed.Etag)
 			if err != nil {
 				log.Error(err)
 			}
 
-			_, err = database.EditFeed(feed.APIID, fetchedFeed, *user)
+			fetchedFeed.APIID = feed.APIID
+
+			err = s.feedsRepo.Update(user, &fetchedFeed)
 			if err != nil {
 				log.Error(err)
 			}
 
-			entries := []models.Entry{}
-			for _, entry := range fetchedEntries {
-				if found := database.EntryWithGUIDExists(entry.GUID, feed.APIID, *user); !found {
-					entries = append(entries, entry)
+			for idx := range fetchedEntries {
+				entry := fetchedEntries[idx]
+				if _, found := s.entriesRepo.EntryWithGUID(user, entry.GUID); !found {
+					entry.APIID = utils.CreateAPIID()
+					entry.Feed = feed
+					s.entriesRepo.Create(user, &entry)
 				}
-			}
-
-			_, err = database.NewEntries(entries, feed.APIID, *user)
-			if err != nil {
-				log.Error(err)
 			}
 		}
 
@@ -238,9 +118,6 @@ func (s *Service) SyncUser(user *models.User) error {
 			break
 		}
 	}
-	database.DeleteOldEntries(time.Now().AddDate(0, 0, s.deleteAfterDays*-1), *user)
-
-	return nil
 }
 
 func (s *Service) scheduleTask() {
@@ -273,10 +150,13 @@ func (s *Service) Stop() {
 }
 
 // NewService creates a new SyncService object
-func NewService(syncInterval time.Duration, deleteAfter int) Service {
+func NewService(syncInterval time.Duration, deleteAfter int, feedsRepo repo.Feeds, usersRepo repo.Users, entriesRepo repo.Entries) Service {
 	return Service{
 		status:          make(chan syncStatus),
 		interval:        syncInterval,
 		deleteAfterDays: deleteAfter,
+		feedsRepo:       feedsRepo,
+		usersRepo:       usersRepo,
+		entriesRepo:     entriesRepo,
 	}
 }
