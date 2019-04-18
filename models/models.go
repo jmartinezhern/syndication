@@ -28,7 +28,7 @@ type Marker int
 
 // Markers identify the visibility status of entities
 const (
-	MarkerNone = iota
+	_ = iota
 	MarkerRead
 	MarkerUnread
 	MarkerAny
@@ -48,34 +48,46 @@ const (
 	// This only applies to Feeds and Entries
 	Uncategorized = "uncategorized"
 
-	// Saved identifies an entity as permenantly saved.
+	// Saved identifies an entity as permanently saved.
 	// This only applies to Entries.
 	Saved = "saved"
 )
 
 // MarkerFromString converts a string to a Marker type
 func MarkerFromString(marker string) Marker {
-	if len(marker) == 0 {
-		return MarkerNone
-	}
-
 	value := strings.ToLower(marker)
-	if value == "unread" {
+	switch value {
+	case "unread":
 		return MarkerUnread
-	} else if value == "read" {
+	case "read":
 		return MarkerRead
+	default:
+		return MarkerAny
 	}
-
-	return MarkerNone
 }
 
 type (
+	Admin struct {
+		ID        uint       `json:"-" gorm:"primary_key"`
+		CreatedAt time.Time  `json:"created_at"`
+		UpdatedAt time.Time  `json:"updated_at"`
+		DeletedAt *time.Time `json:"deleted_at" sql:"index"`
+
+		APIID string `json:"id"`
+
+		APIKeys []APIKey `json:"-"`
+
+		Username     string `json:"username,required"`
+		Email        string `json:"email,optional"`
+		PasswordHash []byte `json:"-"`
+		PasswordSalt []byte `json:"-"`
+	}
 	// User represents a user and owner of all other entities.
 	User struct {
 		ID        uint       `json:"-" gorm:"primary_key"`
-		CreatedAt time.Time  `json:"created_at,omitempty"`
-		UpdatedAt time.Time  `json:"updated_at,omitempty"`
-		DeletedAt *time.Time `json:"deleted_at,omitempty" sql:"index"`
+		CreatedAt time.Time  `json:"created_at"`
+		UpdatedAt time.Time  `json:"updated_at"`
+		DeletedAt *time.Time `json:"deleted_at" sql:"index"`
 
 		APIID string `json:"id"`
 
@@ -94,8 +106,8 @@ type (
 	// Category represents a container for Feed entities.
 	Category struct {
 		ID        uint      `json:"-" gorm:"primary_key"`
-		CreatedAt time.Time `json:"created_at,omitempty"`
-		UpdatedAt time.Time `json:"updated_at,omitempty"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
 
 		APIID string `json:"id"`
 
@@ -168,7 +180,7 @@ type (
 		GUID      string    `json:"-"`
 		Title     string    `json:"title"`
 		Link      string    `json:"link"`
-		Author    string    `json:"author"`
+		Author    string    `json:"author,omitempty"`
 		Published time.Time `json:"published"`
 		Saved     bool      `json:"isSaved"`
 		Mark      Marker    `json:"markedAs"`
@@ -195,7 +207,6 @@ type (
 		UserID  uint      `json:"-"`
 		Expires time.Time `json:"expires"`
 	}
-
 	// APIKeyPair collects a refresh and access token
 	APIKeyPair struct {
 		RefreshKey string `json:"refreshToken"`

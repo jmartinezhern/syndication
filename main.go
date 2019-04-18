@@ -21,35 +21,54 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/jmartinezhern/syndication/cmd"
-	"github.com/jmartinezhern/syndication/database"
-	"github.com/jmartinezhern/syndication/server"
-	"github.com/jmartinezhern/syndication/sync"
-
 	log "github.com/sirupsen/logrus"
+
+	"github.com/jmartinezhern/syndication/cmd"
+	"github.com/jmartinezhern/syndication/controller/rest"
+	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/services"
+	"github.com/jmartinezhern/syndication/sync"
 )
 
-func main() {
+func config() cmd.Config {
 	if err := cmd.Execute(); err != nil {
 		log.Error(err)
 		os.Exit(1)
 	}
 
-	config := cmd.EffectiveConfig
+	return cmd.EffectiveConfig
+}
 
-	if err := database.Init(
-		config.Database.Type,
-		config.Database.Connection,
-	); err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
+func main() {
+	config := config()
+	db := sql.NewDB(config.Database.Type, config.Database.Connection)
 
-	sync := sync.NewService(config.Sync.Interval, config.Sync.DeleteAfter)
-	sync.Start()
-	defer sync.Stop()
+	server := rest.NewServer()
 
-	server := server.NewServer(config.AuthSecret)
+	usersRepo := sql.NewUsers(db)
+	ctgsRepo := sql.NewCategories(db)
+	entriesRepo := sql.NewEntries(db)
+	feedsRepo := sql.NewFeeds(db)
+	tagsRepo := sql.NewTags(db)
+
+	authService := services.NewAuthService(config.AuthSecret, usersRepo)
+	ctgsService := services.NewCategoriesService(ctgsRepo, entriesRepo)
+	feedsService := services.NewFeedsService(feedsRepo, ctgsRepo, entriesRepo)
+	entriesService := services.NewEntriesService(entriesRepo)
+	tagsService := services.NewTagsService(tagsRepo, entriesRepo)
+
+	// TODO: add config for allow registrations
+	server.RegisterAuthService(authService, config.AuthSecret, true)
+	server.RegisterCategoriesService(ctgsService)
+	server.RegisterFeedsService(feedsService)
+	server.RegisterEntriesService(entriesService)
+	server.RegisterTagsController(tagsService)
+	server.RegisterImporters(rest.Importers{"application/xml": services.NewOPMLImporter(ctgsRepo, feedsRepo)})
+	server.RegisterExporters(rest.Exporters{"application/xml": services.NewOPMLExporter(ctgsRepo)})
+
+	syncService := sync.NewService(config.Sync.Interval, config.Sync.DeleteAfter, feedsRepo, usersRepo, entriesRepo)
+	syncService.Start()
+	defer syncService.Stop()
 
 	go func() {
 		if err := server.Start(config.Host.Address, config.Host.Port); err != nil {
@@ -62,6 +81,6 @@ func main() {
 	<-quit
 
 	if err := server.Stop(); err != nil {
-		log.Fatal(err)
+		log.Warn(err)
 	}
 }
