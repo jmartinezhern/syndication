@@ -52,7 +52,4 @@ host:
 sync:
   # How often to sync feeds
   interval: 15m0s
-
-  # Days to hold old non-saved entries
-  delete_after: 30
 ```
