@@ -9,10 +9,8 @@ import (
 )
 
 type (
-	// Admin interface defines the Admin services
-	Admin interface {
-		RegisterInitialAdmin(username, password string) models.Admin
-
+	// Users interface defines the Users services
+	Users interface {
 		// NewUser creates a new user with user name and password
 		NewUser(username, password string) (models.User, error)
 
@@ -26,10 +24,9 @@ type (
 		Users(continuationID string, count int) ([]models.User, string)
 	}
 
-	// AdminServices implement the Admin interface
-	AdminServices struct {
-		adminsRepo repo.Admins
-		usersRepo  repo.Users
+	// UsersService implement the Users interface
+	UsersService struct {
+		usersRepo repo.Users
 	}
 )
 
@@ -41,36 +38,14 @@ var (
 	ErrUserNotFound = errors.New("user not found")
 )
 
-func NewAdminsServices(adminsRepo repo.Admins, usersRepo repo.Users) AdminServices {
-	return AdminServices{
-		adminsRepo,
+func NewUsersService(usersRepo repo.Users) UsersService {
+	return UsersService{
 		usersRepo,
 	}
 }
 
-func (a AdminServices) RegisterInitialAdmin(username, password string) models.Admin {
-	if _, found := a.adminsRepo.InitialUser(); found {
-		// TODO: probably error if we have already registered
-		return models.Admin{}
-	}
-
-	hash, salt := utils.CreatePasswordHashAndSalt(password)
-
-	admin := models.Admin{
-		APIID:        utils.CreateAPIID(),
-		Username:     username,
-		PasswordHash: hash,
-		PasswordSalt: salt,
-	}
-
-	a.adminsRepo.Create(&admin)
-
-	// TODO: probably don't need to do this
-	return admin
-}
-
 // NewUser creates a new user
-func (a *AdminServices) NewUser(username, password string) (models.User, error) {
+func (a *UsersService) NewUser(username, password string) (models.User, error) {
 	if _, found := a.usersRepo.UserWithName(username); found {
 		return models.User{}, ErrUsernameConflicts
 	}
@@ -89,16 +64,16 @@ func (a *AdminServices) NewUser(username, password string) (models.User, error) 
 }
 
 // DeleteUser deletes a user with userID
-func (a *AdminServices) DeleteUser(id string) error {
+func (a *UsersService) DeleteUser(id string) error {
 	return a.usersRepo.Delete(id)
 }
 
 // User gets a user with id
-func (a *AdminServices) User(id string) (models.User, bool) {
+func (a *UsersService) User(id string) (models.User, bool) {
 	return a.usersRepo.UserWithID(id)
 }
 
 // Users returns all users
-func (a *AdminServices) Users(continuationID string, count int) (users []models.User, next string) {
+func (a *UsersService) Users(continuationID string, count int) (users []models.User, next string) {
 	return a.usersRepo.List(continuationID, count)
 }

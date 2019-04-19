@@ -26,16 +26,16 @@ import (
 )
 
 type (
-	AdminsController struct {
+	UsersController struct {
 		e       *echo.Echo
-		service services.Admin
+		service services.Users
 	}
 )
 
-func NewAdminsController(service services.Admin, e *echo.Echo) *AdminsController {
+func NewUsersController(service services.Users, e *echo.Echo) *UsersController {
 	v1 := e.Group("v1")
 
-	controller := AdminsController{
+	controller := UsersController{
 		e,
 		service,
 	}
@@ -48,7 +48,7 @@ func NewAdminsController(service services.Admin, e *echo.Echo) *AdminsController
 	return &controller
 }
 
-func (c *AdminsController) CreateUser(ctx echo.Context) error {
+func (c *UsersController) CreateUser(ctx echo.Context) error {
 	type NewUser struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -69,7 +69,7 @@ func (c *AdminsController) CreateUser(ctx echo.Context) error {
 	return ctx.NoContent(http.StatusNoContent)
 }
 
-func (c *AdminsController) ListUsers(ctx echo.Context) error {
+func (c *UsersController) ListUsers(ctx echo.Context) error {
 	params := paginationParams{}
 	if err := ctx.Bind(&params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
@@ -83,7 +83,7 @@ func (c *AdminsController) ListUsers(ctx echo.Context) error {
 	})
 }
 
-func (c *AdminsController) DeleteUser(ctx echo.Context) error {
+func (c *UsersController) DeleteUser(ctx echo.Context) error {
 	userID := ctx.Param("userID")
 
 	err := c.service.DeleteUser(userID)
@@ -96,7 +96,7 @@ func (c *AdminsController) DeleteUser(ctx echo.Context) error {
 	return ctx.NoContent(http.StatusNoContent)
 }
 
-func (c *AdminsController) GetUser(ctx echo.Context) error {
+func (c *UsersController) GetUser(ctx echo.Context) error {
 	userID := ctx.Param("userID")
 
 	user, found := c.service.User(userID)
