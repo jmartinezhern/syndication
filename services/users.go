@@ -1,3 +1,20 @@
+/*
+  Copyright (C) 2017 Jorge Martinez Hernandez
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Affero General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU Affero General Public License for more details.
+
+  You should have received a copy of the GNU Affero General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package services
 
 import (
@@ -45,7 +62,7 @@ func NewUsersService(usersRepo repo.Users) UsersService {
 }
 
 // NewUser creates a new user
-func (a *UsersService) NewUser(username, password string) (models.User, error) {
+func (a UsersService) NewUser(username, password string) (models.User, error) {
 	if _, found := a.usersRepo.UserWithName(username); found {
 		return models.User{}, ErrUsernameConflicts
 	}
@@ -64,16 +81,16 @@ func (a *UsersService) NewUser(username, password string) (models.User, error) {
 }
 
 // DeleteUser deletes a user with userID
-func (a *UsersService) DeleteUser(id string) error {
+func (a UsersService) DeleteUser(id string) error {
 	return a.usersRepo.Delete(id)
 }
 
 // User gets a user with id
-func (a *UsersService) User(id string) (models.User, bool) {
+func (a UsersService) User(id string) (models.User, bool) {
 	return a.usersRepo.UserWithID(id)
 }
 
 // Users returns all users
-func (a *UsersService) Users(continuationID string, count int) (users []models.User, next string) {
+func (a UsersService) Users(continuationID string, count int) (users []models.User, next string) {
 	return a.usersRepo.List(continuationID, count)
 }
