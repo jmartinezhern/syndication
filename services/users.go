@@ -82,7 +82,12 @@ func (a UsersService) NewUser(username, password string) (models.User, error) {
 
 // DeleteUser deletes a user with userID
 func (a UsersService) DeleteUser(id string) error {
-	return a.usersRepo.Delete(id)
+	err := a.usersRepo.Delete(id)
+	if err == repo.ErrModelNotFound {
+		return ErrUserNotFound
+	}
+
+	return err
 }
 
 // User gets a user with id
