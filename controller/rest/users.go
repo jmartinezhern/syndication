@@ -59,14 +59,14 @@ func (c *UsersController) CreateUser(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	_, err := c.service.NewUser(user.Username, user.Password)
-	if err == services.ErrUserConflicts {
+	newUser, err := c.service.NewUser(user.Username, user.Password)
+	if err == services.ErrUsernameConflicts {
 		return echo.NewHTTPError(http.StatusConflict)
 	} else if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return ctx.JSON(http.StatusCreated, newUser)
 }
 
 func (c *UsersController) ListUsers(ctx echo.Context) error {

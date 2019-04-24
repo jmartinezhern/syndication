@@ -67,6 +67,10 @@ func (s *UsersSuite) TestDeleteUser() {
 	s.NoError(s.service.DeleteUser(userID))
 }
 
+func (s *UsersSuite) TestDeleteMissingUser() {
+	s.EqualError(s.service.DeleteUser("bogus"), ErrUserNotFound.Error())
+}
+
 func (s *UsersSuite) TestUser() {
 	userID := utils.CreateAPIID()
 	s.repo.Create(&models.User{
