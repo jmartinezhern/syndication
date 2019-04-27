@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"golang.org/x/crypto/acme/autocert"
@@ -39,6 +40,8 @@ const (
 )
 
 var (
+	usersController      *UsersController
+	adminAuthController  *AdminAuthController
 	authController       *AuthController
 	feedsController      *FeedsController
 	categoriesController *CategoriesController
@@ -139,9 +142,17 @@ func (s *Server) registerMiddleware() {
 	s.handle.Use(middleware.Logger())
 }
 
+func (s *Server) RegisterAdminAuthService(auth services.Auth, secret string) {
+	adminAuthController = NewAdminAuthController(auth, secret, s.handle)
+}
+
 func (s *Server) RegisterAuthService(auth services.Auth, secret string, allowRegistration bool) {
 	//TODO: remove secret param
 	authController = NewAuthController(auth, secret, allowRegistration, s.handle)
+}
+
+func (s *Server) RegisterUsersService(users services.Users) {
+	usersController = NewUsersController(users, s.handle)
 }
 
 func (s *Server) RegisterFeedsService(feeds services.Feed) {
@@ -176,4 +187,16 @@ func convertOrderByParamToValue(param string) bool {
 
 	// Default behavior is to return by newest
 	return true
+}
+
+func getUserID(ctx echo.Context) string {
+	token := ctx.Get("token").(*jwt.Token)
+
+	claims := token.Claims.(jwt.MapClaims)
+
+	if claims["type"] != "access" {
+		return ""
+	}
+
+	return claims["sub"].(string)
 }

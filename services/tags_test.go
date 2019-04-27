@@ -38,54 +38,54 @@ type TagsSuite struct {
 }
 
 func (t *TagsSuite) TestNewTag() {
-	tag, err := t.service.New("tech", t.user)
+	tag, err := t.service.New("tech", t.user.ID)
 	t.NoError(err)
 	t.Equal("tech", tag.Name)
 }
 
 func (t *TagsSuite) TestNewConflictingTag() {
-	t.tagsRepo.Create(t.user, &models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+	t.tagsRepo.Create(t.user.ID, &models.Tag{
+		ID:   utils.CreateID(),
+		Name: "test",
 	})
-	_, err := t.service.New("test", t.user)
+	_, err := t.service.New("test", t.user.ID)
 	t.Equal(ErrTagConflicts, err)
 	t.EqualError(err, ErrTagConflicts.Error())
 }
 
 func (t *TagsSuite) TestDeleteTag() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.tagsRepo.Create(t.user, &tag)
+	t.tagsRepo.Create(t.user.ID, &tag)
 
-	err := t.service.Delete(tag.APIID, t.user)
+	err := t.service.Delete(tag.ID, t.user.ID)
 	t.NoError(err)
 
-	_, found := t.tagsRepo.TagWithID(t.user, tag.APIID)
+	_, found := t.tagsRepo.TagWithID(t.user.ID, tag.ID)
 	t.False(found)
 }
 
 func (t *TagsSuite) TestDeleteUnknownTag() {
-	err := t.service.Delete("bogus", t.user)
+	err := t.service.Delete("bogus", t.user.ID)
 	t.Equal(ErrTagNotFound, err)
 }
 
 func (t *TagsSuite) TestUpdateTag() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.tagsRepo.Create(t.user, &tag)
+	t.tagsRepo.Create(t.user.ID, &tag)
 
-	newTag, err := t.service.Update(tag.APIID, "other", t.user)
+	newTag, err := t.service.Update(tag.ID, "other", t.user.ID)
 	t.NoError(err)
 	t.Equal("other", newTag.Name)
 }
 
 func (t *TagsSuite) TestEditUnknownTag() {
-	_, err := t.service.Update("", "", t.user)
+	_, err := t.service.Update("", "", t.user.ID)
 	t.EqualError(err, ErrTagNotFound.Error())
 }
 
@@ -93,7 +93,7 @@ func (t *TagsSuite) SetupTest() {
 	t.db = sql.NewDB("sqlite3", ":memory:")
 
 	t.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 	sql.NewUsers(t.db).Create(t.user)

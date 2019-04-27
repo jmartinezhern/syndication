@@ -39,20 +39,20 @@ func NewEntries(db *DB) Entries {
 }
 
 // Create a new Entry owned by user
-func (e Entries) Create(user *models.User, entry *models.Entry) {
-	e.db.db.Model(user).Association("Entries").Append(entry)
+func (e Entries) Create(userID string, entry *models.Entry) {
+	e.db.db.Model(&models.User{ID: userID}).Association("Entries").Append(entry)
 
-	if entry.Feed.APIID != "" {
+	if entry.Feed.ID != "" {
 		var feed models.Feed
-		if !e.db.db.Model(user).Where("api_id = ?", entry.Feed.APIID).Related(&feed).RecordNotFound() {
+		if !e.db.db.Model(&models.User{ID: userID}).Where("id = ?", entry.Feed.ID).Related(&feed).RecordNotFound() {
 			e.db.db.Model(&feed).Association("Entries").Append(entry)
 		}
 	}
 }
 
 // EntryWithGUID returns an Entry with GUID and owned by user
-func (e Entries) EntryWithGUID(user *models.User, guid string) (entry models.Entry, found bool) {
-	found = !e.db.db.Model(user).Where("guid = ?", guid).Related(&entry).RecordNotFound()
+func (e Entries) EntryWithGUID(userID, guid string) (entry models.Entry, found bool) {
+	found = !e.db.db.Model(&models.User{ID: userID}).Where("guid = ?", guid).Related(&entry).RecordNotFound()
 	if found {
 		e.db.db.Model(&entry).Related(&entry.Feed)
 	}
@@ -61,17 +61,16 @@ func (e Entries) EntryWithGUID(user *models.User, guid string) (entry models.Ent
 
 // List all entries owned by user
 func (e Entries) List(
-	user *models.User,
-	continuationID string,
+	userID, continuationID string,
 	count int,
 	orderByNewest bool,
 	marker models.Marker) (entries []models.Entry, next string) {
-	query := e.db.db.Model(user)
+	query := e.db.db.Model(&models.User{ID: userID})
 
 	if continuationID != "" {
-		entry, found := e.EntryWithID(user, continuationID)
+		entry, found := e.EntryWithID(userID, continuationID)
 		if found {
-			query = query.Where("id >= ?", entry.ID)
+			query = query.Where("created_at >= ?", entry.CreatedAt)
 		}
 	}
 
@@ -88,7 +87,7 @@ func (e Entries) List(
 	query.Limit(count + 1).Association("Entries").Find(&entries)
 
 	if len(entries) > count {
-		next = entries[len(entries)-1].APIID
+		next = entries[len(entries)-1].ID
 		entries = entries[:len(entries)-1]
 	}
 
@@ -97,50 +96,47 @@ func (e Entries) List(
 
 // ListFromFeed returns all Entries associated to a feed
 func (e Entries) ListFromFeed(
-	user *models.User,
-	feedID, continuationID string,
+	userID, feedID, continuationID string,
 	count int,
 	orderByNewest bool,
 	marker models.Marker) (entries []models.Entry, next string) {
 	var feed models.Feed
-	if notFound := e.db.db.Model(user).Where("api_id = ?", feedID).Related(&feed).RecordNotFound(); notFound {
+	if notFound := e.db.db.Model(&models.User{ID: userID}).Where("id = ?", feedID).Related(&feed).RecordNotFound(); notFound {
 		return nil, ""
 	}
 
 	query := e.db.db.Model(&feed)
 
-	return e.paginateList(user, query, continuationID, count, orderByNewest, marker)
+	return e.paginateList(userID, query, continuationID, count, orderByNewest, marker)
 }
 
 // ListFromCategory all Entries that are associated to a Category
 func (e Entries) ListFromCategory(
-	user *models.User,
-	ctgID,
-	continuationID string,
+	userID, ctgID, continuationID string,
 	count int,
 	orderByNewest bool,
 	marker models.Marker) (entries []models.Entry, next string) {
 	var ctg models.Category
-	if notFound := e.db.db.Model(user).Where("api_id = ?", ctgID).Related(&ctg).RecordNotFound(); notFound {
+	if notFound := e.db.db.Model(&models.User{ID: userID}).Where("id = ?", ctgID).Related(&ctg).RecordNotFound(); notFound {
 		return nil, ""
 	}
 
-	query := e.db.db.Model(user)
+	query := e.db.db.Model(&models.User{ID: userID})
 
 	var feeds []models.Feed
 	e.db.db.Model(&ctg).Related(&feeds)
-	feedIds := make([]uint, len(feeds))
+	feedIds := make([]models.ID, len(feeds))
 	for idx := range feeds {
 		feedIds[idx] = feeds[idx].ID
 	}
 
 	query.Where("feed_id in (?)", feedIds)
 
-	return e.paginateList(user, query, continuationID, count, orderByNewest, marker)
+	return e.paginateList(userID, query, continuationID, count, orderByNewest, marker)
 }
 
 func (e Entries) paginateList(
-	user *models.User,
+	userID string,
 	query *gorm.DB,
 	continuationID string,
 	count int,
@@ -158,15 +154,15 @@ func (e Entries) paginateList(
 
 	if continuationID != "" {
 		entry := models.Entry{}
-		if !e.db.db.Model(user).Where("api_id = ?", continuationID).Related(&entry).RecordNotFound() {
-			query = query.Where("id >= ?", entry.ID)
+		if !e.db.db.Model(&models.User{ID: userID}).Where("id = ?", continuationID).Related(&entry).RecordNotFound() {
+			query = query.Where("created_at >= ?", entry.CreatedAt)
 		}
 	}
 
 	query.Limit(count + 1).Association("Entries").Find(&entries)
 
 	if len(entries) > count {
-		next = entries[len(entries)-1].APIID
+		next = entries[len(entries)-1].ID
 		entries = entries[:len(entries)-1]
 	}
 
@@ -174,25 +170,25 @@ func (e Entries) paginateList(
 }
 
 // EntryWithID returns an Entry with id owned by user
-func (e Entries) EntryWithID(user *models.User, id string) (entry models.Entry, found bool) {
-	found = !e.db.db.Model(user).Where("api_id = ?", id).Related(&entry).RecordNotFound()
+func (e Entries) EntryWithID(userID, id string) (entry models.Entry, found bool) {
+	found = !e.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&entry).RecordNotFound()
 	return
 }
 
 // TagEntries with the given tag for user
-func (e Entries) TagEntries(user *models.User, tagID string, entryIDs []string) error {
+func (e Entries) TagEntries(userID, tagID string, entryIDs []string) error {
 	if len(entryIDs) == 0 {
 		return nil
 	}
 
 	var tag models.Tag
-	if e.db.db.Model(user).Where("api_id = ?", tagID).Related(&tag).RecordNotFound() {
+	if e.db.db.Model(&models.User{ID: userID}).Where("id = ?", tagID).Related(&tag).RecordNotFound() {
 		return repo.ErrModelNotFound
 	}
 
 	entries := make([]models.Entry, len(entryIDs))
 	for i, id := range entryIDs {
-		entry, found := e.EntryWithID(user, id)
+		entry, found := e.EntryWithID(userID, id)
 		if found {
 			entries[i] = entry
 		}
@@ -204,8 +200,8 @@ func (e Entries) TagEntries(user *models.User, tagID string, entryIDs []string) 
 }
 
 // Mark applies marker to an entry with id and owned by user
-func (e Entries) Mark(user *models.User, id string, marker models.Marker) error {
-	if entry, found := e.EntryWithID(user, id); found {
+func (e Entries) Mark(userID, id string, marker models.Marker) error {
+	if entry, found := e.EntryWithID(userID, id); found {
 		e.db.db.Model(&entry).Update(&models.Entry{Mark: marker})
 		return nil
 	}
@@ -213,32 +209,32 @@ func (e Entries) Mark(user *models.User, id string, marker models.Marker) error 
 }
 
 // MarkAll entries
-func (e Entries) MarkAll(user *models.User, marker models.Marker) {
-	e.db.db.Model(new(models.Entry)).Where("user_id = ?", user.ID).Update(models.Entry{Mark: marker})
+func (e Entries) MarkAll(userID string, marker models.Marker) {
+	e.db.db.Model(new(models.Entry)).Where("user_id = ?", userID).Update(models.Entry{Mark: marker})
 }
 
 // ListFromTags returns all Entries that are related to a list of tags
 func (e Entries) ListFromTags(
-	user *models.User,
+	userID string,
 	tagIDs []string,
 	continuationID string,
 	count int,
 	orderByNewest bool,
 	marker models.Marker) (entries []models.Entry, next string) {
-	query := e.db.db.Model(user)
+	query := e.db.db.Model(&models.User{ID: userID})
 
-	tagPrimaryKey := func(apiID string, user *models.User) uint {
+	tagPrimaryKey := func(id models.ID, userID string) models.ID {
 		tag := &models.Tag{}
-		if e.db.db.Model(user).Where("api_id = ?", apiID).Related(tag).RecordNotFound() {
-			return 0
+		if e.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(tag).RecordNotFound() {
+			return ""
 		}
 		return tag.ID
 	}
 
-	var tagPrimaryKeys []uint
+	var tagPrimaryKeys []models.ID
 	for _, tag := range tagIDs {
-		key := tagPrimaryKey(tag, user)
-		if key != 0 {
+		key := tagPrimaryKey(tag, userID)
+		if key != "" {
 			tagPrimaryKeys = append(tagPrimaryKeys, key)
 		}
 	}
@@ -247,22 +243,22 @@ func (e Entries) ListFromTags(
 
 	query.Joins(sql).Where("entry_tags.tag_id in (?)", tagPrimaryKeys)
 
-	return e.paginateList(user, query, continuationID, count, orderByNewest, marker)
+	return e.paginateList(userID, query, continuationID, count, orderByNewest, marker)
 }
 
 // DeleteOldEntries deletes entries older than a timestamp
-func (e Entries) DeleteOldEntries(user *models.User, timestamp time.Time) {
-	e.db.db.Delete(models.Entry{}, "user_id = ? AND created_at < ? AND saved = ?", user.ID, timestamp, false)
+func (e Entries) DeleteOldEntries(userID string, timestamp time.Time) {
+	e.db.db.Delete(models.Entry{}, "user_id = ? AND created_at < ? AND saved = ?", userID, timestamp, false)
 }
 
 // Stats returns all Stats for feeds owned by user
-func (e Entries) Stats(user *models.User) models.Stats {
+func (e Entries) Stats(userID string) models.Stats {
 	stats := models.Stats{}
 
-	stats.Unread = e.db.db.Model(user).Where("mark = ?", models.MarkerUnread).Association("Entries").Count()
-	stats.Read = e.db.db.Model(user).Where("mark = ?", models.MarkerRead).Association("Entries").Count()
-	stats.Saved = e.db.db.Model(user).Where("saved = ?", true).Association("Entries").Count()
-	stats.Total = e.db.db.Model(user).Association("Entries").Count()
+	stats.Unread = e.db.db.Model(&models.User{ID: userID}).Where("mark = ?", models.MarkerUnread).Association("Entries").Count()
+	stats.Read = e.db.db.Model(&models.User{ID: userID}).Where("mark = ?", models.MarkerRead).Association("Entries").Count()
+	stats.Saved = e.db.db.Model(&models.User{ID: userID}).Where("saved = ?", true).Association("Entries").Count()
+	stats.Total = e.db.db.Model(&models.User{ID: userID}).Association("Entries").Count()
 
 	return stats
 }

@@ -57,14 +57,14 @@ func NewTagsController(service services.Tag, e *echo.Echo) *TagsController {
 
 // NewTag creates a new Tag
 func (s *TagsController) NewTag(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	tag := models.Tag{}
 	if err := c.Bind(&tag); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	newTag, err := s.tags.New(tag.Name, &user)
+	newTag, err := s.tags.New(tag.Name, userID)
 	if err == services.ErrTagConflicts {
 		return echo.NewHTTPError(http.StatusConflict, "tag with name "+tag.Name+" already exists")
 	} else if err != nil {
@@ -76,14 +76,14 @@ func (s *TagsController) NewTag(c echo.Context) error {
 
 // GetTags returns a list of Tags owned by a user
 func (s *TagsController) GetTags(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	params := paginationParams{}
 	if err := c.Bind(&params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	tags, next := s.tags.List(params.ContinuationID, params.Count, &user)
+	tags, next := s.tags.List(params.ContinuationID, params.Count, userID)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"tags":           tags,
@@ -93,9 +93,9 @@ func (s *TagsController) GetTags(c echo.Context) error {
 
 // DeleteTag with id
 func (s *TagsController) DeleteTag(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
-	err := s.tags.Delete(c.Param("tagID"), &user)
+	err := s.tags.Delete(c.Param("tagID"), userID)
 	if err == services.ErrTagNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -107,7 +107,7 @@ func (s *TagsController) DeleteTag(c echo.Context) error {
 
 // UpdateTag with id
 func (s *TagsController) UpdateTag(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	tag := models.Tag{}
 
@@ -117,7 +117,7 @@ func (s *TagsController) UpdateTag(c echo.Context) error {
 
 	tagID := c.Param("tagID")
 
-	newTag, err := s.tags.Update(tagID, tag.Name, &user)
+	newTag, err := s.tags.Update(tagID, tag.Name, userID)
 	switch err {
 	case nil:
 		return c.JSON(http.StatusOK, newTag)
@@ -132,7 +132,7 @@ func (s *TagsController) UpdateTag(c echo.Context) error {
 
 // TagEntries adds a Tag with tagID to a list of entries
 func (s *TagsController) TagEntries(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	type EntryIds struct {
 		Entries []string `json:"entries"`
@@ -143,7 +143,7 @@ func (s *TagsController) TagEntries(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err := s.tags.Apply(c.Param("tagID"), entryIds.Entries, &user)
+	err := s.tags.Apply(c.Param("tagID"), entryIds.Entries, userID)
 	if err == services.ErrTagNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -155,9 +155,9 @@ func (s *TagsController) TagEntries(c echo.Context) error {
 
 // GetTag with id
 func (s *TagsController) GetTag(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
-	tag, found := s.tags.Tag(c.Param("tagID"), &user)
+	tag, found := s.tags.Tag(c.Param("tagID"), userID)
 	if !found {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
@@ -168,7 +168,7 @@ func (s *TagsController) GetTag(c echo.Context) error {
 // GetEntriesFromTag returns a list of Entries
 // that are tagged by a Tag with ID
 func (s *TagsController) GetEntriesFromTag(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	params := new(listEntriesParams)
 	if err := c.Bind(params); err != nil {
@@ -183,7 +183,7 @@ func (s *TagsController) GetEntriesFromTag(c echo.Context) error {
 		params.Count,
 		convertOrderByParamToValue(params.OrderBy),
 		marker,
-		&user)
+		userID)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"entries":        entries,

@@ -36,7 +36,7 @@ type UsersSuite struct {
 
 func (s *UsersSuite) TestCreate() {
 	user := models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 
@@ -44,17 +44,17 @@ func (s *UsersSuite) TestCreate() {
 
 	fUser, found := s.repo.UserWithName("gopher")
 	s.True(found)
-	s.Equal(user.APIID, fUser.APIID)
+	s.Equal(user.ID, fUser.ID)
 	s.Equal(user.Username, fUser.Username)
 }
 
 func (s *UsersSuite) TestList() {
 	s.repo.Create(&models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "test_one",
 	})
 	s.repo.Create(&models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "test_two",
 	})
 
@@ -65,34 +65,34 @@ func (s *UsersSuite) TestList() {
 
 	users, _ = s.repo.List(next, 1)
 	s.Require().Len(users, 1)
-	s.Equal(users[0].APIID, next)
+	s.Equal(users[0].ID, next)
 	s.Equal("test_two", users[0].Username)
 
 }
 
 func (s *UsersSuite) TestUserWithID() {
-	userID := utils.CreateAPIID()
+	userID := utils.CreateID()
 	s.repo.Create(&models.User{
-		APIID:    userID,
+		ID:       userID,
 		Username: "test",
 	})
 
 	user, found := s.repo.UserWithID(userID)
 	s.True(found)
-	s.Equal(userID, user.APIID)
+	s.Equal(userID, user.ID)
 	s.Equal("test", user.Username)
 }
 
 func (s *UsersSuite) TestDelete() {
 	user := models.User{
 		Username: "test",
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 	}
 	s.repo.Create(&user)
 
-	s.NoError(s.repo.Delete(user.APIID))
+	s.NoError(s.repo.Delete(user.ID))
 
-	_, found := s.repo.UserWithID(user.APIID)
+	_, found := s.repo.UserWithID(user.ID)
 	s.False(found)
 }
 

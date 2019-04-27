@@ -35,12 +35,12 @@ func NewFeeds(db *DB) Feeds {
 }
 
 // Create a new feed owned by user
-func (f Feeds) Create(user *models.User, feed *models.Feed) {
-	f.db.db.Model(user).Association("Feeds").Append(feed)
+func (f Feeds) Create(userID string, feed *models.Feed) {
+	f.db.db.Model(&models.User{ID: userID}).Association("Feeds").Append(feed)
 
-	if feed.Category.APIID != "" {
+	if feed.Category.ID != "" {
 		var ctg models.Category
-		found := !f.db.db.Model(user).Where("api_id = ?", feed.Category.APIID).Related(&ctg).RecordNotFound()
+		found := !f.db.db.Model(&models.User{ID: userID}).Where("id = ?", feed.Category.ID).Related(&ctg).RecordNotFound()
 		if found {
 			f.db.db.Model(&ctg).Association("Feeds").Append(feed)
 		}
@@ -48,8 +48,8 @@ func (f Feeds) Create(user *models.User, feed *models.Feed) {
 }
 
 // Update a feed owned by user
-func (f Feeds) Update(user *models.User, feed *models.Feed) error {
-	dbFeed, found := f.FeedWithID(user, feed.APIID)
+func (f Feeds) Update(userID string, feed *models.Feed) error {
+	dbFeed, found := f.FeedWithID(userID, feed.ID)
 	if !found {
 		return repo.ErrModelNotFound
 	}
@@ -59,8 +59,8 @@ func (f Feeds) Update(user *models.User, feed *models.Feed) error {
 }
 
 // Delete a feed owned by user
-func (f Feeds) Delete(user *models.User, id string) error {
-	feed, found := f.FeedWithID(user, id)
+func (f Feeds) Delete(userID, id string) error {
+	feed, found := f.FeedWithID(userID, id)
 	if !found {
 		return repo.ErrModelNotFound
 	}
@@ -70,8 +70,8 @@ func (f Feeds) Delete(user *models.User, id string) error {
 }
 
 // FeedWithID returns a Feed with id and owned by user
-func (f Feeds) FeedWithID(user *models.User, id string) (feed models.Feed, found bool) {
-	found = !f.db.db.Model(user).Where("api_id = ?", id).Related(&feed).RecordNotFound()
+func (f Feeds) FeedWithID(userID, id string) (feed models.Feed, found bool) {
+	found = !f.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&feed).RecordNotFound()
 	if found {
 		f.db.db.Model(&feed).Related(&feed.Category)
 	}
@@ -79,19 +79,19 @@ func (f Feeds) FeedWithID(user *models.User, id string) (feed models.Feed, found
 }
 
 // List all Feeds owned by user
-func (f Feeds) List(user *models.User, continuationID string, count int) (feeds []models.Feed, next string) {
-	query := f.db.db.Model(user)
+func (f Feeds) List(userID, continuationID string, count int) (feeds []models.Feed, next string) {
+	query := f.db.db.Model(&models.User{ID: userID})
 
 	if continuationID != "" {
-		if feed, found := f.FeedWithID(user, continuationID); found {
-			query = query.Where("id >= ?", feed.ID)
+		if feed, found := f.FeedWithID(userID, continuationID); found {
+			query = query.Where("created_at >= ?", feed.CreatedAt)
 		}
 	}
 
 	query.Limit(count + 1).Association("Feeds").Find(&feeds)
 
 	if len(feeds) > count {
-		next = feeds[len(feeds)-1].APIID
+		next = feeds[len(feeds)-1].ID
 		feeds = feeds[:len(feeds)-1]
 	}
 
@@ -99,10 +99,10 @@ func (f Feeds) List(user *models.User, continuationID string, count int) (feeds 
 }
 
 // Mark applies marker to a Feed with id and owned by user
-func (f Feeds) Mark(user *models.User, id string, marker models.Marker) error {
-	if feed, found := f.FeedWithID(user, id); found {
+func (f Feeds) Mark(userID, id string, marker models.Marker) error {
+	if feed, found := f.FeedWithID(userID, id); found {
 		entry := models.Entry{Mark: marker}
-		f.db.db.Model(&entry).Where("user_id = ? AND feed_id = ?", user.ID, feed.ID).Update(&entry)
+		f.db.db.Model(&entry).Where("user_id = ? AND feed_id = ?", userID, feed.ID).Update(&entry)
 		return nil
 	}
 
@@ -110,8 +110,8 @@ func (f Feeds) Mark(user *models.User, id string, marker models.Marker) error {
 }
 
 // Stats returns all Stats for a Feed with the given id and that is owned by user
-func (f Feeds) Stats(user *models.User, id string) (models.Stats, error) {
-	feed, found := f.FeedWithID(user, id)
+func (f Feeds) Stats(userID, id string) (models.Stats, error) {
+	feed, found := f.FeedWithID(userID, id)
 	if !found {
 		return models.Stats{}, repo.ErrModelNotFound
 	}

@@ -70,6 +70,7 @@ func (a UsersService) NewUser(username, password string) (models.User, error) {
 	hash, salt := utils.CreatePasswordHashAndSalt(password)
 
 	user := models.User{
+		ID:           utils.CreateID(),
 		Username:     username,
 		PasswordHash: hash,
 		PasswordSalt: salt,

@@ -59,14 +59,14 @@ func NewFeedsController(service services.Feed, e *echo.Echo) *FeedsController {
 
 // NewFeed creates a new feed
 func (s *FeedsController) NewFeed(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	newFeed := new(models.Feed)
 	if err := c.Bind(newFeed); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feed, err := s.feeds.New(newFeed.Title, newFeed.Subscription, newFeed.Category.APIID, &user)
+	feed, err := s.feeds.New(newFeed.Title, newFeed.Subscription, newFeed.Category.ID, userID)
 	switch err {
 	case services.ErrFetchingFeed:
 		return echo.NewHTTPError(http.StatusBadRequest, "subscription url is not reachable")
@@ -81,7 +81,7 @@ func (s *FeedsController) NewFeed(c echo.Context) error {
 
 // GetFeeds returns a list of subscribed feeds
 func (s *FeedsController) GetFeeds(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	continuationID := c.QueryParam("continuationID")
 
@@ -95,7 +95,7 @@ func (s *FeedsController) GetFeeds(c echo.Context) error {
 		}
 	}
 
-	feeds, next := s.feeds.Feeds(continuationID, count, &user)
+	feeds, next := s.feeds.Feeds(continuationID, count, userID)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"feeds":          feeds,
 		"continuationID": next,
@@ -104,9 +104,9 @@ func (s *FeedsController) GetFeeds(c echo.Context) error {
 
 // GetFeed with id
 func (s *FeedsController) GetFeed(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
-	feed, found := s.feeds.Feed(c.Param("feedID"), &user)
+	feed, found := s.feeds.Feed(c.Param("feedID"), userID)
 	if !found {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
@@ -116,16 +116,16 @@ func (s *FeedsController) GetFeed(c echo.Context) error {
 
 // EditFeed with id
 func (s *FeedsController) EditFeed(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	feed := models.Feed{}
 	if err := c.Bind(&feed); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feed.APIID = c.Param("feedID")
+	feed.ID = c.Param("feedID")
 
-	err := s.feeds.Update(&feed, &user)
+	err := s.feeds.Update(&feed, userID)
 	if err == services.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -137,9 +137,9 @@ func (s *FeedsController) EditFeed(c echo.Context) error {
 
 // DeleteFeed with id
 func (s *FeedsController) DeleteFeed(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
-	err := s.feeds.Delete(c.Param("feedID"), &user)
+	err := s.feeds.Delete(c.Param("feedID"), userID)
 	if err == services.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -151,7 +151,7 @@ func (s *FeedsController) DeleteFeed(c echo.Context) error {
 
 // MarkFeed applies a Marker to a Feed
 func (s *FeedsController) MarkFeed(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	asParam := c.FormValue("as")
 	if asParam == "" {
@@ -160,7 +160,7 @@ func (s *FeedsController) MarkFeed(c echo.Context) error {
 
 	marker := models.MarkerFromString(asParam)
 
-	err := s.feeds.Mark(c.Param("feedID"), marker, &user)
+	err := s.feeds.Mark(c.Param("feedID"), marker, userID)
 	if err == services.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -172,7 +172,7 @@ func (s *FeedsController) MarkFeed(c echo.Context) error {
 
 // GetFeedEntries returns a list of entries provided from a feed
 func (s *FeedsController) GetFeedEntries(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	params := new(listEntriesParams)
 	if err := c.Bind(params); err != nil {
@@ -188,7 +188,7 @@ func (s *FeedsController) GetFeedEntries(c echo.Context) error {
 		params.Count,
 		convertOrderByParamToValue(params.OrderBy),
 		marker,
-		&user,
+		userID,
 	)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -199,9 +199,9 @@ func (s *FeedsController) GetFeedEntries(c echo.Context) error {
 
 // GetFeedStats provides statistics related to a Feed
 func (s *FeedsController) GetFeedStats(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
-	stats, err := s.feeds.Stats(c.Param("feedID"), &user)
+	stats, err := s.feeds.Stats(c.Param("feedID"), userID)
 	if err == services.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}

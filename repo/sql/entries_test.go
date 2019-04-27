@@ -39,7 +39,7 @@ type EntriesSuite struct {
 
 func (s *EntriesSuite) TestCreate() {
 	entry := models.Entry{
-		APIID:     utils.CreateAPIID(),
+		ID:        utils.CreateID(),
 		Title:     "Test Entry",
 		Author:    "John Doe",
 		Link:      "http://example.com",
@@ -47,9 +47,9 @@ func (s *EntriesSuite) TestCreate() {
 		Published: time.Now(),
 	}
 
-	s.repo.Create(s.user, &entry)
+	s.repo.Create(s.user.ID, &entry)
 
-	entry, found := s.repo.EntryWithID(s.user, entry.APIID)
+	entry, found := s.repo.EntryWithID(s.user.ID, entry.ID)
 	s.True(found)
 	s.Equal("Test Entry", entry.Title)
 	s.Equal("John Doe", entry.Author)
@@ -58,7 +58,7 @@ func (s *EntriesSuite) TestCreate() {
 func (s *EntriesSuite) TestList() {
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
-			APIID:     utils.CreateAPIID(),
+			ID:        utils.CreateID(),
 			Title:     "Test Entry " + strconv.Itoa(i),
 			Author:    "John Doe",
 			Link:      "http://example.com",
@@ -66,18 +66,18 @@ func (s *EntriesSuite) TestList() {
 			Published: time.Now(),
 		}
 
-		s.repo.Create(s.user, &entry)
+		s.repo.Create(s.user.ID, &entry)
 	}
 
-	entries, next := s.repo.List(s.user, "", 2, false, models.MarkerUnread)
+	entries, next := s.repo.List(s.user.ID, "", 2, false, models.MarkerUnread)
 	s.Require().Len(entries, 2)
 	s.NotEmpty(next)
 	s.Equal("Test Entry 0", entries[0].Title)
 	s.Equal("Test Entry 1", entries[1].Title)
 
-	entries, _ = s.repo.List(s.user, next, 3, false, models.MarkerUnread)
+	entries, _ = s.repo.List(s.user.ID, next, 3, false, models.MarkerUnread)
 	s.Require().Len(entries, 3)
-	s.Equal(entries[0].APIID, next)
+	s.Equal(entries[0].ID, next)
 	s.Equal("Test Entry 2", entries[0].Title)
 	s.Equal("Test Entry 3", entries[1].Title)
 	s.Equal("Test Entry 4", entries[2].Title)
@@ -85,14 +85,14 @@ func (s *EntriesSuite) TestList() {
 
 func (s *EntriesSuite) TestListFromCategory() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test_category",
+		ID:   utils.CreateID(),
+		Name: "test_category",
 	}
 
 	s.db.db.Model(s.user).Association("Categories").Append(&ctg)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 	}
@@ -102,7 +102,7 @@ func (s *EntriesSuite) TestListFromCategory() {
 
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
-			APIID:     utils.CreateAPIID(),
+			ID:        utils.CreateID(),
 			Title:     "Entry " + strconv.Itoa(i),
 			Author:    "John Doe",
 			Link:      "http://example.com",
@@ -114,15 +114,15 @@ func (s *EntriesSuite) TestListFromCategory() {
 		s.db.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
-	entries, next := s.repo.ListFromCategory(s.user, ctg.APIID, "", 2, false, models.MarkerUnread)
+	entries, next := s.repo.ListFromCategory(s.user.ID, ctg.ID, "", 2, false, models.MarkerUnread)
 	s.Require().Len(entries, 2)
 	s.NotEmpty(next)
 	s.Equal("Entry 0", entries[0].Title)
 	s.Equal("Entry 1", entries[1].Title)
 
-	entries, _ = s.repo.ListFromCategory(s.user, ctg.APIID, next, 3, false, models.MarkerUnread)
+	entries, _ = s.repo.ListFromCategory(s.user.ID, ctg.ID, next, 3, false, models.MarkerUnread)
 	s.Require().Len(entries, 3)
-	s.Equal(entries[0].APIID, next)
+	s.Equal(entries[0].ID, next)
 	s.Equal("Entry 2", entries[0].Title)
 	s.Equal("Entry 3", entries[1].Title)
 	s.Equal("Entry 4", entries[2].Title)
@@ -130,7 +130,7 @@ func (s *EntriesSuite) TestListFromCategory() {
 
 func (s *EntriesSuite) TestListFromFeed() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 	}
@@ -139,7 +139,7 @@ func (s *EntriesSuite) TestListFromFeed() {
 
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
-			APIID:     utils.CreateAPIID(),
+			ID:        utils.CreateID(),
 			Title:     "Entry " + strconv.Itoa(i),
 			Author:    "John Doe",
 			Link:      "http://example.com",
@@ -151,35 +151,35 @@ func (s *EntriesSuite) TestListFromFeed() {
 		s.db.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
-	entries, next := s.repo.ListFromFeed(s.user, feed.APIID, "", 2, false, models.MarkerUnread)
+	entries, next := s.repo.ListFromFeed(s.user.ID, feed.ID, "", 2, false, models.MarkerUnread)
 	s.Require().Len(entries, 2)
 	s.Equal("Entry 0", entries[0].Title)
 	s.Equal("Entry 1", entries[1].Title)
 
-	entries, _ = s.repo.ListFromFeed(s.user, feed.APIID, next, 3, false, models.MarkerUnread)
+	entries, _ = s.repo.ListFromFeed(s.user.ID, feed.ID, next, 3, false, models.MarkerUnread)
 	s.Require().Len(entries, 3)
-	s.Equal(entries[0].APIID, next)
+	s.Equal(entries[0].ID, next)
 	s.Equal("Entry 2", entries[0].Title)
 	s.Equal("Entry 3", entries[1].Title)
 	s.Equal("Entry 4", entries[2].Title)
 }
 
 func (s *EntriesSuite) TestEntriesWithMissingCategory() {
-	entries, _ := s.repo.ListFromCategory(s.user, "bogus", "", 5, true, models.MarkerUnread)
+	entries, _ := s.repo.ListFromCategory(s.user.ID, "bogus", "", 5, true, models.MarkerUnread)
 	s.Empty(entries)
 }
 
 func (s *EntriesSuite) TestEntryWithGUID() {
 	entry := models.Entry{
-		APIID:     utils.CreateAPIID(),
+		ID:        utils.CreateID(),
 		Title:     "Test Entry",
 		GUID:      "entry@test",
 		Published: time.Now(),
 	}
 
-	s.repo.Create(s.user, &entry)
+	s.repo.Create(s.user.ID, &entry)
 
-	entry, found := s.repo.EntryWithGUID(s.user, entry.GUID)
+	entry, found := s.repo.EntryWithGUID(s.user.ID, entry.GUID)
 	s.True(found)
 	s.Equal("Test Entry", entry.Title)
 	s.Equal("entry@test", entry.GUID)
@@ -187,35 +187,35 @@ func (s *EntriesSuite) TestEntryWithGUID() {
 
 func (s *EntriesSuite) TestMark() {
 	entry := models.Entry{
-		APIID:     utils.CreateAPIID(),
+		ID:        utils.CreateID(),
 		Title:     "Article",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
-	s.repo.Create(s.user, &entry)
+	s.repo.Create(s.user.ID, &entry)
 
-	err := s.repo.Mark(s.user, entry.APIID, models.MarkerRead)
+	err := s.repo.Mark(s.user.ID, entry.ID, models.MarkerRead)
 	s.NoError(err)
 
-	entries, _ := s.repo.List(s.user, "", 1, false, models.MarkerRead)
+	entries, _ := s.repo.List(s.user.ID, "", 1, false, models.MarkerRead)
 	s.Require().Len(entries, 1)
 	s.Equal("Article", entry.Title)
 }
 
 func (s *EntriesSuite) TestMarkAll() {
 	entry := models.Entry{
-		APIID:     utils.CreateAPIID(),
+		ID:        utils.CreateID(),
 		Title:     "Article",
 		Mark:      models.MarkerUnread,
 		Published: time.Now(),
 	}
 
-	s.repo.Create(s.user, &entry)
+	s.repo.Create(s.user.ID, &entry)
 
-	s.repo.MarkAll(s.user, models.MarkerRead)
+	s.repo.MarkAll(s.user.ID, models.MarkerRead)
 
-	entries, _ := s.repo.List(s.user, "", 1, false, models.MarkerRead)
+	entries, _ := s.repo.List(s.user.ID, "", 1, false, models.MarkerRead)
 	s.Require().Len(entries, 1)
 	s.Equal("Article", entry.Title)
 }
@@ -223,14 +223,14 @@ func (s *EntriesSuite) TestMarkAll() {
 func (s *EntriesSuite) TestListFromTags() {
 	entries := []models.Entry{
 		{
-			APIID:  utils.CreateAPIID(),
+			ID:     utils.CreateID(),
 			Title:  "Test Entry",
 			Author: "John Doe",
 			Link:   "http://example.com",
 			Mark:   models.MarkerUnread,
 		},
 		{
-			APIID:  utils.CreateAPIID(),
+			ID:     utils.CreateID(),
 			Title:  "Test Entry",
 			Author: "John Doe",
 			Link:   "http://example.com",
@@ -239,25 +239,25 @@ func (s *EntriesSuite) TestListFromTags() {
 	}
 
 	for idx := range entries {
-		s.repo.Create(s.user, &entries[idx])
+		s.repo.Create(s.user.ID, &entries[idx])
 	}
 
-	firstTagID := utils.CreateAPIID()
+	firstTagID := utils.CreateID()
 	s.db.db.Model(s.user).Association("Tags").Append(&models.Tag{
-		APIID: firstTagID,
-		Name:  "first",
+		ID:   firstTagID,
+		Name: "first",
 	})
 
-	secondTagID := utils.CreateAPIID()
+	secondTagID := utils.CreateID()
 	s.db.db.Model(s.user).Association("Tags").Append(&models.Tag{
-		APIID: secondTagID,
-		Name:  "first",
+		ID:   secondTagID,
+		Name: "first",
 	})
 
-	s.NoError(s.repo.TagEntries(s.user, firstTagID, []string{entries[0].APIID}))
-	s.NoError(s.repo.TagEntries(s.user, secondTagID, []string{entries[1].APIID}))
+	s.NoError(s.repo.TagEntries(s.user.ID, firstTagID, []string{entries[0].ID}))
+	s.NoError(s.repo.TagEntries(s.user.ID, secondTagID, []string{entries[1].ID}))
 
-	taggedEntries, _ := s.repo.ListFromTags(s.user, []string{firstTagID, secondTagID}, "", 2, true, models.MarkerAny)
+	taggedEntries, _ := s.repo.ListFromTags(s.user.ID, []string{firstTagID, secondTagID}, "", 2, true, models.MarkerAny)
 	s.Len(taggedEntries, 2)
 }
 
@@ -270,7 +270,7 @@ func (s *EntriesSuite) TestStats() {
 			marker = models.MarkerUnread
 		}
 		entry := models.Entry{
-			APIID:     utils.CreateAPIID(),
+			ID:        utils.CreateID(),
 			Title:     "Item",
 			Link:      "http://example.com",
 			Mark:      marker,
@@ -281,7 +281,7 @@ func (s *EntriesSuite) TestStats() {
 		s.db.db.Model(s.user).Association("Entries").Append(&entry)
 	}
 
-	stats := s.repo.Stats(s.user)
+	stats := s.repo.Stats(s.user.ID)
 	s.Equal(7, stats.Unread)
 	s.Equal(3, stats.Read)
 	s.Equal(2, stats.Saved)
@@ -292,10 +292,10 @@ func (s *EntriesSuite) SetupTest() {
 	s.db = NewDB("sqlite3", ":memory:")
 
 	s.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "test_entries",
 	}
-	s.db.db.Create(s.user)
+	s.db.db.Create(s.user.ID)
 
 	s.repo = NewEntries(s.db)
 }

@@ -47,25 +47,25 @@ type (
 
 func (c *ExporterControllerSuite) TestOPMLExport() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "Test",
+		ID:   utils.CreateID(),
+		Name: "Test",
 	}
-	sql.NewCategories(c.db).Create(c.user, &ctg)
+	sql.NewCategories(c.db).Create(c.user.ID, &ctg)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example.com",
 		Subscription: "https://example.com",
 		Category:     ctg,
 	}
-	sql.NewFeeds(c.db).Create(c.user, &feed)
+	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 	req.Header.Set("Accept", "application/xml")
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/export")
 
@@ -87,7 +87,7 @@ func (c *ExporterControllerSuite) SetupTest() {
 	c.e.Logger.SetLevel(log.OFF)
 
 	c.user = &models.User{
-		APIID: utils.CreateAPIID(),
+		ID: utils.CreateID(),
 	}
 
 	c.db = sql.NewDB("sqlite3", ":memory:")

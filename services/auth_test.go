@@ -18,11 +18,9 @@
 package services
 
 import (
-	"errors"
 	"testing"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -40,10 +38,8 @@ type AuthSuite struct {
 }
 
 func (t *AuthSuite) TestRegister() {
-	keys, err := t.service.Register("newUser", "testtesttest")
+	err := t.service.Register("newUser", "testtesttest")
 	t.NoError(err)
-	t.NotEmpty(keys.AccessKey)
-	t.NotEmpty(keys.RefreshKey)
 
 	user, found := t.usersRepo.UserWithName("newUser")
 	t.True(found)
@@ -53,17 +49,17 @@ func (t *AuthSuite) TestRegister() {
 
 func (t *AuthSuite) TestRegisterConflicting() {
 	t.usersRepo.Create(&models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "testUser",
 	})
-	_, err := t.service.Register("testUser", "testtesttest")
+	err := t.service.Register("testUser", "testtesttest")
 	t.EqualError(err, ErrUserConflicts.Error())
 }
 
 func (t *AuthSuite) TestLogin() {
 	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
 	t.usersRepo.Create(&models.User{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Username:     "testUser",
 		PasswordHash: hash,
 		PasswordSalt: salt,
@@ -78,7 +74,7 @@ func (t *AuthSuite) TestLogin() {
 func (t *AuthSuite) TestBadLogin() {
 	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
 	t.usersRepo.Create(&models.User{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Username:     "testUser",
 		PasswordHash: hash,
 		PasswordSalt: salt,
@@ -91,7 +87,7 @@ func (t *AuthSuite) TestBadLogin() {
 func (t *AuthSuite) TestRenew() {
 	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
 	t.usersRepo.Create(&models.User{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Username:     "testUser",
 		PasswordHash: hash,
 		PasswordSalt: salt,
@@ -110,45 +106,18 @@ func (t *AuthSuite) TestRenew() {
 func (t *AuthSuite) TestRenewWithInvalidKey() {
 	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
 	user := models.User{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Username:     "testUser",
 		PasswordHash: hash,
 		PasswordSalt: salt,
 	}
 	t.usersRepo.Create(&user)
 
-	key, err := newAPIKey("secret_cat", models.RefreshKey, &user)
+	key, err := utils.NewAPIKey("secret_cat", models.RefreshKey, user.ID)
 	t.Require().NoError(err)
-
-	time.Sleep(time.Second)
 
 	_, err = t.service.Renew(key.Key)
 	t.EqualError(err, ErrUserUnauthorized.Error())
-}
-
-func (t *AuthSuite) TestAuthenticate() {
-	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
-	user := models.User{
-		APIID:        utils.CreateAPIID(),
-		Username:     "testUser",
-		PasswordHash: hash,
-		PasswordSalt: salt,
-	}
-	t.usersRepo.Create(&user)
-
-	accessKey, err := newAPIKey("secret_cat", models.AccessKey, &user)
-	t.NoError(err)
-
-	jwtToken, err := jwt.Parse(accessKey.Key, func(t *jwt.Token) (interface{}, error) {
-		if t.Method.Alg() != signingMethod {
-			return nil, errors.New("jwt signing methods mismatch")
-		}
-		return []byte("secret_cat"), nil
-	})
-	t.Require().NoError(err)
-
-	_, authed := t.service.Authenticate(*jwtToken)
-	t.True(authed)
 }
 
 func (t *AuthSuite) SetupTest() {

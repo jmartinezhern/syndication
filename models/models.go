@@ -24,7 +24,10 @@ import (
 )
 
 // Marker type alias
-type Marker int
+type Marker = int
+
+// ID type alias
+type ID = string
 
 // Markers identify the visibility status of entities
 const (
@@ -35,22 +38,12 @@ const (
 )
 
 // APIKeyType alias
-type APIKeyType int
+type APIKeyType = int
 
 // APIKeyTypes identifies the kind of access or purpose of a key
 const (
 	RefreshKey APIKeyType = iota
 	AccessKey
-)
-
-const (
-	// Uncategorized identifies an entity as having no category.
-	// This only applies to Feeds and Entries
-	Uncategorized = "uncategorized"
-
-	// Saved identifies an entity as permanently saved.
-	// This only applies to Entries.
-	Saved = "saved"
 )
 
 // MarkerFromString converts a string to a Marker type
@@ -68,12 +61,10 @@ func MarkerFromString(marker string) Marker {
 
 type (
 	Admin struct {
-		ID        uint       `json:"-" gorm:"primary_key"`
+		ID        ID         `json:"id" gorm:"primary_key"`
 		CreatedAt time.Time  `json:"created_at"`
 		UpdatedAt time.Time  `json:"updated_at"`
 		DeletedAt *time.Time `json:"deleted_at" sql:"index"`
-
-		APIID string `json:"id"`
 
 		APIKeys []APIKey `json:"-"`
 
@@ -84,12 +75,10 @@ type (
 	}
 	// User represents a user and owner of all other entities.
 	User struct {
-		ID        uint       `json:"-" gorm:"primary_key"`
+		ID        ID         `json:"id" gorm:"primary_key"`
 		CreatedAt time.Time  `json:"created_at"`
 		UpdatedAt time.Time  `json:"updated_at"`
 		DeletedAt *time.Time `json:"deleted_at" sql:"index"`
-
-		APIID string `json:"id"`
 
 		Categories []Category `json:"categories,omitempty"`
 		Feeds      []Feed     `json:"feeds,omitempty"`
@@ -105,14 +94,12 @@ type (
 
 	// Category represents a container for Feed entities.
 	Category struct {
-		ID        uint      `json:"-" gorm:"primary_key"`
+		ID        ID        `json:"id" gorm:"primary_key"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 
-		APIID string `json:"id"`
-
 		User   User `json:"-"`
-		UserID uint `json:"-"`
+		UserID ID   `json:"-"`
 
 		Feeds []Feed `json:"-"`
 
@@ -121,17 +108,15 @@ type (
 
 	// Feed represents an Atom or RSS feed subscription.
 	Feed struct {
-		ID        uint      `json:"-" gorm:"primary_key"`
+		ID        ID        `json:"id" gorm:"primary_key"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 
-		APIID string `json:"id"`
-
 		Category   Category `json:"category,omitempty"`
-		CategoryID uint     `json:"-"`
+		CategoryID ID       `json:"-"`
 
 		User   User `json:"-"`
-		UserID uint `json:"-"`
+		UserID ID   `json:"-"`
 
 		Entries []Entry `json:"-"`
 
@@ -147,33 +132,29 @@ type (
 
 	// Tag represents an identifier object that can be applied to Entry objects.
 	Tag struct {
-		ID        uint      `json:"-" gorm:"primary_key"`
+		ID        ID        `json:"id" gorm:"primary_key"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 
 		Name string `json:"name"`
 
 		User   User `json:"-"`
-		UserID uint `json:"-"`
-
-		APIID string `json:"id"`
+		UserID ID   `json:"-"`
 
 		Entries []Entry `json:"entries,omitempty" gorm:"many2many:entry_tags;"`
 	}
 
 	// Entry represents subscription items obtained from Feed objects.
 	Entry struct {
-		ID        uint      `json:"-" gorm:"primary_key"`
+		ID        ID        `json:"id" gorm:"primary_key"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 
-		APIID string `json:"id"`
-
 		User   User `json:"-"`
-		UserID uint `json:"-"`
+		UserID ID   `json:"-"`
 
 		Feed   Feed `json:"-"`
-		FeedID uint `json:"-"`
+		FeedID ID   `json:"-"`
 
 		Tags []Tag `json:"tags,omitempty" gorm:"many2many:entry_tags;"`
 
@@ -196,7 +177,7 @@ type (
 
 	// APIKey represents an SQL schema for JSON Web Tokens created for User objects.
 	APIKey struct {
-		ID        uint      `json:"-" gorm:"primary_key"`
+		ID        ID        `json:"id" gorm:"primary_key"`
 		CreatedAt time.Time `json:"-"`
 		UpdatedAt time.Time `json:"-"`
 
@@ -204,7 +185,7 @@ type (
 		Type APIKeyType `json:"-"`
 
 		User    User      `json:"-"`
-		UserID  uint      `json:"-"`
+		UserID  ID        `json:"-"`
 		Expires time.Time `json:"expires"`
 	}
 	// APIKeyPair collects a refresh and access token

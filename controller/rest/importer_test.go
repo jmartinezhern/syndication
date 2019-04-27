@@ -76,7 +76,7 @@ func (c *ImporterControllerSuite) TestOPMLImport() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/import")
 
@@ -84,17 +84,17 @@ func (c *ImporterControllerSuite) TestOPMLImport() {
 	c.Equal(http.StatusNoContent, rec.Code)
 
 	ctgsRepo := sql.NewCategories(c.db)
-	ctgs, _ := ctgsRepo.List(c.user, "", 1)
+	ctgs, _ := ctgsRepo.List(c.user.ID, "", 1)
 	c.Require().Len(ctgs, 1)
 	c.Equal("Sports", ctgs[0].Name)
-	c.NotEmpty(ctgs[0].APIID)
+	c.NotEmpty(ctgs[0].ID)
 
-	feeds, _ := ctgsRepo.Feeds(c.user, ctgs[0].APIID, "", 1)
+	feeds, _ := ctgsRepo.Feeds(c.user.ID, ctgs[0].ID, "", 1)
 	c.Require().Len(feeds, 1)
 	c.Equal("Basketball", feeds[0].Title)
 	c.Equal("http://example.com/basketball", feeds[0].Subscription)
 
-	unctgsFeeds, _ := ctgsRepo.Uncategorized(c.user, "", 1)
+	unctgsFeeds, _ := ctgsRepo.Uncategorized(c.user.ID, "", 1)
 	c.Require().Len(unctgsFeeds, 1)
 	c.Equal("Baseball", unctgsFeeds[0].Title)
 	c.Equal("http://example.com/baseball", unctgsFeeds[0].Subscription)
@@ -106,7 +106,7 @@ func (c *ImporterControllerSuite) SetupTest() {
 	c.e.Logger.SetLevel(log.OFF)
 
 	c.user = &models.User{
-		APIID: utils.CreateAPIID(),
+		ID: utils.CreateID(),
 	}
 
 	c.db = sql.NewDB("sqlite3", ":memory:")

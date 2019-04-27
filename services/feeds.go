@@ -29,28 +29,28 @@ type (
 	// Feed defines the Feed service interface
 	Feed interface {
 		// New creates a new Feed
-		New(title, subscription string, ctgID string, user *models.User) (models.Feed, error)
+		New(title, subscription string, ctgID string, userID string) (models.Feed, error)
 
 		// Feeds returns all feeds owned by user
-		Feeds(continuationID string, count int, user *models.User) ([]models.Feed, string)
+		Feeds(continuationID string, count int, userID string) ([]models.Feed, string)
 
 		// Feed returns a feed with id owned by user
-		Feed(id string, user *models.User) (models.Feed, bool)
+		Feed(id string, userID string) (models.Feed, bool)
 
 		// Update feed owned by user
-		Update(feed *models.Feed, user *models.User) error
+		Update(feed *models.Feed, userID string) error
 
 		// Delete a feed with id
-		Delete(id string, user *models.User) error
+		Delete(id string, userID string) error
 
 		// Mark a feed with id
-		Mark(id string, marker models.Marker, user *models.User) error
+		Mark(id string, marker models.Marker, userID string) error
 
 		// Entries returns all entry items associated to a feed
-		Entries(id string, continuationID string, count int, order bool, marker models.Marker, user *models.User) ([]models.Entry, string)
+		Entries(id string, continuationID string, count int, order bool, marker models.Marker, userID string) ([]models.Entry, string)
 
 		// Stats returns statistics of a feed
-		Stats(id string, user *models.User) (models.Stats, error)
+		Stats(id string, userID string) (models.Stats, error)
 	}
 
 	// FeedService implementation
@@ -83,21 +83,21 @@ func NewFeedsService(feedsRepo repo.Feeds, ctgsRepo repo.Categories, entriesRepo
 }
 
 // New creates a new Feed
-func (f FeedService) New(title, subscription, ctgID string, user *models.User) (models.Feed, error) {
+func (f FeedService) New(title, subscription, ctgID, userID string) (models.Feed, error) {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Subscription: subscription,
 	}
 
 	if ctgID != "" {
-		ctg, found := f.ctgsRepo.CategoryWithID(user, ctgID)
+		ctg, found := f.ctgsRepo.CategoryWithID(userID, ctgID)
 		if !found {
 			return models.Feed{}, ErrFeedCategoryNotFound
 		}
 		feed.Category = ctg
 	}
 
-	f.feedsRepo.Create(user, &feed)
+	f.feedsRepo.Create(userID, &feed)
 
 	fetchedFeed, entries, err := utils.PullFeed(subscription, "")
 	if err != nil {
@@ -107,9 +107,9 @@ func (f FeedService) New(title, subscription, ctgID string, user *models.User) (
 	if feed.Title != "" {
 		fetchedFeed.Title = feed.Title
 	}
-	fetchedFeed.APIID = feed.APIID
+	fetchedFeed.ID = feed.ID
 
-	err = f.feedsRepo.Update(user, &fetchedFeed)
+	err = f.feedsRepo.Update(userID, &fetchedFeed)
 	if err == repo.ErrModelNotFound {
 		return models.Feed{}, ErrFeedNotFound
 	} else if err != nil {
@@ -118,27 +118,27 @@ func (f FeedService) New(title, subscription, ctgID string, user *models.User) (
 
 	for idx := range entries {
 		entry := entries[idx]
-		entry.APIID = utils.CreateAPIID()
+		entry.ID = utils.CreateID()
 		entry.Feed = feed
-		f.entriesRepo.Create(user, &entry)
+		f.entriesRepo.Create(userID, &entry)
 	}
 
 	return fetchedFeed, nil
 }
 
 // Feeds returns all feeds owned by user
-func (f FeedService) Feeds(continuationID string, count int, user *models.User) (feeds []models.Feed, next string) {
-	return f.feedsRepo.List(user, continuationID, count)
+func (f FeedService) Feeds(continuationID string, count int, userID string) (feeds []models.Feed, next string) {
+	return f.feedsRepo.List(userID, continuationID, count)
 }
 
 // Feed returns a feed with id owned by user
-func (f FeedService) Feed(id string, user *models.User) (models.Feed, bool) {
-	return f.feedsRepo.FeedWithID(user, id)
+func (f FeedService) Feed(id, userID string) (models.Feed, bool) {
+	return f.feedsRepo.FeedWithID(userID, id)
 }
 
 // Update a feed owned by user
-func (f FeedService) Update(feed *models.Feed, user *models.User) error {
-	err := f.feedsRepo.Update(user, feed)
+func (f FeedService) Update(feed *models.Feed, userID string) error {
+	err := f.feedsRepo.Update(userID, feed)
 	if err == repo.ErrModelNotFound {
 		return ErrFeedNotFound
 	}
@@ -146,8 +146,8 @@ func (f FeedService) Update(feed *models.Feed, user *models.User) error {
 }
 
 // Delete a feed with id
-func (f FeedService) Delete(id string, user *models.User) error {
-	err := f.feedsRepo.Delete(user, id)
+func (f FeedService) Delete(id, userID string) error {
+	err := f.feedsRepo.Delete(userID, id)
 	if err == repo.ErrModelNotFound {
 		return ErrFeedNotFound
 	}
@@ -156,8 +156,8 @@ func (f FeedService) Delete(id string, user *models.User) error {
 }
 
 // Mark a feed with id
-func (f FeedService) Mark(id string, marker models.Marker, user *models.User) error {
-	err := f.feedsRepo.Mark(user, id, marker)
+func (f FeedService) Mark(id string, marker models.Marker, userID string) error {
+	err := f.feedsRepo.Mark(userID, id, marker)
 	if err == repo.ErrModelNotFound {
 		return ErrFeedNotFound
 	}
@@ -171,13 +171,13 @@ func (f FeedService) Entries(
 	count int,
 	order bool,
 	marker models.Marker,
-	user *models.User) (entries []models.Entry, next string) {
-	return f.entriesRepo.ListFromFeed(user, id, continuationID, count, order, marker)
+	userID string) (entries []models.Entry, next string) {
+	return f.entriesRepo.ListFromFeed(userID, id, continuationID, count, order, marker)
 }
 
 // Stats returns statistics of a feed
-func (f FeedService) Stats(id string, user *models.User) (models.Stats, error) {
-	stats, err := f.feedsRepo.Stats(user, id)
+func (f FeedService) Stats(id, userID string) (models.Stats, error) {
+	stats, err := f.feedsRepo.Stats(userID, id)
 	if err == repo.ErrModelNotFound {
 		return stats, ErrFeedNotFound
 	} else if err != nil {

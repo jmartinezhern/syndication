@@ -52,104 +52,104 @@ func (t *FeedsSuite) TestNewFeed() {
 	}))
 	defer ts.Close()
 
-	feed, err := t.service.New("Example", ts.URL, "", t.user)
+	feed, err := t.service.New("Example", ts.URL, "", t.user.ID)
 	t.NoError(err)
-	_, found := t.feedsRepo.FeedWithID(t.user, feed.APIID)
+	_, found := t.feedsRepo.FeedWithID(t.user.ID, feed.ID)
 	t.True(found)
 }
 
 func (t *FeedsSuite) TestUnreachableNewFeed() {
-	_, err := t.service.New("Example", "bogus", "", t.user)
+	_, err := t.service.New("Example", "bogus", "", t.user.ID)
 	t.EqualError(err, ErrFetchingFeed.Error())
 }
 
 func (t *FeedsSuite) TestFeeds() {
-	feeds, _ := t.service.Feeds("", 2, t.user)
+	feeds, _ := t.service.Feeds("", 2, t.user.ID)
 	t.Len(feeds, 1)
 	t.Equal(t.feed.Title, feeds[0].Title)
 }
 
 func (t *FeedsSuite) TestFeed() {
-	_, found := t.service.Feed(t.feed.APIID, t.user)
+	_, found := t.service.Feed(t.feed.ID, t.user.ID)
 	t.True(found)
 }
 
 func (t *FeedsSuite) TestEditFeed() {
-	feed := models.Feed{APIID: t.feed.APIID, Title: "New Title"}
-	err := t.service.Update(&feed, t.user)
+	feed := models.Feed{ID: t.feed.ID, Title: "New Title"}
+	err := t.service.Update(&feed, t.user.ID)
 	t.NoError(err)
 
-	updatedFeed, _ := t.feedsRepo.FeedWithID(t.user, t.feed.APIID)
+	updatedFeed, _ := t.feedsRepo.FeedWithID(t.user.ID, t.feed.ID)
 	t.Equal("New Title", updatedFeed.Title)
 }
 
 func (t *FeedsSuite) TestEditMissingFeed() {
-	err := t.service.Update(&models.Feed{}, t.user)
+	err := t.service.Update(&models.Feed{}, t.user.ID)
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
 func (t *FeedsSuite) TestDeleteFeed() {
-	err := t.service.Delete(t.feed.APIID, t.user)
+	err := t.service.Delete(t.feed.ID, t.user.ID)
 	t.NoError(err)
 
-	_, found := t.feedsRepo.FeedWithID(t.user, t.feed.APIID)
+	_, found := t.feedsRepo.FeedWithID(t.user.ID, t.feed.ID)
 	t.False(found)
 }
 
 func (t *FeedsSuite) TestDeleteMissingFeed() {
-	err := t.service.Delete("bogus", t.user)
+	err := t.service.Delete("bogus", t.user.ID)
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
 func (t *FeedsSuite) TestMarkFeed() {
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test Entries",
 		Mark:  models.MarkerUnread,
 		Feed:  t.feed,
 	}
-	t.entriesRepo.Create(t.user, &entry)
+	t.entriesRepo.Create(t.user.ID, &entry)
 
-	err := t.service.Mark(t.feed.APIID, models.MarkerRead, t.user)
+	err := t.service.Mark(t.feed.ID, models.MarkerRead, t.user.ID)
 	t.NoError(err)
 
-	entries, _ := sql.NewEntries(t.db).ListFromFeed(t.user, t.feed.APIID, "", 1, false, models.MarkerAny)
+	entries, _ := sql.NewEntries(t.db).ListFromFeed(t.user.ID, t.feed.ID, "", 1, false, models.MarkerAny)
 	t.Require().Len(entries, 1)
-	t.Equal(entry.APIID, entries[0].APIID)
+	t.Equal(entry.ID, entries[0].ID)
 	t.Equal(entry.Title, entries[0].Title)
 }
 
 func (t *FeedsSuite) TestMarkMissingFeed() {
-	err := t.service.Mark("bogus", models.MarkerRead, t.user)
+	err := t.service.Mark("bogus", models.MarkerRead, t.user.ID)
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
 func (t *FeedsSuite) TestFeedEntries() {
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test Entries",
 		Mark:  models.MarkerUnread,
 		Feed:  t.feed,
 	}
-	t.entriesRepo.Create(t.user, &entry)
+	t.entriesRepo.Create(t.user.ID, &entry)
 
-	entries, _ := t.service.Entries(t.feed.APIID, "", 1, true, models.MarkerAny, t.user)
+	entries, _ := t.service.Entries(t.feed.ID, "", 1, true, models.MarkerAny, t.user.ID)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
 
 func (t *FeedsSuite) TestMissingFeedEntries() {
-	entries, _ := t.service.Entries(t.feed.APIID, "", 1, true, models.MarkerAny, t.user)
+	entries, _ := t.service.Entries(t.feed.ID, "", 1, true, models.MarkerAny, t.user.ID)
 	t.Len(entries, 0)
 }
 
 func (t *FeedsSuite) TestFeedStats() {
-	_, err := t.service.Stats(t.feed.APIID, t.user)
+	_, err := t.service.Stats(t.feed.ID, t.user.ID)
 	t.NoError(err)
 }
 
 func (t *FeedsSuite) TestMissingFeedStats() {
-	_, err := t.service.Stats("bogus", t.user)
+	_, err := t.service.Stats("bogus", t.user.ID)
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
@@ -162,17 +162,17 @@ func (t *FeedsSuite) SetupTest() {
 	t.service = NewFeedsService(t.feedsRepo, t.ctgsRepo, t.entriesRepo)
 
 	t.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 	sql.NewUsers(t.db).Create(t.user)
 
 	t.feed = models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Example",
 		Subscription: "example.com",
 	}
-	t.feedsRepo.Create(t.user, &t.feed)
+	t.feedsRepo.Create(t.user.ID, &t.feed)
 }
 
 func (t *FeedsSuite) TearDownTest() {

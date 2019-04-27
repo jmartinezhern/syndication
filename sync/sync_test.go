@@ -85,7 +85,7 @@ func (s *SyncTestSuite) SetupTest() {
 
 	randUserName := RandStringRunes(8)
 	s.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: randUserName,
 	}
 	s.usersRepo.Create(s.user)
@@ -111,58 +111,58 @@ func (s *SyncTestSuite) TestPullFeedWithBadSubscription() {
 
 func (s *SyncTestSuite) TestSyncWithEtags() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Sync Test",
 		Subscription: rssURL,
 	}
 
-	s.feedsRepo.Create(s.user, &feed)
+	s.feedsRepo.Create(s.user.ID, &feed)
 
 	_, entries, err := utils.PullFeed(feed.Subscription, "")
 	s.Require().NoError(err)
 	s.Require().Len(entries, 5)
 
 	for idx := range entries {
-		s.entriesRepo.Create(s.user, &entries[idx])
+		s.entriesRepo.Create(s.user.ID, &entries[idx])
 	}
 
 	serv := NewService(testSyncInterval, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
-	serv.SyncUser(s.user)
+	serv.SyncUser(s.user.ID)
 
-	entries, _ = s.entriesRepo.ListFromFeed(s.user, feed.APIID, "", 5, true, models.MarkerAny)
+	entries, _ = s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, "", 5, true, models.MarkerAny)
 	s.Require().NoError(err)
 	s.Len(entries, 0)
 }
 
 func (s *SyncTestSuite) TestSyncUser() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Sync Test",
 		Subscription: rssURL,
 	}
-	s.feedsRepo.Create(s.user, &feed)
+	s.feedsRepo.Create(s.user.ID, &feed)
 
 	serv := NewService(testSyncInterval, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
-	serv.SyncUser(s.user)
+	serv.SyncUser(s.user.ID)
 
-	entries, _ := s.entriesRepo.ListFromFeed(s.user, feed.APIID, "", 5, true, models.MarkerAny)
+	entries, _ := s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, "", 5, true, models.MarkerAny)
 	s.Len(entries, 5)
 }
 
 func (s *SyncTestSuite) TestSyncUsers() {
 	for i := 0; i < 10; i++ {
 		user := models.User{
-			APIID:    utils.CreateAPIID(),
+			ID:       utils.CreateID(),
 			Username: "test" + strconv.Itoa(i),
 		}
 		s.usersRepo.Create(&user)
 
 		feed := models.Feed{
-			APIID:        utils.CreateAPIID(),
+			ID:           utils.CreateID(),
 			Title:        "Sync Test",
 			Subscription: rssMinimalURL,
 		}
-		s.feedsRepo.Create(&user, &feed)
+		s.feedsRepo.Create(user.ID, &feed)
 	}
 
 	serv := NewService(testSyncInterval, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
@@ -173,7 +173,7 @@ func (s *SyncTestSuite) TestSyncUsers() {
 	users = users[1:]
 
 	for idx := range users {
-		entries, _ := s.entriesRepo.List(&users[idx], "", 100, true, models.MarkerAny)
+		entries, _ := s.entriesRepo.List(users[idx].ID, "", 100, true, models.MarkerAny)
 		s.Len(entries, 5)
 	}
 }
@@ -181,17 +181,17 @@ func (s *SyncTestSuite) TestSyncUsers() {
 func (s *SyncTestSuite) TestSyncService() {
 	for i := 0; i < 10; i++ {
 		user := models.User{
-			APIID:    utils.CreateAPIID(),
+			ID:       utils.CreateID(),
 			Username: "test" + strconv.Itoa(i),
 		}
 		s.usersRepo.Create(&user)
 
 		feed := models.Feed{
-			APIID:        utils.CreateAPIID(),
+			ID:           utils.CreateID(),
 			Title:        "Sync Test",
 			Subscription: rssMinimalURL,
 		}
-		s.feedsRepo.Create(&user, &feed)
+		s.feedsRepo.Create(user.ID, &feed)
 	}
 
 	serv := NewService(time.Second, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
@@ -206,7 +206,7 @@ func (s *SyncTestSuite) TestSyncService() {
 	users = users[1:]
 
 	for idx := range users {
-		entries, _ := s.entriesRepo.List(&users[idx], "", 100, true, models.MarkerAny)
+		entries, _ := s.entriesRepo.List(users[idx].ID, "", 100, true, models.MarkerAny)
 		s.Len(entries, 5)
 	}
 }

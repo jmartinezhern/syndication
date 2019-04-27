@@ -49,27 +49,27 @@ type (
 
 func (c *EntriesControllerSuite) TestGetEntry() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "example",
 		Feed:  feed,
 	}
-	c.entriesRepo.Create(c.user, &entry)
+	c.entriesRepo.Create(c.user.ID, &entry)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetParamNames("entryID")
-	ctx.SetParamValues(entry.APIID)
+	ctx.SetParamValues(entry.ID)
 	ctx.SetPath("/v1/entries/:entryID")
 
 	c.NoError(c.controller.GetEntry(ctx))
@@ -86,7 +86,7 @@ func (c *EntriesControllerSuite) TestGetUnknownEntry() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetParamNames("entryID")
 	ctx.SetParamValues("bogus")
@@ -100,24 +100,24 @@ func (c *EntriesControllerSuite) TestGetUnknownEntry() {
 
 func (c *EntriesControllerSuite) TestGetEntries() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "example",
 		Feed:  feed,
 	}
-	c.entriesRepo.Create(c.user, &entry)
+	c.entriesRepo.Create(c.user.ID, &entry)
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/entries")
 
@@ -136,30 +136,30 @@ func (c *EntriesControllerSuite) TestGetEntries() {
 
 func (c *EntriesControllerSuite) TestMarkEntry() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "example",
 		Feed:  feed,
 	}
-	c.entriesRepo.Create(c.user, &entry)
+	c.entriesRepo.Create(c.user.ID, &entry)
 
-	entries, _ := c.entriesRepo.List(c.user, "", 2, true, models.MarkerRead)
+	entries, _ := c.entriesRepo.List(c.user.ID, "", 2, true, models.MarkerRead)
 	c.Empty(entries)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetParamNames("entryID")
-	ctx.SetParamValues(entry.APIID)
+	ctx.SetParamValues(entry.ID)
 	ctx.SetPath("/v1/entries/:entryID/mark")
 
 	c.NoError(c.controller.MarkEntry(ctx))
@@ -170,7 +170,7 @@ func (c *EntriesControllerSuite) TestMarkUnknownEntry() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetParamNames("entryID")
 	ctx.SetParamValues("bogus")
@@ -184,27 +184,27 @@ func (c *EntriesControllerSuite) TestMarkUnknownEntry() {
 
 func (c *EntriesControllerSuite) TestMarkAllEntries() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "example",
 		Feed:  feed,
 	}
-	c.entriesRepo.Create(c.user, &entry)
+	c.entriesRepo.Create(c.user.ID, &entry)
 
-	entries, _ := c.entriesRepo.List(c.user, "", 2, true, models.MarkerRead)
+	entries, _ := c.entriesRepo.List(c.user.ID, "", 2, true, models.MarkerRead)
 	c.Empty(entries)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/entries/mark")
 
@@ -216,7 +216,7 @@ func (c *EntriesControllerSuite) TestGetEntryStats() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/entries/stats")
 
@@ -232,7 +232,7 @@ func (c *EntriesControllerSuite) SetupTest() {
 	c.e.Logger.SetLevel(log.OFF)
 
 	c.user = &models.User{
-		APIID: utils.CreateAPIID(),
+		ID: utils.CreateID(),
 	}
 
 	c.db = sql.NewDB("sqlite3", ":memory:")

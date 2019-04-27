@@ -29,7 +29,7 @@ type (
 	// Importer is an interface that wraps the basic
 	// import functions.
 	Importer interface {
-		Import([]byte, *models.User) error
+		Import([]byte, string) error
 	}
 
 	// An OPMLImporter represents an importer for the OPML 2.0 format
@@ -81,7 +81,7 @@ func (i OPMLImporter) extractFeeds(items []models.OPMLOutline) []models.Feed {
 }
 
 // Import data that must be in a OPML 2.0 format.
-func (i OPMLImporter) Import(data []byte, user *models.User) error {
+func (i OPMLImporter) Import(data []byte, userID string) error {
 	b := models.OPML{}
 
 	err := xml.Unmarshal(data, &b)
@@ -99,22 +99,22 @@ func (i OPMLImporter) Import(data []byte, user *models.User) error {
 		feed := feeds[idx]
 		if feed.Category.Name != "" {
 			dbCtg := models.Category{}
-			if ctg, exists := i.ctgsRepo.CategoryWithName(user, feed.Category.Name); exists {
+			if ctg, exists := i.ctgsRepo.CategoryWithName(userID, feed.Category.Name); exists {
 				dbCtg = ctg
 			} else {
 				dbCtg = models.Category{
-					APIID: utils.CreateAPIID(),
-					Name:  feed.Category.Name,
+					ID:   utils.CreateID(),
+					Name: feed.Category.Name,
 				}
-				i.ctgsRepo.Create(user, &dbCtg)
+				i.ctgsRepo.Create(userID, &dbCtg)
 			}
 
-			feed.APIID = utils.CreateAPIID()
+			feed.ID = utils.CreateID()
 			feed.Category = dbCtg
-			i.feedsRepo.Create(user, &feed)
+			i.feedsRepo.Create(userID, &feed)
 		} else {
-			feed.APIID = utils.CreateAPIID()
-			i.feedsRepo.Create(user, &feed)
+			feed.ID = utils.CreateID()
+			i.feedsRepo.Create(userID, &feed)
 		}
 	}
 

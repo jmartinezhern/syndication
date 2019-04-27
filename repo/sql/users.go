@@ -43,7 +43,7 @@ func (u Users) Create(user *models.User) {
 
 // Update a user
 func (u Users) Update(user *models.User) error {
-	dbUser, found := u.UserWithID(user.APIID)
+	dbUser, found := u.UserWithID(user.ID)
 	if !found {
 		return repo.ErrModelNotFound
 	}
@@ -54,7 +54,7 @@ func (u Users) Update(user *models.User) error {
 
 // UserWithID returns a User with id
 func (u Users) UserWithID(id string) (user models.User, found bool) {
-	found = !u.db.db.First(&user, "api_id = ?", id).RecordNotFound()
+	found = !u.db.db.First(&user, "id = ?", id).RecordNotFound()
 	return
 }
 
@@ -76,13 +76,13 @@ func (u Users) List(continuationID string, count int) (users []models.User, next
 	if continuationID != "" {
 		user, found := u.UserWithID(continuationID)
 		if found {
-			query = query.Where("id >= ?", user.ID)
+			query = query.Where("created_at >= ?", user.CreatedAt)
 		}
 	}
 	query.Find(&users)
 
 	if len(users) > count {
-		next = users[len(users)-1].APIID
+		next = users[len(users)-1].ID
 		users = users[:len(users)-1]
 	}
 
@@ -93,14 +93,4 @@ func (u Users) List(continuationID string, count int) (users []models.User, next
 func (u Users) UserWithName(name string) (user models.User, found bool) {
 	found = !u.db.db.First(&user, "username = ?", name).RecordNotFound()
 	return
-}
-
-// OwnsKey returns true if the given APIKey is owned by user
-func (u Users) OwnsKey(key *models.APIKey, user *models.User) bool {
-	return !u.db.db.Model(user).Where("key = ?", key.Key).Related(key).RecordNotFound()
-}
-
-// AddAPIKey associates an API key with user
-func (u Users) AddAPIKey(key *models.APIKey, user *models.User) {
-	u.db.db.Model(user).Association("APIKeys").Append(key)
 }

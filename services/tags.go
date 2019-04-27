@@ -29,25 +29,25 @@ type (
 	// Tag defines the Tag service interface
 	Tag interface {
 		// New creates a new tag
-		New(name string, user *models.User) (models.Tag, error)
+		New(name string, userID string) (models.Tag, error)
 
 		// List returns all tags owned by user
-		List(continuationID string, count int, user *models.User) ([]models.Tag, string)
+		List(continuationID string, count int, userID string) ([]models.Tag, string)
 
 		// Delete a tag id
-		Delete(id string, user *models.User) error
+		Delete(id string, userID string) error
 
 		// Update a tag with id
-		Update(id string, newName string, user *models.User) (models.Tag, error)
+		Update(id string, newName string, userID string) (models.Tag, error)
 
 		// Apply associates a tag with an entry
-		Apply(id string, entries []string, user *models.User) error
+		Apply(id string, entries []string, userID string) error
 
 		// Tag returns a tag with id
-		Tag(id string, user *models.User) (models.Tag, bool)
+		Tag(id string, userID string) (models.Tag, bool)
 
 		// Entries returns all entries associated with a tag with id
-		Entries(id string, continuationID string, count int, order bool, marker models.Marker, user *models.User) ([]models.Entry, string)
+		Entries(id string, continuationID string, count int, order bool, marker models.Marker, userID string) ([]models.Entry, string)
 	}
 
 	// TagsService implementation
@@ -73,28 +73,28 @@ func NewTagsService(tagsRepo repo.Tags, entriesRepo repo.Entries) TagsService {
 }
 
 // New creates a new tag
-func (t TagsService) New(name string, user *models.User) (models.Tag, error) {
-	if _, found := t.tagsRepo.TagWithName(user, name); found {
+func (t TagsService) New(name, userID string) (models.Tag, error) {
+	if _, found := t.tagsRepo.TagWithName(userID, name); found {
 		return models.Tag{}, ErrTagConflicts
 	}
 
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  name,
+		ID:   utils.CreateID(),
+		Name: name,
 	}
-	t.tagsRepo.Create(user, &tag)
+	t.tagsRepo.Create(userID, &tag)
 
 	return tag, nil
 }
 
 // List returns all tags owned by user
-func (t TagsService) List(continuationID string, count int, user *models.User) (tags []models.Tag, next string) {
-	return t.tagsRepo.List(user, continuationID, count)
+func (t TagsService) List(continuationID string, count int, userID string) (tags []models.Tag, next string) {
+	return t.tagsRepo.List(userID, continuationID, count)
 }
 
 // Delete a tag id
-func (t TagsService) Delete(id string, user *models.User) error {
-	err := t.tagsRepo.Delete(user, id)
+func (t TagsService) Delete(id, userID string) error {
+	err := t.tagsRepo.Delete(userID, id)
 	if err == repo.ErrModelNotFound {
 		return ErrTagNotFound
 	}
@@ -102,13 +102,13 @@ func (t TagsService) Delete(id string, user *models.User) error {
 }
 
 // Update a tag with id
-func (t TagsService) Update(id, newName string, user *models.User) (models.Tag, error) {
-	if _, found := t.tagsRepo.TagWithName(user, newName); found {
+func (t TagsService) Update(id, newName, userID string) (models.Tag, error) {
+	if _, found := t.tagsRepo.TagWithName(userID, newName); found {
 		return models.Tag{}, ErrTagConflicts
 	}
 
-	tag := models.Tag{APIID: id, Name: newName}
-	err := t.tagsRepo.Update(user, &tag)
+	tag := models.Tag{ID: id, Name: newName}
+	err := t.tagsRepo.Update(userID, &tag)
 	if err == repo.ErrModelNotFound {
 		return models.Tag{}, ErrTagNotFound
 	}
@@ -117,8 +117,8 @@ func (t TagsService) Update(id, newName string, user *models.User) (models.Tag, 
 }
 
 // Apply associates a tag with an entry
-func (t TagsService) Apply(id string, entries []string, user *models.User) error {
-	err := t.entriesRepo.TagEntries(user, id, entries)
+func (t TagsService) Apply(id string, entries []string, userID string) error {
+	err := t.entriesRepo.TagEntries(userID, id, entries)
 	if err == repo.ErrModelNotFound {
 		return ErrTagNotFound
 	}
@@ -127,8 +127,8 @@ func (t TagsService) Apply(id string, entries []string, user *models.User) error
 }
 
 // Tag returns a tag with id
-func (t TagsService) Tag(id string, user *models.User) (models.Tag, bool) {
-	return t.tagsRepo.TagWithID(user, id)
+func (t TagsService) Tag(id, userID string) (models.Tag, bool) {
+	return t.tagsRepo.TagWithID(userID, id)
 }
 
 // Entries returns all entries associated with a tag with id
@@ -137,6 +137,6 @@ func (t TagsService) Entries(
 	count int,
 	order bool,
 	marker models.Marker,
-	user *models.User) (entries []models.Entry, next string) {
-	return t.entriesRepo.ListFromTags(user, []string{id}, continuationID, count, order, marker)
+	userID string) (entries []models.Entry, next string) {
+	return t.entriesRepo.ListFromTags(userID, []string{id}, continuationID, count, order, marker)
 }

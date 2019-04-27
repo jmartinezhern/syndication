@@ -38,16 +38,16 @@ type CategoriesSuite struct {
 }
 
 func (s *CategoriesSuite) TestCreate() {
-	ctgID := utils.CreateAPIID()
+	ctgID := utils.CreateID()
 
-	s.repo.Create(s.user, &models.Category{
-		APIID: ctgID,
-		Name:  "news",
+	s.repo.Create(s.user.ID, &models.Category{
+		ID:   ctgID,
+		Name: "news",
 	})
 
-	ctg, found := s.repo.CategoryWithID(s.user, ctgID)
+	ctg, found := s.repo.CategoryWithID(s.user.ID, ctgID)
 	s.True(found)
-	s.Equal(ctgID, ctg.APIID)
+	s.Equal(ctgID, ctg.ID)
 	s.Equal("news", ctg.Name)
 }
 
@@ -55,20 +55,20 @@ func (s *CategoriesSuite) TestCategories() {
 	var ctgs []models.Category
 	for i := 0; i < 5; i++ {
 		ctg := models.Category{
-			APIID: utils.CreateAPIID(),
-			Name:  "Test Category " + strconv.Itoa(i),
+			ID:   utils.CreateID(),
+			Name: "Test Category " + strconv.Itoa(i),
 		}
-		s.repo.Create(s.user, &ctg)
+		s.repo.Create(s.user.ID, &ctg)
 		ctgs = append(ctgs, ctg)
 	}
 
-	cCtgs, continuationID := s.repo.List(s.user, "", 2)
-	s.Equal(ctgs[2].APIID, continuationID)
+	cCtgs, continuationID := s.repo.List(s.user.ID, "", 2)
+	s.Equal(ctgs[2].ID, continuationID)
 	s.Require().Len(cCtgs, 2)
 	s.Equal(ctgs[0].Name, cCtgs[0].Name)
 	s.Equal(ctgs[1].Name, cCtgs[1].Name)
 
-	cCtgs, continuationID = s.repo.List(s.user, continuationID, 3)
+	cCtgs, continuationID = s.repo.List(s.user.ID, continuationID, 3)
 	s.Len(continuationID, 0)
 	s.Require().Len(cCtgs, 3)
 	s.Equal(ctgs[2].Name, cCtgs[0].Name)
@@ -78,14 +78,14 @@ func (s *CategoriesSuite) TestCategories() {
 
 func (s *CategoriesSuite) TestFeeds() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	s.repo.Create(s.user, &ctg)
+	s.repo.Create(s.user.ID, &ctg)
 
 	for i := 0; i < 5; i++ {
 		feed := models.Feed{
-			APIID:        utils.CreateAPIID(),
+			ID:           utils.CreateID(),
 			Title:        "Feed " + strconv.Itoa(i),
 			Subscription: "https://example.com",
 			Category:     ctg,
@@ -93,15 +93,15 @@ func (s *CategoriesSuite) TestFeeds() {
 		s.db.db.Model(s.user).Association("Feeds").Append(&feed)
 	}
 
-	feeds, next := s.repo.Feeds(s.user, ctg.APIID, "", 2)
+	feeds, next := s.repo.Feeds(s.user.ID, ctg.ID, "", 2)
 	s.NotEmpty(next)
 	s.Require().Len(feeds, 2)
 	s.Equal("Feed 0", feeds[0].Title)
 	s.Equal("Feed 1", feeds[1].Title)
 
-	feeds, _ = s.repo.Feeds(s.user, ctg.APIID, next, 3)
+	feeds, _ = s.repo.Feeds(s.user.ID, ctg.ID, next, 3)
 	s.Require().Len(feeds, 3)
-	s.Equal(feeds[0].APIID, next)
+	s.Equal(feeds[0].ID, next)
 	s.Equal("Feed 2", feeds[0].Title)
 	s.Equal("Feed 3", feeds[1].Title)
 	s.Equal("Feed 4", feeds[2].Title)
@@ -110,88 +110,88 @@ func (s *CategoriesSuite) TestFeeds() {
 func (s *CategoriesSuite) TestUncategorized() {
 	for i := 0; i < 5; i++ {
 		feed := models.Feed{
-			APIID:        utils.CreateAPIID(),
+			ID:           utils.CreateID(),
 			Title:        "Feed " + strconv.Itoa(i),
 			Subscription: "https://example.com",
 		}
 		s.db.db.Model(s.user).Association("Feeds").Append(&feed)
 	}
 
-	feeds, next := s.repo.Uncategorized(s.user, "", 2)
+	feeds, next := s.repo.Uncategorized(s.user.ID, "", 2)
 	s.NotEmpty(next)
 	s.Require().Len(feeds, 2)
 	s.Equal("Feed 0", feeds[0].Title)
 	s.Equal("Feed 1", feeds[1].Title)
 
-	feeds, _ = s.repo.Uncategorized(s.user, next, 3)
+	feeds, _ = s.repo.Uncategorized(s.user.ID, next, 3)
 	s.Require().Len(feeds, 3)
-	s.Equal(feeds[0].APIID, next)
+	s.Equal(feeds[0].ID, next)
 	s.Equal("Feed 2", feeds[0].Title)
 	s.Equal("Feed 3", feeds[1].Title)
 	s.Equal("Feed 4", feeds[2].Title)
 }
 
 func (s *CategoriesSuite) TestCategoryWithName() {
-	s.repo.Create(s.user, &models.Category{
+	s.repo.Create(s.user.ID, &models.Category{
 		Name: "test",
 	})
 
-	ctg, found := s.repo.CategoryWithName(s.user, "test")
+	ctg, found := s.repo.CategoryWithName(s.user.ID, "test")
 	s.True(found)
 	s.Equal("test", ctg.Name)
 }
 
 func (s *CategoriesSuite) TestUpdate() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "news",
+		ID:   utils.CreateID(),
+		Name: "news",
 	}
-	s.repo.Create(s.user, &ctg)
+	s.repo.Create(s.user.ID, &ctg)
 
 	ctg.Name = "updates"
 
-	err := s.repo.Update(s.user, &ctg)
+	err := s.repo.Update(s.user.ID, &ctg)
 	s.NoError(err)
 
-	updatedCtg, _ := s.repo.CategoryWithID(s.user, ctg.APIID)
+	updatedCtg, _ := s.repo.CategoryWithID(s.user.ID, ctg.ID)
 	s.Equal(ctg.Name, updatedCtg.Name)
 }
 
 func (s *CategoriesSuite) TestUpdateMissing() {
-	err := s.repo.Update(s.user, &models.Category{
-		APIID: "",
+	err := s.repo.Update(s.user.ID, &models.Category{
+		ID: "",
 	})
 	s.Equal(repo.ErrModelNotFound, err)
 }
 
 func (s *CategoriesSuite) TestDelete() {
-	ctgID := utils.CreateAPIID()
-	s.repo.Create(s.user, &models.Category{
-		APIID: ctgID,
-		Name:  "news",
+	ctgID := utils.CreateID()
+	s.repo.Create(s.user.ID, &models.Category{
+		ID:   ctgID,
+		Name: "news",
 	})
 
-	err := s.repo.Delete(s.user, ctgID)
+	err := s.repo.Delete(s.user.ID, ctgID)
 	s.NoError(err)
 
-	_, found := s.repo.CategoryWithID(s.user, ctgID)
+	_, found := s.repo.CategoryWithID(s.user.ID, ctgID)
 	s.False(found)
 }
 
 func (s *CategoriesSuite) TestDeleteMissing() {
-	err := s.repo.Delete(s.user, "bogus")
+	err := s.repo.Delete(s.user.ID, "bogus")
 	s.Equal(repo.ErrModelNotFound, err)
 }
 
 func (s *CategoriesSuite) TestMark() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test_ctg",
+		ID:   utils.CreateID(),
+		Name: "test_ctg",
 	}
-	s.repo.Create(s.user, &ctg)
+	s.repo.Create(s.user.ID, &ctg)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 	}
@@ -201,7 +201,7 @@ func (s *CategoriesSuite) TestMark() {
 
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
-			APIID:     utils.CreateAPIID(),
+			ID:        utils.CreateID(),
 			Title:     "Entry " + strconv.Itoa(i),
 			Author:    "John Doe",
 			Link:      "http://example.com",
@@ -213,51 +213,51 @@ func (s *CategoriesSuite) TestMark() {
 		s.db.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
-	err := s.repo.Mark(s.user, ctg.APIID, models.MarkerRead)
+	err := s.repo.Mark(s.user.ID, ctg.ID, models.MarkerRead)
 	s.NoError(err)
 
-	entries, _ := NewEntries(s.db).ListFromCategory(s.user, ctg.APIID, "", 5, false, models.MarkerRead)
+	entries, _ := NewEntries(s.db).ListFromCategory(s.user.ID, ctg.ID, "", 5, false, models.MarkerRead)
 	s.Len(entries, 5)
 }
 
 func (s *CategoriesSuite) TestMarkUnknownCategory() {
-	err := s.repo.Mark(s.user, "bogus", models.MarkerRead)
+	err := s.repo.Mark(s.user.ID, "bogus", models.MarkerRead)
 	s.Equal(repo.ErrModelNotFound, err)
 }
 
 func (s *CategoriesSuite) TestAddFeed() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "tech",
+		ID:   utils.CreateID(),
+		Name: "tech",
 	}
-	s.repo.Create(s.user, &ctg)
+	s.repo.Create(s.user.ID, &ctg)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 		Category:     ctg,
 	}
 	s.db.db.Model(s.user).Association("Feeds").Append(&feed)
 
-	s.NoError(s.repo.AddFeed(s.user, feed.APIID, ctg.APIID))
+	s.NoError(s.repo.AddFeed(s.user.ID, feed.ID, ctg.ID))
 
-	feeds, _ := s.repo.Feeds(s.user, ctg.APIID, "", 1)
+	feeds, _ := s.repo.Feeds(s.user.ID, ctg.ID, "", 1)
 	s.Require().Len(feeds, 1)
 	s.Equal(feed.Title, feeds[0].Title)
-	s.Equal(feed.APIID, feeds[0].APIID)
+	s.Equal(feed.ID, feeds[0].ID)
 }
 
 func (s *CategoriesSuite) TestCategoryStats() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "news",
+		ID:   utils.CreateID(),
+		Name: "news",
 	}
 
-	s.repo.Create(s.user, &ctg)
+	s.repo.Create(s.user.ID, &ctg)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 	}
@@ -273,7 +273,7 @@ func (s *CategoriesSuite) TestCategoryStats() {
 			marker = models.MarkerUnread
 		}
 		entry := models.Entry{
-			APIID:     utils.CreateAPIID(),
+			ID:        utils.CreateID(),
 			Title:     "Item",
 			Link:      "http://example.com",
 			Mark:      marker,
@@ -285,7 +285,7 @@ func (s *CategoriesSuite) TestCategoryStats() {
 		s.db.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
-	stats, err := s.repo.Stats(s.user, ctg.APIID)
+	stats, err := s.repo.Stats(s.user.ID, ctg.ID)
 	s.NoError(err)
 	s.Equal(7, stats.Unread)
 	s.Equal(3, stats.Read)
@@ -297,11 +297,11 @@ func (s *CategoriesSuite) SetupTest() {
 	s.db = NewDB("sqlite3", ":memory:")
 
 	s.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "test_ctgs",
 	}
 
-	s.db.db.Create(s.user)
+	s.db.db.Create(s.user.ID)
 
 	s.repo = NewCategories(s.db)
 }

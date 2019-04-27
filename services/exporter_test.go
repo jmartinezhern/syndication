@@ -41,28 +41,28 @@ type ExporterSuite struct {
 
 func (t *ExporterSuite) TestOPMLExporter() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.repo.Create(t.user, &ctg)
+	t.repo.Create(t.user.ID, &ctg)
 
 	feedsRepo := sql.NewFeeds(t.db)
 	unCtgFeed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Uncategorized",
 		Subscription: "example.com",
 	}
-	feedsRepo.Create(t.user, &unCtgFeed)
+	feedsRepo.Create(t.user.ID, &unCtgFeed)
 
 	ctgFeed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Categorized",
 		Subscription: "example.com",
 		Category:     ctg,
 	}
-	feedsRepo.Create(t.user, &ctgFeed)
+	feedsRepo.Create(t.user.ID, &ctgFeed)
 
-	data, err := t.service.Export(t.user)
+	data, err := t.service.Export(t.user.ID)
 	t.NoError(err)
 
 	b := models.OPML{}
@@ -84,7 +84,7 @@ func (t *ExporterSuite) SetupTest() {
 	t.service = NewOPMLExporter(t.repo)
 
 	t.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 	sql.NewUsers(t.db).Create(t.user)

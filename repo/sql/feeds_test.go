@@ -40,38 +40,38 @@ type FeedsSuite struct {
 
 func (s *FeedsSuite) TestCreate() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 		Category:     s.ctg,
 	}
-	s.repo.Create(s.user, &feed)
+	s.repo.Create(s.user.ID, &feed)
 
-	query, found := s.repo.FeedWithID(s.user, feed.APIID)
+	query, found := s.repo.FeedWithID(s.user.ID, feed.ID)
 	s.True(found)
 
-	s.Equal(s.ctg.APIID, query.Category.APIID)
+	s.Equal(s.ctg.ID, query.Category.ID)
 	s.Equal(s.ctg.Name, query.Category.Name)
 }
 
 func (s *FeedsSuite) TestList() {
 	for i := 0; i < 5; i++ {
 		feed := models.Feed{
-			APIID: utils.CreateAPIID(),
+			ID:    utils.CreateID(),
 			Title: "Test site " + strconv.Itoa(i),
 		}
-		s.repo.Create(s.user, &feed)
+		s.repo.Create(s.user.ID, &feed)
 	}
 
-	feeds, next := s.repo.List(s.user, "", 2)
+	feeds, next := s.repo.List(s.user.ID, "", 2)
 	s.Require().Len(feeds, 2)
 	s.NotEmpty(next)
 	s.Equal("Test site 0", feeds[0].Title)
 	s.Equal("Test site 1", feeds[1].Title)
 
-	feeds, _ = s.repo.List(s.user, next, 3)
+	feeds, _ = s.repo.List(s.user.ID, next, 3)
 	s.Require().Len(feeds, 3)
-	s.Equal(feeds[0].APIID, next)
+	s.Equal(feeds[0].ID, next)
 	s.Equal("Test site 2", feeds[0].Title)
 	s.Equal("Test site 3", feeds[1].Title)
 	s.Equal("Test site 4", feeds[2].Title)
@@ -80,60 +80,60 @@ func (s *FeedsSuite) TestList() {
 
 func (s *FeedsSuite) TestUpdate() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 	}
-	s.repo.Create(s.user, &feed)
+	s.repo.Create(s.user.ID, &feed)
 
 	feed.Title = "New Name"
 	feed.Subscription = "http://example.com/feed"
-	err := s.repo.Update(s.user, &feed)
+	err := s.repo.Update(s.user.ID, &feed)
 	s.NoError(err)
 
-	updatedFeed, _ := s.repo.FeedWithID(s.user, feed.APIID)
-	s.Equal(feed.APIID, updatedFeed.APIID)
+	updatedFeed, _ := s.repo.FeedWithID(s.user.ID, feed.ID)
+	s.Equal(feed.ID, updatedFeed.ID)
 	s.Equal("New Name", updatedFeed.Title)
 	s.Equal("http://example.com/feed", updatedFeed.Subscription)
 }
 
 func (s *FeedsSuite) TestUpdateMissing() {
-	err := s.repo.Update(s.user, &models.Feed{})
+	err := s.repo.Update(s.user.ID, &models.Feed{})
 	s.EqualError(err, repo.ErrModelNotFound.Error())
 }
 
 func (s *FeedsSuite) TestDelete() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 	}
-	s.repo.Create(s.user, &feed)
+	s.repo.Create(s.user.ID, &feed)
 
-	err := s.repo.Delete(s.user, feed.APIID)
+	err := s.repo.Delete(s.user.ID, feed.ID)
 	s.NoError(err)
 
-	_, found := s.repo.FeedWithID(s.user, feed.APIID)
+	_, found := s.repo.FeedWithID(s.user.ID, feed.ID)
 	s.False(found)
 }
 
 func (s *FeedsSuite) TestDeleteMissing() {
-	err := s.repo.Delete(s.user, "bogus")
+	err := s.repo.Delete(s.user.ID, "bogus")
 	s.EqualError(err, repo.ErrModelNotFound.Error())
 }
 
 func (s *FeedsSuite) TestMark() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 	}
 
-	s.repo.Create(s.user, &feed)
+	s.repo.Create(s.user.ID, &feed)
 
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
-			APIID:     utils.CreateAPIID(),
+			ID:        utils.CreateID(),
 			Title:     "Entry " + strconv.Itoa(i),
 			Author:    "John Doe",
 			Link:      "http://example.com",
@@ -145,20 +145,20 @@ func (s *FeedsSuite) TestMark() {
 		s.db.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
-	err := s.repo.Mark(s.user, feed.APIID, models.MarkerRead)
+	err := s.repo.Mark(s.user.ID, feed.ID, models.MarkerRead)
 	s.NoError(err)
 
-	entries, _ := NewEntries(s.db).ListFromFeed(s.user, feed.APIID, "", 5, false, models.MarkerRead)
+	entries, _ := NewEntries(s.db).ListFromFeed(s.user.ID, feed.ID, "", 5, false, models.MarkerRead)
 	s.Len(entries, 5)
 }
 
 func (s *FeedsSuite) TestStats() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Test site",
 		Subscription: "http://example.com",
 	}
-	s.repo.Create(s.user, &feed)
+	s.repo.Create(s.user.ID, &feed)
 
 	for i := 0; i < 10; i++ {
 		var marker models.Marker
@@ -168,7 +168,7 @@ func (s *FeedsSuite) TestStats() {
 			marker = models.MarkerUnread
 		}
 		entry := models.Entry{
-			APIID:     utils.CreateAPIID(),
+			ID:        utils.CreateID(),
 			Title:     "Item",
 			Link:      "http://example.com",
 			Mark:      marker,
@@ -179,7 +179,7 @@ func (s *FeedsSuite) TestStats() {
 		s.db.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
-	stats, err := s.repo.Stats(s.user, feed.APIID)
+	stats, err := s.repo.Stats(s.user.ID, feed.ID)
 	s.NoError(err)
 	s.Equal(7, stats.Unread)
 	s.Equal(3, stats.Read)
@@ -191,14 +191,14 @@ func (s *FeedsSuite) SetupTest() {
 	s.db = NewDB("sqlite3", ":memory:")
 
 	s.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "test_feeds",
 	}
-	s.db.db.Create(s.user)
+	s.db.db.Create(s.user.ID)
 
 	s.ctg = models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "category",
+		ID:   utils.CreateID(),
+		Name: "category",
 	}
 	s.db.db.Create(&s.ctg)
 

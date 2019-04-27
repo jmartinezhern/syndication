@@ -56,14 +56,14 @@ func NewCategoriesController(service services.Categories, e *echo.Echo) *Categor
 
 // NewCategory creates a new Categories
 func (s *CategoriesController) NewCategory(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	ctg := models.Category{}
 	if err := c.Bind(&ctg); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	newCtg, err := s.categories.New(ctg.Name, &user)
+	newCtg, err := s.categories.New(ctg.Name, userID)
 	if err == services.ErrCategoryConflicts {
 		return echo.NewHTTPError(http.StatusConflict)
 	} else if err != nil {
@@ -75,9 +75,9 @@ func (s *CategoriesController) NewCategory(c echo.Context) error {
 
 // GetCategory with id
 func (s *CategoriesController) GetCategory(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
-	ctg, found := s.categories.Category(c.Param("categoryID"), &user)
+	ctg, found := s.categories.Category(c.Param("categoryID"), userID)
 	if found {
 		return c.JSON(http.StatusOK, ctg)
 	}
@@ -87,14 +87,14 @@ func (s *CategoriesController) GetCategory(c echo.Context) error {
 
 // GetCategories returns a list of Categories owned by a user
 func (s *CategoriesController) GetCategories(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	params := paginationParams{}
 	if err := c.Bind(&params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	ctgs, next := s.categories.Categories(params.ContinuationID, params.Count, &user)
+	ctgs, next := s.categories.Categories(params.ContinuationID, params.Count, userID)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"categories":     ctgs,
@@ -104,14 +104,14 @@ func (s *CategoriesController) GetCategories(c echo.Context) error {
 
 // GetCategoryFeeds returns a list of Feeds that belong to a Categories
 func (s *CategoriesController) GetCategoryFeeds(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	params := paginationParams{}
 	if err := c.Bind(&params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 	ctgID := c.Param("categoryID")
-	feeds, next := s.categories.Feeds(ctgID, params.ContinuationID, params.Count, &user)
+	feeds, next := s.categories.Feeds(ctgID, params.ContinuationID, params.Count, userID)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"feeds":          feeds,
@@ -121,7 +121,7 @@ func (s *CategoriesController) GetCategoryFeeds(c echo.Context) error {
 
 // EditCategory with id
 func (s *CategoriesController) EditCategory(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	ctg := models.Category{}
 	ctgID := c.Param("categoryID")
@@ -130,7 +130,7 @@ func (s *CategoriesController) EditCategory(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	newCtg, err := s.categories.Update(ctg.Name, ctgID, &user)
+	newCtg, err := s.categories.Update(ctg.Name, ctgID, userID)
 	if err == services.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -142,7 +142,7 @@ func (s *CategoriesController) EditCategory(c echo.Context) error {
 
 // AppendCategoryFeeds adds a Feed to a Categories with id
 func (s *CategoriesController) AppendCategoryFeeds(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	ctgID := c.Param("categoryID")
 
@@ -155,16 +155,16 @@ func (s *CategoriesController) AppendCategoryFeeds(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	s.categories.AddFeeds(ctgID, feeds.Feeds, &user)
+	s.categories.AddFeeds(ctgID, feeds.Feeds, userID)
 
 	return c.NoContent(http.StatusNoContent)
 }
 
 // DeleteCategory with id
 func (s *CategoriesController) DeleteCategory(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
-	err := s.categories.Delete(c.Param("categoryID"), &user)
+	err := s.categories.Delete(c.Param("categoryID"), userID)
 	if err == services.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -176,11 +176,11 @@ func (s *CategoriesController) DeleteCategory(c echo.Context) error {
 
 // MarkCategory applies a Marker to a Categories
 func (s *CategoriesController) MarkCategory(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	marker := models.MarkerFromString(c.FormValue("as"))
 
-	err := s.categories.Mark(c.Param("categoryID"), marker, &user)
+	err := s.categories.Mark(c.Param("categoryID"), marker, userID)
 	if err == services.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
@@ -191,7 +191,7 @@ func (s *CategoriesController) MarkCategory(c echo.Context) error {
 // GetCategoryEntries returns a list of Entries
 // that belong to a Feed that belongs to a Categories
 func (s *CategoriesController) GetCategoryEntries(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	params := listEntriesParams{}
 	if err := c.Bind(&params); err != nil {
@@ -208,7 +208,7 @@ func (s *CategoriesController) GetCategoryEntries(c echo.Context) error {
 		params.Count,
 		convertOrderByParamToValue(params.OrderBy),
 		marker,
-		&user)
+		userID)
 	if err == services.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -223,9 +223,9 @@ func (s *CategoriesController) GetCategoryEntries(c echo.Context) error {
 
 // GetCategoryStats returns statistics related to a Categories
 func (s *CategoriesController) GetCategoryStats(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
-	stats, err := s.categories.Stats(c.Param("categoryID"), &user)
+	stats, err := s.categories.Stats(c.Param("categoryID"), userID)
 	if err == services.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
