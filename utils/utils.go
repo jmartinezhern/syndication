@@ -22,12 +22,14 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"io"
 	mathRand "math/rand"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/gommon/log"
 	"github.com/mmcdole/gofeed"
 	"golang.org/x/crypto/scrypt"
@@ -43,6 +45,11 @@ const (
 var (
 	lastTimeIDWasCreated int64
 	random32Int          uint32
+)
+
+const (
+	refreshKeyExpirationInterval = time.Hour * 24 * 7
+	accessKeyExpirationInterval  = time.Hour * 24 * 3
 )
 
 var (
@@ -171,7 +178,7 @@ func VerifyPasswordHash(password string, pwHash, pwSalt []byte) bool {
 }
 
 // CreateAPIID creates an API ID
-func CreateAPIID() string {
+func CreateID() string {
 	currentTime := time.Now().Unix()
 	duplicateTime := (lastTimeIDWasCreated == currentTime)
 	lastTimeIDWasCreated = currentTime
@@ -184,4 +191,63 @@ func CreateAPIID() string {
 
 	idStr := strconv.FormatInt(currentTime+int64(random32Int), 10)
 	return base64.StdEncoding.EncodeToString([]byte(idStr))
+}
+
+func NewAPIKey(secret string, keyType models.APIKeyType, userID string) (models.APIKey, error) {
+	token := jwt.New(jwt.SigningMethodHS256)
+
+	claims := token.Claims.(jwt.MapClaims)
+	claims["sub"] = userID
+
+	switch keyType {
+	case models.RefreshKey:
+		claims["exp"] = time.Now().Add(refreshKeyExpirationInterval).Unix()
+		claims["type"] = "refresh"
+	case models.AccessKey:
+		claims["exp"] = time.Now().Add(accessKeyExpirationInterval).Unix()
+		claims["type"] = "access"
+	}
+
+	t, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return models.APIKey{}, err
+	}
+
+	return models.APIKey{
+		Key:  t,
+		Type: keyType,
+	}, nil
+}
+
+func NewKeyPair(secret, userID string) (models.APIKeyPair, error) {
+	accessKey, err := NewAPIKey(secret, models.AccessKey, userID)
+	if err != nil {
+		return models.APIKeyPair{}, err
+	}
+
+	refreshKey, err := NewAPIKey(secret, models.RefreshKey, userID)
+	if err != nil {
+		return models.APIKeyPair{}, err
+	}
+
+	return models.APIKeyPair{
+		AccessKey:  accessKey.Key,
+		RefreshKey: refreshKey.Key,
+	}, nil
+}
+
+func ParseJWTClaims(secret, signingMethod, token string) (jwt.MapClaims, error) {
+	jwtToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+		// Check the signing method
+		if t.Method.Alg() != signingMethod {
+			return nil, errors.New("jwt signing methods mismatch")
+		}
+		return []byte(secret), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return jwtToken.Claims.(jwt.MapClaims), nil
 }

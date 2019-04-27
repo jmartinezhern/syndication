@@ -55,11 +55,11 @@ func NewEntriesController(service services.Entries, e *echo.Echo) *EntriesContro
 
 // GetEntry with id
 func (s *EntriesController) GetEntry(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	entryID := c.Param("entryID")
 
-	entry, err := s.entries.Entry(entryID, &user)
+	entry, err := s.entries.Entry(entryID, userID)
 	if err == services.ErrEntryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -71,7 +71,7 @@ func (s *EntriesController) GetEntry(c echo.Context) error {
 
 // GetEntries returns a list of entries that belong to a user
 func (s *EntriesController) GetEntries(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	params := new(listEntriesParams)
 	if err := c.Bind(params); err != nil {
@@ -85,7 +85,7 @@ func (s *EntriesController) GetEntries(c echo.Context) error {
 		params.Count,
 		convertOrderByParamToValue(params.OrderBy),
 		marker,
-		&user,
+		userID,
 	)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -96,7 +96,7 @@ func (s *EntriesController) GetEntries(c echo.Context) error {
 
 // MarkEntry applies a Marker to an Entries
 func (s *EntriesController) MarkEntry(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	asParam := c.FormValue("as")
 	if asParam == "" {
@@ -106,7 +106,7 @@ func (s *EntriesController) MarkEntry(c echo.Context) error {
 	marker := models.MarkerFromString(asParam)
 	entryID := c.Param("entryID")
 
-	err := s.entries.Mark(entryID, marker, &user)
+	err := s.entries.Mark(entryID, marker, userID)
 	if err == services.ErrEntryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -118,7 +118,7 @@ func (s *EntriesController) MarkEntry(c echo.Context) error {
 
 // MarkAllEntries applies a Marker to all Entries
 func (s *EntriesController) MarkAllEntries(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	asParam := c.FormValue("as")
 	if asParam == "" {
@@ -127,14 +127,14 @@ func (s *EntriesController) MarkAllEntries(c echo.Context) error {
 
 	marker := models.MarkerFromString(asParam)
 
-	s.entries.MarkAll(marker, &user)
+	s.entries.MarkAll(marker, userID)
 
 	return c.NoContent(http.StatusNoContent)
 }
 
 // GetEntryStats provides statistics related to Entries
 func (s *EntriesController) GetEntryStats(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
-	return c.JSON(http.StatusOK, s.entries.Stats(&user))
+	return c.JSON(http.StatusOK, s.entries.Stats(userID))
 }

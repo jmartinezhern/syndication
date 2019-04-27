@@ -41,71 +41,71 @@ type EntriesSuite struct {
 
 func (t *EntriesSuite) TestEntry() {
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test Entries",
 		Mark:  models.MarkerUnread,
 		Feed:  t.feed,
 	}
-	t.entriesRepo.Create(t.user, &entry)
+	t.entriesRepo.Create(t.user.ID, &entry)
 
-	uEntry, err := t.service.Entry(entry.APIID, t.user)
+	uEntry, err := t.service.Entry(entry.ID, t.user.ID)
 	t.NoError(err)
 	t.Equal(entry.Title, uEntry.Title)
 }
 
 func (t *EntriesSuite) TestMissingEntry() {
-	_, err := t.service.Entry("bogus", t.user)
+	_, err := t.service.Entry("bogus", t.user.ID)
 	t.EqualError(err, ErrEntryNotFound.Error())
 }
 
 func (t *EntriesSuite) TestEntries() {
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test Entries",
 		Mark:  models.MarkerUnread,
 		Feed:  t.feed,
 	}
-	t.entriesRepo.Create(t.user, &entry)
+	t.entriesRepo.Create(t.user.ID, &entry)
 
-	entries, _ := t.service.Entries("", 1, true, models.MarkerAny, t.user)
+	entries, _ := t.service.Entries("", 1, true, models.MarkerAny, t.user.ID)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
 
 func (t *EntriesSuite) TestMarkEntry() {
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test Entries",
 		Mark:  models.MarkerUnread,
 		Feed:  t.feed,
 	}
-	t.entriesRepo.Create(t.user, &entry)
+	t.entriesRepo.Create(t.user.ID, &entry)
 
-	err := t.service.Mark(entry.APIID, models.MarkerRead, t.user)
+	err := t.service.Mark(entry.ID, models.MarkerRead, t.user.ID)
 	t.NoError(err)
 
-	entries, _ := t.entriesRepo.List(t.user, "", 2, true, models.MarkerRead)
+	entries, _ := t.entriesRepo.List(t.user.ID, "", 2, true, models.MarkerRead)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
 
 func (t *EntriesSuite) TestMarkMissingEntry() {
-	err := t.service.Mark("bogus", models.MarkerRead, t.user)
+	err := t.service.Mark("bogus", models.MarkerRead, t.user.ID)
 	t.EqualError(err, ErrEntryNotFound.Error())
 }
 
 func (t *EntriesSuite) TestMarkAll() {
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test Entries",
 		Mark:  models.MarkerUnread,
 		Feed:  t.feed,
 	}
-	t.entriesRepo.Create(t.user, &entry)
+	t.entriesRepo.Create(t.user.ID, &entry)
 
-	t.service.MarkAll(models.MarkerRead, t.user)
+	t.service.MarkAll(models.MarkerRead, t.user.ID)
 
-	entries, _ := t.entriesRepo.List(t.user, "", 2, true, models.MarkerRead)
+	entries, _ := t.entriesRepo.List(t.user.ID, "", 2, true, models.MarkerRead)
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
@@ -116,18 +116,18 @@ func (t *EntriesSuite) SetupTest() {
 	t.service = NewEntriesService(t.entriesRepo)
 
 	t.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 	sql.NewUsers(t.db).Create(t.user)
 
 	t.feed = models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Example",
 		Subscription: "example.com",
 	}
 	t.feedsRepo = sql.NewFeeds(t.db)
-	t.feedsRepo.Create(t.user, &t.feed)
+	t.feedsRepo.Create(t.user.ID, &t.feed)
 }
 
 func (t *EntriesSuite) TearDownTest() {

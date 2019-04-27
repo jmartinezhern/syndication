@@ -23,7 +23,6 @@ import (
 
 	"github.com/labstack/echo"
 
-	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/services"
 )
 
@@ -55,7 +54,7 @@ func NewCImporterController(importers Importers, e *echo.Echo) *ImporterControll
 // The current supported formats are:
 //    - OPML (application/xml)
 func (s *ImporterController) Import(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	contLength := c.Request().ContentLength
 	if contLength <= 0 {
@@ -74,7 +73,7 @@ func (s *ImporterController) Import(c echo.Context) error {
 	}
 
 	if val, ok := s.importers[contType]; ok {
-		err = val.Import(data, &user)
+		err = val.Import(data, userID)
 	} else {
 		return echo.NewHTTPError(http.StatusUnsupportedMediaType)
 	}

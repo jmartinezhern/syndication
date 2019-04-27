@@ -64,7 +64,7 @@ func (s *UsersSuite) TestNewUser() {
 
 func (s *UsersSuite) TestNewConflictingUser() {
 	s.usersRepo.Create(&models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "test",
 	})
 
@@ -86,7 +86,7 @@ func (s *UsersSuite) TestNewConflictingUser() {
 
 func (s *UsersSuite) TestListUsers() {
 	user := models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 	s.usersRepo.Create(&user)
@@ -114,7 +114,7 @@ func (s *UsersSuite) TestListUsers() {
 
 func (s *UsersSuite) TestDeleteUser() {
 	user := models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 	s.usersRepo.Create(&user)
@@ -124,7 +124,7 @@ func (s *UsersSuite) TestDeleteUser() {
 	rec := httptest.NewRecorder()
 	ctx := s.e.NewContext(req, rec)
 	ctx.SetParamNames("userID")
-	ctx.SetParamValues(user.APIID)
+	ctx.SetParamValues(user.ID)
 
 	ctx.SetPath("/v1/users/:userID")
 
@@ -150,7 +150,7 @@ func (s *UsersSuite) TestDeleteMissingUser() {
 
 func (s *UsersSuite) TestGetUser() {
 	user := models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 	s.usersRepo.Create(&user)
@@ -160,7 +160,7 @@ func (s *UsersSuite) TestGetUser() {
 	rec := httptest.NewRecorder()
 	ctx := s.e.NewContext(req, rec)
 	ctx.SetParamNames("userID")
-	ctx.SetParamValues(user.APIID)
+	ctx.SetParamValues(user.ID)
 
 	ctx.SetPath("/v1/users/:userID")
 

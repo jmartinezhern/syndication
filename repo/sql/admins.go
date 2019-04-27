@@ -55,12 +55,27 @@ func (u Admins) Update(id string, admin *models.Admin) error {
 
 // AdminWithID returns an admin with id
 func (u Admins) AdminWithID(id string) (admin models.Admin, found bool) {
-	found = !u.db.db.First(&admin, "api_id = ?", id).RecordNotFound()
+	found = !u.db.db.First(&admin, "id = ?", id).RecordNotFound()
 	return
 }
 
-func (u Admins) InitialUser() (admin models.Admin, found bool) {
-	found = !u.db.db.First(&admin, "id = ?", 1).RecordNotFound()
+// List all admins
+func (u Admins) List(continuationID string, count int) (admins []models.Admin, next string) {
+	query := u.db.db.Limit(count + 1)
+
+	if continuationID != "" {
+		user, found := u.AdminWithID(continuationID)
+		if found {
+			query = query.Where("created_at >= ?", user.CreatedAt)
+		}
+	}
+	query.Find(&admins)
+
+	if len(admins) > count {
+		next = admins[len(admins)-1].ID
+		admins = admins[:len(admins)-1]
+	}
+
 	return
 }
 
@@ -79,14 +94,4 @@ func (u Admins) Delete(id string) error {
 func (u Admins) AdminWithName(name string) (admin models.Admin, found bool) {
 	found = !u.db.db.First(&admin, "username = ?", name).RecordNotFound()
 	return
-}
-
-// OwnsKey returns true if the given APIKey is owned by admin
-func (u Admins) OwnsKey(key *models.APIKey, admin *models.Admin) bool {
-	return !u.db.db.Model(admin).Where("key = ?", key.Key).Related(key).RecordNotFound()
-}
-
-// AddAPIKey associates an API key with admin
-func (u Admins) AddAPIKey(key *models.APIKey, admin *models.Admin) {
-	u.db.db.Model(admin).Association("APIKeys").Append(key)
 }

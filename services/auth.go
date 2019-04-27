@@ -19,42 +19,44 @@ package services
 
 import (
 	"errors"
-	"time"
-
-	"github.com/dgrijalva/jwt-go"
 
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
+const (
+	refreshType = "refresh"
+)
+
 type (
 	// Auth service interface
 	Auth interface {
-		// Authenticate a user
-		Authenticate(token jwt.Token) (models.User, bool)
-
 		// Login a user with username and password
 		Login(username, password string) (models.APIKeyPair, error)
 
 		// Register a user with username and password
-		Register(username, password string) (models.APIKeyPair, error)
+		Register(username, password string) error
 
 		// Renew access tokens using a refresh token
 		Renew(token string) (models.APIKey, error)
 	}
 
-	// AuthService implements Auth service
+	// AuthService implements Auth service for end users
 	AuthService struct {
 		AuthSecret string
 		repo       repo.Users
 	}
+
+	// AdminAuthService implements Auth service for admins
+	AdminAuthService struct {
+		AuthSecret string
+		repo       repo.Admins
+	}
 )
 
 const (
-	signingMethod                = "HS256"
-	refreshKeyExpirationInterval = time.Hour * 24 * 7
-	accessKeyExpirationInterval  = time.Hour * 24 * 3
+	signingMethod = "HS256"
 )
 
 var (
@@ -72,30 +74,6 @@ func NewAuthService(authSecret string, userRepo repo.Users) AuthService {
 	}
 }
 
-// Authenticate a user
-func (a AuthService) Authenticate(token jwt.Token) (models.User, bool) {
-	claims := token.Claims.(jwt.MapClaims)
-
-	if !claims.VerifyExpiresAt(time.Now().Unix(), true) {
-		return models.User{}, false
-	}
-
-	user, found := a.repo.UserWithID(claims["id"].(string))
-	if !found {
-		return models.User{}, false
-	}
-
-	// Check that a refresh key was not used to authenticate
-	found = a.repo.OwnsKey(&models.APIKey{
-		Key: token.Raw,
-	}, &user)
-	if found {
-		return models.User{}, false
-	}
-
-	return user, true
-}
-
 // Login a user
 func (a AuthService) Login(username, password string) (models.APIKeyPair, error) {
 	user, found := a.repo.UserWithName(username)
@@ -107,19 +85,24 @@ func (a AuthService) Login(username, password string) (models.APIKeyPair, error)
 		return models.APIKeyPair{}, ErrUserUnauthorized
 	}
 
-	return a.createNewKeyPair(&user)
+	keys, err := utils.NewKeyPair(a.AuthSecret, user.ID)
+	if err != nil {
+		return models.APIKeyPair{}, err
+	}
+
+	return keys, nil
 }
 
 // Register a user
-func (a AuthService) Register(username, password string) (models.APIKeyPair, error) {
+func (a AuthService) Register(username, password string) error {
 	if _, found := a.repo.UserWithName(username); found {
-		return models.APIKeyPair{}, ErrUserConflicts
+		return ErrUserConflicts
 	}
 
 	hash, salt := utils.CreatePasswordHashAndSalt(password)
 
 	user := models.User{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Username:     username,
 		PasswordHash: hash,
 		PasswordSalt: salt,
@@ -127,78 +110,74 @@ func (a AuthService) Register(username, password string) (models.APIKeyPair, err
 
 	a.repo.Create(&user)
 
-	return a.createNewKeyPair(&user)
+	return nil
 }
 
 // Renew an API token
 func (a AuthService) Renew(token string) (models.APIKey, error) {
-	jwtToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
-		// Check the signing method
-		if t.Method.Alg() != signingMethod {
-			return nil, errors.New("jwt signing methods mismatch")
-		}
-		return []byte(a.AuthSecret), nil
-	})
+	claims, err := utils.ParseJWTClaims(a.AuthSecret, signingMethod, token)
 	if err != nil {
 		return models.APIKey{}, ErrUserUnauthorized
 	}
 
-	claims := jwtToken.Claims.(jwt.MapClaims)
-	user, found := a.repo.UserWithID(claims["id"].(string))
+	if claims["type"].(string) != refreshType {
+		return models.APIKey{}, ErrUserUnauthorized
+	}
+
+	user, found := a.repo.UserWithID(claims["sub"].(string))
 	if !found {
 		return models.APIKey{}, ErrUserUnauthorized
 	}
 
-	key := models.APIKey{
-		Key: token,
+	return utils.NewAPIKey(a.AuthSecret, models.AccessKey, user.ID)
+}
+
+func NewAdminAuthService(authSecret string, adminsRepo repo.Admins) AdminAuthService {
+	return AdminAuthService{
+		authSecret,
+		adminsRepo,
+	}
+}
+
+// Login a user
+func (a AdminAuthService) Login(username, password string) (models.APIKeyPair, error) {
+	admin, found := a.repo.AdminWithName(username)
+	if !found {
+		return models.APIKeyPair{}, ErrUserUnauthorized
 	}
 
-	if !a.repo.OwnsKey(&key, &user) {
+	if !utils.VerifyPasswordHash(password, admin.PasswordHash, admin.PasswordSalt) {
+		return models.APIKeyPair{}, ErrUserUnauthorized
+	}
+
+	keys, err := utils.NewKeyPair(a.AuthSecret, admin.ID)
+	if err != nil {
+		return models.APIKeyPair{}, err
+	}
+
+	return keys, nil
+}
+
+// Register a user
+func (a AdminAuthService) Register(username, password string) error {
+	return errors.New("not implemented")
+}
+
+// Renew an API token
+func (a AdminAuthService) Renew(token string) (models.APIKey, error) {
+	claims, err := utils.ParseJWTClaims(a.AuthSecret, signingMethod, token)
+	if err != nil {
 		return models.APIKey{}, ErrUserUnauthorized
 	}
 
-	return newAPIKey(a.AuthSecret, models.AccessKey, &user)
-}
-
-func (a AuthService) createNewKeyPair(user *models.User) (models.APIKeyPair, error) {
-	accessKey, err := newAPIKey(a.AuthSecret, models.AccessKey, user)
-	if err != nil {
-		return models.APIKeyPair{}, err
+	if claims["type"].(string) != "refresh" {
+		return models.APIKey{}, ErrUserUnauthorized
 	}
 
-	refreshKey, err := newAPIKey(a.AuthSecret, models.RefreshKey, user)
-	if err != nil {
-		return models.APIKeyPair{}, err
+	admin, found := a.repo.AdminWithID(claims["sub"].(string))
+	if !found {
+		return models.APIKey{}, ErrUserUnauthorized
 	}
 
-	a.repo.AddAPIKey(&refreshKey, user)
-
-	return models.APIKeyPair{
-		AccessKey:  accessKey.Key,
-		RefreshKey: refreshKey.Key,
-	}, nil
-}
-
-func newAPIKey(secret string, keyType models.APIKeyType, user *models.User) (models.APIKey, error) {
-	token := jwt.New(jwt.SigningMethodHS256)
-
-	claims := token.Claims.(jwt.MapClaims)
-	claims["id"] = user.APIID
-
-	switch keyType {
-	case models.RefreshKey:
-		claims["exp"] = time.Now().Add(refreshKeyExpirationInterval).Unix()
-	case models.AccessKey:
-		claims["exp"] = time.Now().Add(accessKeyExpirationInterval).Unix()
-	}
-
-	t, err := token.SignedString([]byte(secret))
-	if err != nil {
-		return models.APIKey{}, err
-	}
-
-	return models.APIKey{
-		Key:  t,
-		Type: keyType,
-	}, nil
+	return utils.NewAPIKey(a.AuthSecret, models.AccessKey, admin.ID)
 }

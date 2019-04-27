@@ -37,46 +37,46 @@ type TagsSuite struct {
 
 func (s *TagsSuite) TestCreate() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "tech",
+		ID:   utils.CreateID(),
+		Name: "tech",
 	}
 
-	s.repo.Create(s.user, &tag)
+	s.repo.Create(s.user.ID, &tag)
 
-	tag, found := s.repo.TagWithID(s.user, tag.APIID)
+	tag, found := s.repo.TagWithID(s.user.ID, tag.ID)
 	s.True(found)
 	s.Equal("tech", tag.Name)
 }
 
 func (s *TagsSuite) TestDelete() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "news",
+		ID:   utils.CreateID(),
+		Name: "news",
 	}
 
-	s.repo.Create(s.user, &tag)
+	s.repo.Create(s.user.ID, &tag)
 
-	err := s.repo.Delete(s.user, tag.APIID)
+	err := s.repo.Delete(s.user.ID, tag.ID)
 	s.NoError(err)
 
-	_, found := s.repo.TagWithID(s.user, tag.APIID)
+	_, found := s.repo.TagWithID(s.user.ID, tag.ID)
 	s.False(found)
 }
 
 func (s *TagsSuite) TestUpdate() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "news",
+		ID:   utils.CreateID(),
+		Name: "news",
 	}
 
-	s.repo.Create(s.user, &tag)
+	s.repo.Create(s.user.ID, &tag)
 
 	tag.Name = "World News"
 
-	err := s.repo.Update(s.user, &tag)
+	err := s.repo.Update(s.user.ID, &tag)
 	s.NoError(err)
 
-	updatedTag, _ := s.repo.TagWithID(s.user, tag.APIID)
+	updatedTag, _ := s.repo.TagWithID(s.user.ID, tag.ID)
 	s.Equal("World News", updatedTag.Name)
 }
 
@@ -84,10 +84,10 @@ func (s *TagsSuite) SetupTest() {
 	s.db = NewDB("sqlite3", ":memory:")
 
 	s.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "test_tags",
 	}
-	s.db.db.Create(s.user)
+	s.db.db.Create(s.user.ID)
 
 	s.repo = NewTags(s.db)
 }

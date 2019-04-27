@@ -57,7 +57,7 @@ func (c *AuthControllerSuite) TestRegister() {
 	ctx.SetPath("/v1/auth/register")
 
 	c.NoError(c.controller.Register(ctx))
-	c.Equal(http.StatusOK, rec.Code)
+	c.Equal(http.StatusCreated, rec.Code)
 }
 
 func (c *AuthControllerSuite) TestDisallowedRegistrations() {
@@ -80,8 +80,8 @@ func (c *AuthControllerSuite) TestLogin() {
 	username := "test"
 	password := "testtesttest"
 
-	_, err := c.controller.auth.Register(username, password)
-	c.NoError(err)
+	err := c.controller.auth.Register(username, password)
+	c.Require().NoError(err)
 
 	req := httptest.NewRequest(
 		echo.POST,
@@ -105,8 +105,11 @@ func (c *AuthControllerSuite) TestLogin() {
 }
 
 func (c *AuthControllerSuite) TestRenew() {
-	keyPair, err := c.controller.auth.Register("gopher", "testtesttest")
-	c.NoError(err)
+	err := c.controller.auth.Register("gopher", "testtesttest")
+	c.Require().NoError(err)
+
+	keyPair, err := c.controller.auth.Login("gopher", "testtesttest")
+	c.Require().NoError(err)
 
 	req := httptest.NewRequest(
 		echo.POST,
@@ -127,6 +130,7 @@ func (c *AuthControllerSuite) TestRenew() {
 	key := new(models.APIKey)
 	c.NoError(json.Unmarshal(rec.Body.Bytes(), key))
 	c.NotEmpty(key.Key)
+	c.Equal(http.StatusOK, rec.Code)
 }
 
 func (c *AuthControllerSuite) SetupTest() {

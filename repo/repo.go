@@ -33,90 +33,83 @@ type (
 	Admins interface {
 		Create(admin *models.Admin)
 		Update(id string, admin *models.Admin) error
-		AdminWithID(id string) (models.Admin, bool)
-		InitialUser() (admin models.Admin, found bool)
-		Delete(id string) error
-		OwnsKey(key *models.APIKey, admin *models.Admin) bool
-		AddAPIKey(key *models.APIKey, admin *models.Admin)
 		AdminWithName(name string) (models.Admin, bool)
+		AdminWithID(id string) (models.Admin, bool)
+		List(continuationID string, count int) ([]models.Admin, string)
+		Delete(id string) error
 	}
 
 	Categories interface {
-		Create(user *models.User, ctg *models.Category)
-		Update(user *models.User, ctg *models.Category) error
-		Delete(user *models.User, id string) error
-		CategoryWithID(user *models.User, id string) (models.Category, bool)
-		CategoryWithName(user *models.User, name string) (models.Category, bool)
-		List(user *models.User, continuationID string, count int) ([]models.Category, string)
-		Feeds(user *models.User, ctgID string, continuationID string, count int) ([]models.Feed, string)
-		Uncategorized(user *models.User, continuationID string, count int) ([]models.Feed, string)
-		AddFeed(user *models.User, feedID, ctgID string) error
-		Stats(user *models.User, ctgID string) (models.Stats, error)
-		Mark(user *models.User, ctgID string, marker models.Marker) error
+		Create(userID string, ctg *models.Category)
+		Update(userID string, ctg *models.Category) error
+		Delete(userID, id string) error
+		CategoryWithID(userID, id string) (models.Category, bool)
+		CategoryWithName(userID, name string) (models.Category, bool)
+		List(userID, continuationID string, count int) ([]models.Category, string)
+		Feeds(userID, ctgID, continuationID string, count int) ([]models.Feed, string)
+		Uncategorized(userID, continuationID string, count int) ([]models.Feed, string)
+		AddFeed(userID, feedID, ctgID string) error
+		Stats(userID, ctgID string) (models.Stats, error)
+		Mark(userID, ctgID string, marker models.Marker) error
 	}
 
 	Users interface {
 		Create(user *models.User)
 		Update(user *models.User) error
+		UserWithName(name string) (models.User, bool)
 		UserWithID(id string) (models.User, bool)
 		Delete(id string) error
-		OwnsKey(key *models.APIKey, user *models.User) bool
-		AddAPIKey(key *models.APIKey, user *models.User)
 		List(continuationID string, count int) ([]models.User, string)
-		UserWithName(name string) (models.User, bool)
 	}
 
 	Entries interface {
-		Create(user *models.User, entry *models.Entry)
-		EntryWithID(user *models.User, id string) (models.Entry, bool)
-		EntryWithGUID(user *models.User, guid string) (models.Entry, bool)
+		Create(userID string, entry *models.Entry)
+		EntryWithID(userID, id string) (models.Entry, bool)
+		EntryWithGUID(userID, guid string) (models.Entry, bool)
 		List(
-			user *models.User,
-			continuationID string,
+			userID, continuationID string,
 			count int,
 			orderByNewest bool,
 			marker models.Marker) ([]models.Entry, string)
 		ListFromTags(
-			user *models.User,
+			userID string,
 			tagIDs []string,
 			continuationID string,
 			count int,
 			orderByNewest bool,
 			marker models.Marker) ([]models.Entry, string)
 		ListFromCategory(
-			user *models.User,
-			ctgID, continuationID string,
+			userID, ctgID, continuationID string,
 			count int,
 			orderByNewest bool,
 			marker models.Marker) ([]models.Entry, string)
 		ListFromFeed(
-			user *models.User,
-			feedID, continuationID string,
+			userID, feedID, continuationID string,
 			count int,
 			orderByNewest bool,
 			marked models.Marker) ([]models.Entry, string)
-		TagEntries(user *models.User, tagID string, entryIDs []string) error
-		Mark(user *models.User, id string, marker models.Marker) error
-		MarkAll(user *models.User, marker models.Marker)
-		Stats(user *models.User) models.Stats
+		TagEntries(userID, tagID string, entryIDs []string) error
+		Mark(userID, id string, marker models.Marker) error
+		MarkAll(userID string, marker models.Marker)
+		Stats(userID string) models.Stats
 	}
 
 	Feeds interface {
-		Create(user *models.User, feed *models.Feed)
-		Update(user *models.User, feed *models.Feed) error
-		Delete(user *models.User, id string) error
-		FeedWithID(user *models.User, id string) (models.Feed, bool)
-		List(user *models.User, continuationID string, count int) ([]models.Feed, string)
-		Mark(user *models.User, id string, marker models.Marker) error
-		Stats(user *models.User, ctgID string) (models.Stats, error)
+		Create(userID string, feed *models.Feed)
+		Update(userID string, feed *models.Feed) error
+		Delete(userID, id string) error
+		FeedWithID(userID, id string) (models.Feed, bool)
+		List(userID, continuationID string, count int) ([]models.Feed, string)
+		Mark(userID, id string, marker models.Marker) error
+		Stats(userID, ctgID string) (models.Stats, error)
 	}
 
 	Tags interface {
-		Create(user *models.User, tag *models.Tag)
-		Update(user *models.User, tag *models.Tag) error
-		Delete(user *models.User, id string) error
-		TagWithID(user *models.User, id string) (models.Tag, bool)
-		TagWithName(user *models.User, name string) (models.Tag, bool)
-		List(user *models.User, continuationID string, count int) ([]models.Tag, string)
+		Create(userID string, tag *models.Tag)
+		Update(userID string, tag *models.Tag) error
+		Delete(userID, id string) error
+		TagWithID(userID, id string) (models.Tag, bool)
+		TagWithName(userID, name string) (models.Tag, bool)
+		List(userID, continuationID string, count int) ([]models.Tag, string)
 	}
 )

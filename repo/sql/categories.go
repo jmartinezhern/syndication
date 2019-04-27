@@ -35,13 +35,13 @@ func NewCategories(db *DB) Categories {
 }
 
 // Create a new Category owned by user
-func (c Categories) Create(user *models.User, ctg *models.Category) {
-	c.db.db.Model(user).Association("Categories").Append(ctg)
+func (c Categories) Create(userID string, ctg *models.Category) {
+	c.db.db.Model(&models.User{ID: userID}).Association("Categories").Append(ctg)
 }
 
 // Update a category owned by user
-func (c Categories) Update(user *models.User, ctg *models.Category) error {
-	dbCtg, found := c.CategoryWithID(user, ctg.APIID)
+func (c Categories) Update(userID string, ctg *models.Category) error {
+	dbCtg, found := c.CategoryWithID(userID, ctg.ID)
 	if !found {
 		return repo.ErrModelNotFound
 	}
@@ -51,8 +51,8 @@ func (c Categories) Update(user *models.User, ctg *models.Category) error {
 }
 
 // Delete a category with id owned by user
-func (c Categories) Delete(user *models.User, id string) error {
-	ctg, found := c.CategoryWithID(user, id)
+func (c Categories) Delete(userID, id string) error {
+	ctg, found := c.CategoryWithID(userID, id)
 	if !found {
 		return repo.ErrModelNotFound
 	}
@@ -62,25 +62,25 @@ func (c Categories) Delete(user *models.User, id string) error {
 }
 
 // CategoryWithID returns a category with ID owned by user
-func (c Categories) CategoryWithID(user *models.User, id string) (ctg models.Category, found bool) {
-	found = !c.db.db.Model(user).Where("api_id = ?", id).Related(&ctg).RecordNotFound()
+func (c Categories) CategoryWithID(userID, id string) (ctg models.Category, found bool) {
+	found = !c.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&ctg).RecordNotFound()
 	return
 }
 
 // List all Categories owned by user
-func (c Categories) List(user *models.User, continuationID string, count int) (categories []models.Category, next string) {
-	query := c.db.db.Model(user)
+func (c Categories) List(userID, continuationID string, count int) (categories []models.Category, next string) {
+	query := c.db.db.Model(&models.User{ID: userID})
 
 	if continuationID != "" {
-		if ctg, found := c.CategoryWithID(user, continuationID); found {
-			query = query.Where("id >= ?", ctg.ID)
+		if ctg, found := c.CategoryWithID(userID, continuationID); found {
+			query = query.Where("created_at >= ?", ctg.CreatedAt)
 		}
 	}
 
 	query.Limit(count + 1).Association("Categories").Find(&categories)
 
 	if len(categories) > count {
-		next = categories[len(categories)-1].APIID
+		next = categories[len(categories)-1].ID
 		categories = categories[:len(categories)-1]
 	}
 
@@ -88,8 +88,8 @@ func (c Categories) List(user *models.User, continuationID string, count int) (c
 }
 
 // Feeds returns all Feeds in category with ctgID owned by user
-func (c Categories) Feeds(user *models.User, ctgID, continuationID string, count int) (feeds []models.Feed, next string) {
-	ctg, found := c.CategoryWithID(user, ctgID)
+func (c Categories) Feeds(userID, ctgID, continuationID string, count int) (feeds []models.Feed, next string) {
+	ctg, found := c.CategoryWithID(userID, ctgID)
 	if !found {
 		return nil, ""
 	}
@@ -98,15 +98,15 @@ func (c Categories) Feeds(user *models.User, ctgID, continuationID string, count
 
 	if continuationID != "" {
 		feed := models.Feed{}
-		if !c.db.db.Model(user).Where("api_id = ?", continuationID).Related(&feed).RecordNotFound() {
-			query = query.Where("id >= ?", feed.ID)
+		if !c.db.db.Model(&models.User{ID: userID}).Where("id = ?", continuationID).Related(&feed).RecordNotFound() {
+			query = query.Where("created_at >= ?", feed.CreatedAt)
 		}
 	}
 
 	query.Limit(count + 1).Association("Feeds").Find(&feeds)
 
 	if len(feeds) > count {
-		next = feeds[len(feeds)-1].APIID
+		next = feeds[len(feeds)-1].ID
 		feeds = feeds[:len(feeds)-1]
 	}
 
@@ -114,20 +114,20 @@ func (c Categories) Feeds(user *models.User, ctgID, continuationID string, count
 }
 
 // Uncategorized returns all Feeds that belong to a category with categoryID
-func (c Categories) Uncategorized(user *models.User, continuationID string, count int) (feeds []models.Feed, next string) {
-	query := c.db.db.Model(user).Where("category_id = ?", 0)
+func (c Categories) Uncategorized(userID, continuationID string, count int) (feeds []models.Feed, next string) {
+	query := c.db.db.Model(&models.User{ID: userID}).Where("category_id = ?", "")
 
 	if continuationID != "" {
 		feed := models.Feed{}
-		if !c.db.db.Model(user).Where("api_id = ?", continuationID).Related(&feed).RecordNotFound() {
-			query = query.Where("id >= ?", feed.ID)
+		if !c.db.db.Model(&models.User{ID: userID}).Where("id = ?", continuationID).Related(&feed).RecordNotFound() {
+			query = query.Where("created_at >= ?", feed.CreatedAt)
 		}
 	}
 
 	query.Limit(count + 1).Association("Feeds").Find(&feeds)
 
 	if len(feeds) > count {
-		next = feeds[len(feeds)-1].APIID
+		next = feeds[len(feeds)-1].ID
 		feeds = feeds[:len(feeds)-1]
 	}
 
@@ -135,19 +135,19 @@ func (c Categories) Uncategorized(user *models.User, continuationID string, coun
 }
 
 // CategoryWithName returns a Category that has a matching name and belongs to the given user
-func (c Categories) CategoryWithName(user *models.User, name string) (ctg models.Category, found bool) {
-	found = !c.db.db.Model(user).Where("name = ?", name).Related(&ctg).RecordNotFound()
+func (c Categories) CategoryWithName(userID, name string) (ctg models.Category, found bool) {
+	found = !c.db.db.Model(&models.User{ID: userID}).Where("name = ?", name).Related(&ctg).RecordNotFound()
 	return
 }
 
 // AddFeed associates a feed to a category with ctgID
-func (c Categories) AddFeed(user *models.User, feedID, ctgID string) error {
+func (c Categories) AddFeed(userID, feedID, ctgID string) error {
 	var feed models.Feed
-	if c.db.db.Model(user).Where("api_id = ?", feedID).Related(&feed).RecordNotFound() {
+	if c.db.db.Model(&models.User{ID: userID}).Where("id = ?", feedID).Related(&feed).RecordNotFound() {
 		return repo.ErrModelNotFound
 	}
 
-	ctg, found := c.CategoryWithID(user, ctgID)
+	ctg, found := c.CategoryWithID(userID, ctgID)
 	if !found {
 		return repo.ErrModelNotFound
 	}
@@ -156,8 +156,8 @@ func (c Categories) AddFeed(user *models.User, feedID, ctgID string) error {
 }
 
 // Stats returns all Stats for a Category with the given id and that is owned by user
-func (c Categories) Stats(user *models.User, ctgID string) (models.Stats, error) {
-	ctg, found := c.CategoryWithID(user, ctgID)
+func (c Categories) Stats(userID, ctgID string) (models.Stats, error) {
+	ctg, found := c.CategoryWithID(userID, ctgID)
 	if !found {
 		return models.Stats{}, repo.ErrModelNotFound
 	}
@@ -165,12 +165,12 @@ func (c Categories) Stats(user *models.User, ctgID string) (models.Stats, error)
 	var feeds []models.Feed
 	c.db.db.Model(&ctg).Association("Feeds").Find(&feeds)
 
-	feedIds := make([]uint, len(feeds))
+	feedIds := make([]string, len(feeds))
 	for idx := range feeds {
 		feedIds[idx] = feeds[idx].ID
 	}
 
-	query := c.db.db.Model(user).Where("feed_id in (?)", feedIds)
+	query := c.db.db.Model(&models.User{ID: userID}).Where("feed_id in (?)", feedIds)
 
 	stats := models.Stats{}
 
@@ -183,8 +183,8 @@ func (c Categories) Stats(user *models.User, ctgID string) (models.Stats, error)
 }
 
 // Mark applies marker to a category with id and owned by user
-func (c Categories) Mark(user *models.User, ctgID string, marker models.Marker) error {
-	ctg, found := c.CategoryWithID(user, ctgID)
+func (c Categories) Mark(userID, ctgID string, marker models.Marker) error {
+	ctg, found := c.CategoryWithID(userID, ctgID)
 	if !found {
 		return repo.ErrModelNotFound
 	}
@@ -192,12 +192,12 @@ func (c Categories) Mark(user *models.User, ctgID string, marker models.Marker) 
 	var feeds []models.Feed
 	c.db.db.Model(&ctg).Association("Feeds").Find(&feeds)
 
-	feedIds := make([]uint, len(feeds))
+	feedIds := make([]models.ID, len(feeds))
 	for idx := range feeds {
 		feedIds[idx] = feeds[idx].ID
 	}
 
 	markedEntry := &models.Entry{Mark: marker}
-	c.db.db.Model(markedEntry).Where("user_id = ? AND feed_id in (?)", user.ID, feedIds).Update(markedEntry)
+	c.db.db.Model(markedEntry).Where("user_id = ? AND feed_id in (?)", userID, feedIds).Update(markedEntry)
 	return nil
 }

@@ -28,7 +28,7 @@ type (
 	// Exporter is an interface that wraps the basic
 	// export functions.
 	Exporter interface {
-		Export(user *models.User) ([]byte, error)
+		Export(userID string) ([]byte, error)
 	}
 
 	// An OPMLExporter represents an exporter for the OPML 2.0 format
@@ -63,7 +63,7 @@ func marshal(feeds []models.Feed) []models.OPMLOutline {
 }
 
 // Export categories and feeds to data in OPML 2.0 format.
-func (e OPMLExporter) Export(user *models.User) ([]byte, error) {
+func (e OPMLExporter) Export(userID string) ([]byte, error) {
 	var continuationID string
 	var ctgs []models.Category
 
@@ -72,11 +72,11 @@ func (e OPMLExporter) Export(user *models.User) ([]byte, error) {
 	}
 
 	for {
-		ctgs, continuationID = e.repo.List(user, continuationID, 100)
+		ctgs, continuationID = e.repo.List(userID, continuationID, 100)
 
 		for idx := range ctgs {
 			ctg := ctgs[idx]
-			feeds, _ := e.repo.Feeds(user, ctg.APIID, "", 100)
+			feeds, _ := e.repo.Feeds(userID, ctg.ID, "", 100)
 			items := marshal(feeds)
 			ctgOutline := models.OPMLOutline{
 				Text:  ctg.Name,
@@ -93,7 +93,7 @@ func (e OPMLExporter) Export(user *models.User) ([]byte, error) {
 
 	for {
 		var feeds []models.Feed
-		feeds, continuationID = e.repo.Uncategorized(user, continuationID, 100)
+		feeds, continuationID = e.repo.Uncategorized(userID, continuationID, 100)
 
 		items := marshal(feeds)
 		b.Body.Items = append(b.Body.Items, items...)

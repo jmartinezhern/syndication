@@ -60,17 +60,17 @@ type ImporterSuite struct {
 }
 
 func (t *ImporterSuite) TestOPMLImporter() {
-	err := t.importer.Import([]byte(opml), t.user)
+	err := t.importer.Import([]byte(opml), t.user.ID)
 	t.NoError(err)
 
-	ctg, found := t.importer.ctgsRepo.CategoryWithName(t.user, "Test")
+	ctg, found := t.importer.ctgsRepo.CategoryWithName(t.user.ID, "Test")
 	t.Require().True(found)
 
-	ctgFeeds, _ := t.importer.ctgsRepo.Feeds(t.user, ctg.APIID, "", 10)
+	ctgFeeds, _ := t.importer.ctgsRepo.Feeds(t.user.ID, ctg.ID, "", 10)
 	t.Require().Len(ctgFeeds, 1)
 	t.Equal(ctgFeeds[0].Title, "Example")
 
-	feeds, _ := t.importer.feedsRepo.List(t.user, "", 2)
+	feeds, _ := t.importer.feedsRepo.List(t.user.ID, "", 2)
 
 	t.NotZero(sort.Search(len(feeds), func(i int) bool {
 		return feeds[i].Title == "Empty"
@@ -81,7 +81,7 @@ func (t *ImporterSuite) SetupTest() {
 	t.db = sql.NewDB("sqlite3", ":memory:")
 
 	t.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 

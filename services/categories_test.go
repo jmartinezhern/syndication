@@ -37,221 +37,222 @@ type CategoriesSuite struct {
 }
 
 func (t *CategoriesSuite) TestNewCategory() {
-	_, err := t.service.New("test", t.user)
+	_, err := t.service.New("test", t.user.ID)
 	t.NoError(err)
 
-	_, found := t.service.ctgsRepo.CategoryWithName(t.user, "test")
+	_, found := t.service.ctgsRepo.CategoryWithName(t.user.ID, "test")
 	t.True(found)
 }
 
 func (t *CategoriesSuite) TestNewConflictingCategory() {
-	t.service.ctgsRepo.Create(t.user, &models.Category{
+	t.service.ctgsRepo.Create(t.user.ID, &models.Category{
 		Name: "test",
 	})
 
-	_, err := t.service.New("test", t.user)
+	_, err := t.service.New("test", t.user.ID)
 	t.EqualError(err, ErrCategoryConflicts.Error())
 }
 
 func (t *CategoriesSuite) TestCategory() {
-	ctgID := utils.CreateAPIID()
-	t.service.ctgsRepo.Create(t.user, &models.Category{
-		APIID: ctgID,
-		Name:  "test",
+	ctgID := utils.CreateID()
+	t.service.ctgsRepo.Create(t.user.ID, &models.Category{
+		ID:   ctgID,
+		Name: "test",
 	})
 
-	_, found := t.service.Category(ctgID, t.user)
+	_, found := t.service.Category(ctgID, t.user.ID)
 	t.True(found)
 }
 
 func (t *CategoriesSuite) TestCategories() {
-	ctgID := utils.CreateAPIID()
-	t.service.ctgsRepo.Create(t.user, &models.Category{
-		APIID: ctgID,
-		Name:  "test",
+	ctgID := utils.CreateID()
+	t.service.ctgsRepo.Create(t.user.ID, &models.Category{
+		ID:   ctgID,
+		Name: "test",
 	})
 
-	ctgs, _ := t.service.Categories("", 2, t.user)
+	ctgs, _ := t.service.Categories("", 2, t.user.ID)
 	t.Require().Len(ctgs, 1)
 	t.Equal("test", ctgs[0].Name)
-	t.Equal(ctgID, ctgs[0].APIID)
+	t.Equal(ctgID, ctgs[0].ID)
 }
 
 func (t *CategoriesSuite) TestCategoryFeeds() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user, &ctg)
+	t.service.ctgsRepo.Create(t.user.ID, &ctg)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "example.com",
 		Category:     ctg,
 	}
 
-	sql.NewFeeds(t.db).Create(t.user, &feed)
+	sql.NewFeeds(t.db).Create(t.user.ID, &feed)
 
-	feeds, _ := t.service.Feeds(ctg.APIID, "", 1, t.user)
+	feeds, _ := t.service.Feeds(ctg.ID, "", 1, t.user.ID)
 	t.Require().Len(feeds, 1)
 	t.Equal(feed.Title, feeds[0].Title)
 }
 
 func (t *CategoriesSuite) TestUncategorized() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "example.com",
 	}
 
-	sql.NewFeeds(t.db).Create(t.user, &feed)
+	sql.NewFeeds(t.db).Create(t.user.ID, &feed)
 
-	feeds, _ := t.service.Uncategorized("", 1, t.user)
+	feeds, _ := t.service.Uncategorized("", 1, t.user.ID)
 	t.Require().Len(feeds, 1)
 	t.Equal(feed.Title, feeds[0].Title)
 }
 
 func (t *CategoriesSuite) TestEditCategory() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user, &ctg)
+	t.service.ctgsRepo.Create(t.user.ID, &ctg)
 
 	ctg.Name = "newName"
 
-	newCtg, err := t.service.Update("newName", ctg.APIID, t.user)
+	newCtg, err := t.service.Update("newName", ctg.ID, t.user.ID)
 	t.NoError(err)
 	t.Equal("newName", newCtg.Name)
 }
 
 func (t *CategoriesSuite) TestEditMissingCategory() {
-	_, err := t.service.Update("bogus", "bogus", t.user)
+	_, err := t.service.Update("bogus", "bogus", t.user.ID)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
 func (t *CategoriesSuite) TestAddFeedsToCategory() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user, &ctg)
+	t.service.ctgsRepo.Create(t.user.ID, &ctg)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "example.com",
 		Category:     ctg,
 	}
-	sql.NewFeeds(t.db).Create(t.user, &feed)
+	sql.NewFeeds(t.db).Create(t.user.ID, &feed)
 
-	t.service.AddFeeds(ctg.APIID, []string{feed.APIID}, t.user)
+	t.service.AddFeeds(ctg.ID, []string{feed.ID}, t.user.ID)
 
-	feeds, _ := t.service.ctgsRepo.Feeds(t.user, ctg.APIID, "", 1)
+	feeds, _ := t.service.ctgsRepo.Feeds(t.user.ID, ctg.ID, "", 1)
 	t.Require().Len(feeds, 1)
 	t.Equal(feed.Title, feeds[0].Title)
 }
 
 func (t *CategoriesSuite) TestDeleteCategory() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user, &ctg)
+	t.service.ctgsRepo.Create(t.user.ID, &ctg)
 
-	err := t.service.Delete(ctg.APIID, t.user)
+	err := t.service.Delete(ctg.ID, t.user.ID)
 	t.NoError(err)
 
-	_, found := t.service.ctgsRepo.CategoryWithID(t.user, ctg.APIID)
+	_, found := t.service.ctgsRepo.CategoryWithID(t.user.ID, ctg.ID)
 	t.False(found)
 }
 
 func (t *CategoriesSuite) TestDeleteMissingCategory() {
-	err := t.service.Delete("bogus", t.user)
+	err := t.service.Delete("bogus", t.user.ID)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
 func (t *CategoriesSuite) TestMarkCategory() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user, &ctg)
+	t.service.ctgsRepo.Create(t.user.ID, &ctg)
 
 	feed := models.Feed{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Title:    "example",
 		Category: ctg,
 	}
-	sql.NewFeeds(t.db).Create(t.user, &feed)
+	sql.NewFeeds(t.db).Create(t.user.ID, &feed)
 
 	entriesRepo := sql.NewEntries(t.db)
-	entriesRepo.Create(t.user, &models.Entry{
+	entriesRepo.Create(t.user.ID, &models.Entry{
+		ID:    utils.CreateID(),
 		Title: "Test Entries",
 		Mark:  models.MarkerUnread,
 		Feed:  feed,
 	})
 
-	err := t.service.Mark(ctg.APIID, models.MarkerRead, t.user)
+	err := t.service.Mark(ctg.ID, models.MarkerRead, t.user.ID)
 	t.NoError(err)
 
-	entries, _ := entriesRepo.List(t.user, "", 2, true, models.MarkerRead)
+	entries, _ := entriesRepo.List(t.user.ID, "", 2, true, models.MarkerRead)
 	t.Len(entries, 1)
 }
 
 func (t *CategoriesSuite) TestMarkMissingCategory() {
-	err := t.service.Mark("bogus", models.MarkerRead, t.user)
+	err := t.service.Mark("bogus", models.MarkerRead, t.user.ID)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
 func (t *CategoriesSuite) TestCategoryEntries() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user, &ctg)
+	t.service.ctgsRepo.Create(t.user.ID, &ctg)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "example.com",
 		Category:     ctg,
 	}
-	sql.NewFeeds(t.db).Create(t.user, &feed)
+	sql.NewFeeds(t.db).Create(t.user.ID, &feed)
 
 	entriesRepo := sql.NewEntries(t.db)
-	entriesRepo.Create(t.user, &models.Entry{
-		APIID: utils.CreateAPIID(),
+	entriesRepo.Create(t.user.ID, &models.Entry{
+		ID:    utils.CreateID(),
 		Title: "Test Entries",
 		Mark:  models.MarkerUnread,
 		Feed:  feed,
 	})
 
-	entries, _, err := t.service.Entries(ctg.APIID, "", 1, true, models.MarkerUnread, t.user)
+	entries, _, err := t.service.Entries(ctg.ID, "", 1, true, models.MarkerUnread, t.user.ID)
 	t.Require().Len(entries, 1)
 	t.NoError(err)
 	t.Equal("Test Entries", entries[0].Title)
 }
 
 func (t *CategoriesSuite) TestEntriesForMissingCategory() {
-	_, _, err := t.service.Entries("bogus", "", 1, true, models.MarkerAny, t.user)
+	_, _, err := t.service.Entries("bogus", "", 1, true, models.MarkerAny, t.user.ID)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
 func (t *CategoriesSuite) TestCategoryStats() {
 	ctg := models.Category{
-		APIID: utils.CreateAPIID(),
-		Name:  "test",
+		ID:   utils.CreateID(),
+		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user, &ctg)
+	t.service.ctgsRepo.Create(t.user.ID, &ctg)
 
-	_, err := t.service.Stats(ctg.APIID, t.user)
+	_, err := t.service.Stats(ctg.ID, t.user.ID)
 	t.NoError(err)
 }
 
 func (t *CategoriesSuite) TestMissingCategoryStats() {
-	_, err := t.service.Stats("bogus", t.user)
+	_, err := t.service.Stats("bogus", t.user.ID)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
@@ -260,7 +261,7 @@ func (t *CategoriesSuite) SetupTest() {
 	t.service = NewCategoriesService(sql.NewCategories(t.db), sql.NewEntries(t.db))
 
 	t.user = &models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
 	sql.NewUsers(t.db).Create(t.user)

@@ -20,8 +20,8 @@ package rest
 import (
 	"net/http"
 	"sort"
+	"strings"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 
@@ -29,54 +29,27 @@ import (
 	"github.com/jmartinezhern/syndication/services"
 )
 
-var (
-	unauthorizedPaths = []string{
-		"/v1/auth/login",
-		"/v1/auth/register",
-		"/v1/auth/renew",
-	}
-)
-
 type (
-	AuthController struct {
-		e                  *echo.Echo
-		auth               services.Auth
-		secret             string
-		allowRegistrations bool
+	AdminAuthController struct {
+		e      *echo.Echo
+		auth   services.Auth
+		secret string
 	}
 )
 
-func isPathUnauthorized(c echo.Context) bool {
+var (
+	adminContextKey = "admin"
+)
+
+func isUserPath(c echo.Context) bool {
 	path := c.Path()
 	i := sort.SearchStrings(unauthorizedPaths, path)
-	return i < len(unauthorizedPaths) && unauthorizedPaths[i] == path
+	return (i < len(unauthorizedPaths) && unauthorizedPaths[i] == path) || !strings.HasPrefix(path, "/v1/users")
 }
 
-func (s *AuthController) checkAuth(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		if isPathUnauthorized(c) {
-			return next(c)
-		}
-
-		userClaim, ok := c.Get("token").(*jwt.Token)
-		if !ok {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to parse JWT")
-		}
-		user, isAuth := s.auth.Authenticate(*userClaim)
-
-		if !isAuth {
-			return echo.NewHTTPError(http.StatusUnauthorized)
-		}
-
-		c.Set("user", user)
-
-		return next(c)
-	}
-}
-
-func NewAuthController(service services.Auth, secret string, allowRegistration bool, e *echo.Echo) *AuthController {
+func NewAdminAuthController(service services.Auth, secret string, e *echo.Echo) *AdminAuthController {
 	e.Use(middleware.JWTWithConfig(middleware.JWTConfig{
-		Skipper:       isPathUnauthorized,
+		Skipper:       isUserPath,
 		SigningKey:    []byte(secret),
 		SigningMethod: "HS256",
 		ContextKey:    "token",
@@ -84,24 +57,37 @@ func NewAuthController(service services.Auth, secret string, allowRegistration b
 
 	v1 := e.Group("v1")
 
-	controller := AuthController{
+	controller := AdminAuthController{
 		e,
 		service,
 		secret,
-		allowRegistration,
 	}
 
-	controller.e.Use(controller.checkAuth)
+	controller.e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if isUserPath(c) {
+				return next(c)
+			}
 
-	v1.POST("/auth/login", controller.Login)
-	v1.POST("/auth/register", controller.Register)
-	v1.POST("/auth/renew", controller.Renew)
+			userID := getUserID(c)
+			if userID == "" {
+				return echo.NewHTTPError(http.StatusUnauthorized)
+			}
+
+			c.Set(adminContextKey, userID)
+
+			return next(c)
+		}
+	})
+
+	v1.POST("/admin/login", controller.Login)
+	v1.POST("/admin/renew", controller.Renew)
 
 	return &controller
 }
 
 // Login a user
-func (s *AuthController) Login(c echo.Context) error {
+func (s *AdminAuthController) Login(c echo.Context) error {
 	keys, err := s.auth.Login(c.FormValue("username"), c.FormValue("password"))
 	if err == services.ErrUserUnauthorized {
 		return echo.NewHTTPError(http.StatusUnauthorized)
@@ -112,24 +98,8 @@ func (s *AuthController) Login(c echo.Context) error {
 	return c.JSON(http.StatusOK, keys)
 }
 
-// Register a user
-func (s *AuthController) Register(c echo.Context) error {
-	if !s.allowRegistrations {
-		return echo.NewHTTPError(http.StatusNotFound)
-	}
-
-	keys, err := s.auth.Register(c.FormValue("username"), c.FormValue("password"))
-	if err == services.ErrUserConflicts {
-		return echo.NewHTTPError(http.StatusConflict)
-	} else if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError)
-	}
-
-	return c.JSON(http.StatusOK, keys)
-}
-
 // Renew an API Token
-func (s *AuthController) Renew(c echo.Context) error {
+func (s *AdminAuthController) Renew(c echo.Context) error {
 	key := models.APIKeyPair{}
 	if err := c.Bind(&key); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)

@@ -63,7 +63,7 @@ func (c *FeedsControllerSuite) TestNewFeed() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/feeds")
 
@@ -79,7 +79,7 @@ func (c *FeedsControllerSuite) TestUnreachableNewFeed() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/feeds")
 
@@ -88,17 +88,17 @@ func (c *FeedsControllerSuite) TestUnreachableNewFeed() {
 
 func (c *FeedsControllerSuite) TestGetFeeds() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/feeds")
 
@@ -118,19 +118,19 @@ func (c *FeedsControllerSuite) TestGetFeeds() {
 
 func (c *FeedsControllerSuite) TestGetFeed() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.APIID)
+	ctx.SetParamValues(feed.ID)
 
 	ctx.SetPath("/v1/feeds/:feedID")
 
@@ -148,7 +148,7 @@ func (c *FeedsControllerSuite) TestGetUnknownFeed() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
 	ctx.SetParamValues("bogus")
 
@@ -163,20 +163,20 @@ func (c *FeedsControllerSuite) TestGetUnknownFeed() {
 func (c *FeedsControllerSuite) TestEditFeed() {
 	newFeed := `{ "title": "NewName" }`
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(newFeed))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.APIID)
+	ctx.SetParamValues(feed.ID)
 
 	ctx.SetPath("/v1/feeds/:feedID")
 
@@ -197,7 +197,7 @@ func (c *FeedsControllerSuite) TestEditUnknownFeed() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
 	ctx.SetParamValues("bogus")
 
@@ -211,25 +211,25 @@ func (c *FeedsControllerSuite) TestEditUnknownFeed() {
 
 func (c *FeedsControllerSuite) TestDeleteFeed() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.APIID)
+	ctx.SetParamValues(feed.ID)
 
 	ctx.SetPath("/v1/feeds/:feedID")
 
 	c.NoError(c.controller.DeleteFeed(ctx))
 
-	_, found := c.feedsRepo.FeedWithID(c.user, feed.APIID)
+	_, found := c.feedsRepo.FeedWithID(c.user.ID, feed.ID)
 	c.False(found)
 }
 
@@ -238,7 +238,7 @@ func (c *FeedsControllerSuite) TestDeleteUnknownFeed() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
 	ctx.SetParamValues("bogus")
 
@@ -252,34 +252,34 @@ func (c *FeedsControllerSuite) TestDeleteUnknownFeed() {
 
 func (c *FeedsControllerSuite) TestMarkFeed() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
 		Feed:  feed,
 	}
-	c.entriesRepo.Create(c.user, &entry)
+	c.entriesRepo.Create(c.user.ID, &entry)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.APIID)
+	ctx.SetParamValues(feed.ID)
 
 	ctx.SetPath("/v1/feeds/:feedID/mark")
 
 	c.NoError(c.controller.MarkFeed(ctx))
 	c.Equal(http.StatusNoContent, rec.Code)
 
-	entries, _ := c.entriesRepo.List(c.user, "", 1, false, models.MarkerRead)
+	entries, _ := c.entriesRepo.List(c.user.ID, "", 1, false, models.MarkerRead)
 	c.Len(entries, 1)
 }
 
@@ -288,7 +288,7 @@ func (c *FeedsControllerSuite) TestMarkUnknownFeeed() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
 	ctx.SetParamValues("bogus")
 
@@ -302,27 +302,27 @@ func (c *FeedsControllerSuite) TestMarkUnknownFeeed() {
 
 func (c *FeedsControllerSuite) TestGetFeedEntries() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	entry := models.Entry{
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
 		Feed:  feed,
 	}
-	c.entriesRepo.Create(c.user, &entry)
+	c.entriesRepo.Create(c.user.ID, &entry)
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.APIID)
+	ctx.SetParamValues(feed.ID)
 	ctx.SetPath("/v1/feeds/:feedID/entries")
 
 	c.NoError(c.controller.GetFeedEntries(ctx))
@@ -340,19 +340,19 @@ func (c *FeedsControllerSuite) TestGetFeedEntries() {
 
 func (c *FeedsControllerSuite) TestGetFeedStats() {
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "Example",
 		Subscription: "http://example.com",
 	}
-	c.feedsRepo.Create(c.user, &feed)
+	c.feedsRepo.Create(c.user.ID, &feed)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.APIID)
+	ctx.SetParamValues(feed.ID)
 
 	ctx.SetPath("/v1/feeds/:feedID/stats")
 
@@ -367,7 +367,7 @@ func (c *FeedsControllerSuite) TestGetUnknownFeedStats() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
 	ctx.SetParamValues("bogus")
 
@@ -385,7 +385,7 @@ func (c *FeedsControllerSuite) SetupTest() {
 	c.e.Logger.SetLevel(log.OFF)
 
 	c.user = &models.User{
-		APIID: utils.CreateAPIID(),
+		ID: utils.CreateID(),
 	}
 
 	c.db = sql.NewDB("sqlite3", ":memory:")

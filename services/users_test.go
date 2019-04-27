@@ -49,7 +49,7 @@ func (s *UsersSuite) TestNewUser() {
 
 func (s *UsersSuite) TestNewConflictingUser() {
 	s.repo.Create(&models.User{
-		APIID:    utils.CreateAPIID(),
+		ID:       utils.CreateID(),
 		Username: "gopher",
 	})
 
@@ -58,9 +58,9 @@ func (s *UsersSuite) TestNewConflictingUser() {
 }
 
 func (s *UsersSuite) TestDeleteUser() {
-	userID := utils.CreateAPIID()
+	userID := utils.CreateID()
 	s.repo.Create(&models.User{
-		APIID:    userID,
+		ID:       userID,
 		Username: "gopher",
 	})
 
@@ -72,9 +72,9 @@ func (s *UsersSuite) TestDeleteMissingUser() {
 }
 
 func (s *UsersSuite) TestUser() {
-	userID := utils.CreateAPIID()
+	userID := utils.CreateID()
 	s.repo.Create(&models.User{
-		APIID:    userID,
+		ID:       userID,
 		Username: "gopher",
 	})
 

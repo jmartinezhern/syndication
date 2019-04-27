@@ -64,7 +64,7 @@ func (s *Service) SyncUsers() {
 
 		for idx := range users {
 			go func(user models.User) {
-				s.SyncUser(&user)
+				s.SyncUser(user.ID)
 				s.userWaitGroup.Done()
 			}(users[idx])
 		}
@@ -78,14 +78,14 @@ func (s *Service) SyncUsers() {
 }
 
 // SyncUser sync's all feeds owned by user
-func (s *Service) SyncUser(user *models.User) {
+func (s *Service) SyncUser(userID string) {
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
 	continuationID := ""
 	for {
 		var feeds []models.Feed
-		feeds, continuationID = s.feedsRepo.List(user, continuationID, 100)
+		feeds, continuationID = s.feedsRepo.List(userID, continuationID, 100)
 		for idx := range feeds {
 			feed := feeds[idx]
 			if !time.Now().After(feed.LastUpdated.Add(s.interval)) {
@@ -97,19 +97,19 @@ func (s *Service) SyncUser(user *models.User) {
 				log.Error(err)
 			}
 
-			fetchedFeed.APIID = feed.APIID
+			fetchedFeed.ID = feed.ID
 
-			err = s.feedsRepo.Update(user, &fetchedFeed)
+			err = s.feedsRepo.Update(userID, &fetchedFeed)
 			if err != nil {
 				log.Error(err)
 			}
 
 			for idx := range fetchedEntries {
 				entry := fetchedEntries[idx]
-				if _, found := s.entriesRepo.EntryWithGUID(user, entry.GUID); !found {
-					entry.APIID = utils.CreateAPIID()
+				if _, found := s.entriesRepo.EntryWithGUID(userID, entry.GUID); !found {
+					entry.ID = utils.CreateID()
 					entry.Feed = feed
-					s.entriesRepo.Create(user, &entry)
+					s.entriesRepo.Create(userID, &entry)
 				}
 			}
 		}

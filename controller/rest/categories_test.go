@@ -54,7 +54,7 @@ func (c *CategoriesControllerSuite) TestNewCategory() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/categories")
 
@@ -65,7 +65,7 @@ func (c *CategoriesControllerSuite) TestNewCategory() {
 func (c *CategoriesControllerSuite) TestNewConflictingCategory() {
 	ctg := `{ "name": "test" }`
 
-	_, err := c.controller.categories.New("test", c.user)
+	_, err := c.controller.categories.New("test", c.user.ID)
 	c.NoError(err)
 
 	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(ctg))
@@ -73,7 +73,7 @@ func (c *CategoriesControllerSuite) TestNewConflictingCategory() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/categories")
 
@@ -91,7 +91,7 @@ func (c *CategoriesControllerSuite) TestNewCategoryWithBadInput() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/categories")
 
@@ -102,18 +102,18 @@ func (c *CategoriesControllerSuite) TestNewCategoryWithBadInput() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategory() {
-	ctg, err := c.controller.categories.New("Test", c.user)
+	ctg, err := c.controller.categories.New("Test", c.user.ID)
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID")
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.APIID)
+	ctx.SetParamValues(ctg.ID)
 
 	c.NoError(c.controller.GetCategory(ctx))
 	c.Equal(http.StatusOK, rec.Code)
@@ -128,7 +128,7 @@ func (c *CategoriesControllerSuite) TestGetMissingCategory() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID")
 	ctx.SetParamNames("categoryID")
@@ -141,14 +141,14 @@ func (c *CategoriesControllerSuite) TestGetMissingCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategories() {
-	ctg, err := c.controller.categories.New("Test", c.user)
+	ctg, err := c.controller.categories.New("Test", c.user.ID)
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/categories")
 
@@ -167,24 +167,24 @@ func (c *CategoriesControllerSuite) TestGetCategories() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategoryFeeds() {
-	ctg, err := c.controller.categories.New("test", c.user)
+	ctg, err := c.controller.categories.New("test", c.user.ID)
 	c.Require().NoError(err)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Subscription: "http://localhost:9090",
 		Title:        "example",
 		Category:     ctg,
 	}
-	sql.NewFeeds(c.db).Create(c.user, &feed)
+	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.APIID)
+	ctx.SetParamValues(ctg.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID/feeds")
 
@@ -202,7 +202,7 @@ func (c *CategoriesControllerSuite) TestGetCategoryFeeds() {
 }
 
 func (c *CategoriesControllerSuite) TestEditCategory() {
-	ctg, err := c.controller.categories.New("test", c.user)
+	ctg, err := c.controller.categories.New("test", c.user.ID)
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{"name": "gopher"}`))
@@ -210,9 +210,9 @@ func (c *CategoriesControllerSuite) TestEditCategory() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.APIID)
+	ctx.SetParamValues(ctg.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID")
 
@@ -221,27 +221,27 @@ func (c *CategoriesControllerSuite) TestEditCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestAppendFeeds() {
-	ctg, err := c.controller.categories.New("test", c.user)
+	ctg, err := c.controller.categories.New("test", c.user.ID)
 	c.Require().NoError(err)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Subscription: "http://localhost:9090",
 		Title:        "example",
 		Category:     ctg,
 	}
-	sql.NewFeeds(c.db).Create(c.user, &feed)
+	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
 
-	feeds := fmt.Sprintf(`{ "feeds": ["%s"] }`, feed.APIID)
+	feeds := fmt.Sprintf(`{ "feeds": ["%s"] }`, feed.ID)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(feeds))
 	req.Header.Set("Content-Type", "application/json")
 
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.APIID)
+	ctx.SetParamValues(ctg.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID/feeds")
 
@@ -250,16 +250,16 @@ func (c *CategoriesControllerSuite) TestAppendFeeds() {
 }
 
 func (c *CategoriesControllerSuite) TestDeleteCategory() {
-	ctg, err := c.controller.categories.New("test", c.user)
+	ctg, err := c.controller.categories.New("test", c.user.ID)
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.APIID)
+	ctx.SetParamValues(ctg.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID")
 
@@ -268,16 +268,16 @@ func (c *CategoriesControllerSuite) TestDeleteCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestMarkCategory() {
-	ctg, err := c.controller.categories.New("test", c.user)
+	ctg, err := c.controller.categories.New("test", c.user.ID)
 	c.Require().NoError(err)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Subscription: "http://localhost:9090",
 		Title:        "example",
 		Category:     ctg,
 	}
-	sql.NewFeeds(c.db).Create(c.user, &feed)
+	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
 
 	entry := models.Entry{
 		Title: "Test Entry",
@@ -286,22 +286,22 @@ func (c *CategoriesControllerSuite) TestMarkCategory() {
 	}
 
 	entriesRepo := sql.NewEntries(c.db)
-	entriesRepo.Create(c.user, &entry)
+	entriesRepo.Create(c.user.ID, &entry)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.APIID)
+	ctx.SetParamValues(ctg.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID/mark")
 
 	c.NoError(c.controller.MarkCategory(ctx))
 	c.Equal(http.StatusNoContent, rec.Code)
 
-	entries, _ := entriesRepo.List(c.user, "", 1, true, models.MarkerRead)
+	entries, _ := entriesRepo.List(c.user.ID, "", 1, true, models.MarkerRead)
 	c.Require().Len(entries, 1)
 }
 
@@ -310,7 +310,7 @@ func (c *CategoriesControllerSuite) TestMarkUnknownCategory() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
 	ctx.SetParamValues("bogus")
 
@@ -323,34 +323,34 @@ func (c *CategoriesControllerSuite) TestMarkUnknownCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategoryEntries() {
-	ctg, err := c.controller.categories.New("test", c.user)
+	ctg, err := c.controller.categories.New("test", c.user.ID)
 	c.Require().NoError(err)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Subscription: "http://localhost:9090",
 		Title:        "example",
 		Category:     ctg,
 	}
-	sql.NewFeeds(c.db).Create(c.user, &feed)
+	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
 
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test Entry",
 		Mark:  models.MarkerUnread,
 		Feed:  feed,
 	}
 
 	entriesRepo := sql.NewEntries(c.db)
-	entriesRepo.Create(c.user, &entry)
+	entriesRepo.Create(c.user.ID, &entry)
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.APIID)
+	ctx.SetParamValues(ctg.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID/entries")
 
@@ -372,7 +372,7 @@ func (c *CategoriesControllerSuite) TestGetUnknownCategoryEntries() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
 	ctx.SetParamValues("bogus")
 
@@ -385,16 +385,16 @@ func (c *CategoriesControllerSuite) TestGetUnknownCategoryEntries() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategoryStats() {
-	ctg, err := c.controller.categories.New("test", c.user)
+	ctg, err := c.controller.categories.New("test", c.user.ID)
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.APIID)
+	ctx.SetParamValues(ctg.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID/stats")
 
@@ -409,7 +409,7 @@ func (c *CategoriesControllerSuite) TestGetUnknownCategoryStats() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
 	ctx.SetParamValues("bogus")
 
@@ -427,7 +427,7 @@ func (c *CategoriesControllerSuite) SetupTest() {
 	c.e.Logger.SetLevel(log.OFF)
 
 	c.user = &models.User{
-		APIID: utils.CreateAPIID(),
+		ID: utils.CreateID(),
 	}
 
 	c.db = sql.NewDB("sqlite3", ":memory:")

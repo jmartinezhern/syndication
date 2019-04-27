@@ -28,19 +28,19 @@ type (
 	// Entries interface defines the Entries service
 	Entries interface {
 		// Entry returns an entry with id that belongs to user
-		Entry(id string, user *models.User) (models.Entry, error)
+		Entry(id string, userID string) (models.Entry, error)
 
 		// Entries returns all entries belong to a user with a marker
-		Entries(continuationID string, count int, order bool, marker models.Marker, user *models.User) ([]models.Entry, string)
+		Entries(continuationID string, count int, order bool, marker models.Marker, userID string) ([]models.Entry, string)
 
 		// Mark entry with id
-		Mark(id string, marker models.Marker, user *models.User) error
+		Mark(id string, marker models.Marker, userID string) error
 
 		// MarkAll entries
-		MarkAll(marker models.Marker, user *models.User)
+		MarkAll(marker models.Marker, userID string)
 
 		// Stats returns statistics for all entries
-		Stats(user *models.User) models.Stats
+		Stats(userID string) models.Stats
 	}
 
 	// EntriesService implements Entries service
@@ -61,8 +61,8 @@ func NewEntriesService(entriesRepo repo.Entries) EntriesService {
 }
 
 // Entry returns an entry with ID that belongs to user
-func (e EntriesService) Entry(id string, user *models.User) (models.Entry, error) {
-	entry, found := e.repo.EntryWithID(user, id)
+func (e EntriesService) Entry(id, userID string) (models.Entry, error) {
+	entry, found := e.repo.EntryWithID(userID, id)
 	if !found {
 		return models.Entry{}, ErrEntryNotFound
 	}
@@ -76,13 +76,13 @@ func (e EntriesService) Entries(
 	count int,
 	order bool,
 	marker models.Marker,
-	user *models.User) (entries []models.Entry, next string) {
-	return e.repo.List(user, continuationID, count, order, marker)
+	userID string) (entries []models.Entry, next string) {
+	return e.repo.List(userID, continuationID, count, order, marker)
 }
 
 // Mark entry with id
-func (e EntriesService) Mark(id string, marker models.Marker, user *models.User) error {
-	err := e.repo.Mark(user, id, marker)
+func (e EntriesService) Mark(id string, marker models.Marker, userID string) error {
+	err := e.repo.Mark(userID, id, marker)
 	if err == repo.ErrModelNotFound {
 		return ErrEntryNotFound
 	}
@@ -91,11 +91,11 @@ func (e EntriesService) Mark(id string, marker models.Marker, user *models.User)
 }
 
 // MarkAll entries
-func (e EntriesService) MarkAll(marker models.Marker, user *models.User) {
-	e.repo.MarkAll(user, marker)
+func (e EntriesService) MarkAll(marker models.Marker, userID string) {
+	e.repo.MarkAll(userID, marker)
 }
 
 // Stats returns statistics for all entries
-func (e EntriesService) Stats(user *models.User) models.Stats {
-	return e.repo.Stats(user)
+func (e EntriesService) Stats(userID string) models.Stats {
+	return e.repo.Stats(userID)
 }

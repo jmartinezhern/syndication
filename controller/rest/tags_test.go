@@ -57,7 +57,7 @@ func (c *TagsControllerSuite) TestNewTag() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/tags")
 
@@ -67,17 +67,17 @@ func (c *TagsControllerSuite) TestNewTag() {
 
 func (c *TagsControllerSuite) TestNewConflictingTag() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "Test",
+		ID:   utils.CreateID(),
+		Name: "Test",
 	}
-	c.tagsRepo.Create(c.user, &tag)
+	c.tagsRepo.Create(c.user.ID, &tag)
 
 	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(`{ "name": "Test" }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/tags")
 
@@ -89,16 +89,16 @@ func (c *TagsControllerSuite) TestNewConflictingTag() {
 
 func (c *TagsControllerSuite) TestGetTags() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "Test",
+		ID:   utils.CreateID(),
+		Name: "Test",
 	}
-	c.tagsRepo.Create(c.user, &tag)
+	c.tagsRepo.Create(c.user.ID, &tag)
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/tags")
 
@@ -118,18 +118,18 @@ func (c *TagsControllerSuite) TestGetTags() {
 
 func (c *TagsControllerSuite) TestDeleteTag() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "Test",
+		ID:   utils.CreateID(),
+		Name: "Test",
 	}
-	c.tagsRepo.Create(c.user, &tag)
+	c.tagsRepo.Create(c.user.ID, &tag)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.APIID)
+	ctx.SetParamValues(tag.ID)
 
 	ctx.SetPath("/v1/tags/:tagID")
 
@@ -142,7 +142,7 @@ func (c *TagsControllerSuite) TestDeleteUnknownTag() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
 	ctx.SetParamValues("bogus")
 
@@ -156,10 +156,10 @@ func (c *TagsControllerSuite) TestDeleteUnknownTag() {
 
 func (c *TagsControllerSuite) TestEditTag() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "Test",
+		ID:   utils.CreateID(),
+		Name: "Test",
 	}
-	c.tagsRepo.Create(c.user, &tag)
+	c.tagsRepo.Create(c.user.ID, &tag)
 
 	mdfTagJSON := `{"name": "gopher"}`
 
@@ -168,9 +168,9 @@ func (c *TagsControllerSuite) TestEditTag() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.APIID)
+	ctx.SetParamValues(tag.ID)
 
 	ctx.SetPath("/v1/tags/:tagID")
 
@@ -188,7 +188,7 @@ func (c *TagsControllerSuite) TestEditUnknownTag() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
 	ctx.SetParamValues("bogus")
 
@@ -202,39 +202,39 @@ func (c *TagsControllerSuite) TestEditUnknownTag() {
 
 func (c *TagsControllerSuite) TestTagEntries() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "Test",
+		ID:   utils.CreateID(),
+		Name: "Test",
 	}
-	c.tagsRepo.Create(c.user, &tag)
+	c.tagsRepo.Create(c.user.ID, &tag)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "http://example.com",
 	}
-	sql.NewFeeds(c.db).Create(c.user, &feed)
+	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
 
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test",
 		Feed:  feed,
 	}
-	c.entriesRepo.Create(c.user, &entry)
+	c.entriesRepo.Create(c.user.ID, &entry)
 
 	req := httptest.NewRequest(
 		echo.PUT,
 		"/",
 		strings.NewReader(fmt.Sprintf(`{
 			"entries" :  ["%s"]
-		}`, entry.APIID)),
+		}`, entry.ID)),
 	)
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.APIID)
+	ctx.SetParamValues(tag.ID)
 
 	ctx.SetPath("/v1/tags/:tagID")
 
@@ -254,7 +254,7 @@ func (c *TagsControllerSuite) TestTagEntriesWithUnknownTag() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
 	ctx.SetParamValues("bogus")
 
@@ -268,18 +268,18 @@ func (c *TagsControllerSuite) TestTagEntriesWithUnknownTag() {
 
 func (c *TagsControllerSuite) TestGetTag() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "Test",
+		ID:   utils.CreateID(),
+		Name: "Test",
 	}
-	c.tagsRepo.Create(c.user, &tag)
+	c.tagsRepo.Create(c.user.ID, &tag)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.APIID)
+	ctx.SetParamValues(tag.ID)
 
 	ctx.SetPath("/v1/tags/:tagID")
 
@@ -295,7 +295,7 @@ func (c *TagsControllerSuite) TestGetUnknownTag() {
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
 	ctx.SetParamValues("bogus")
 
@@ -309,35 +309,35 @@ func (c *TagsControllerSuite) TestGetUnknownTag() {
 
 func (c *TagsControllerSuite) TestGetEntriesFromTag() {
 	tag := models.Tag{
-		APIID: utils.CreateAPIID(),
-		Name:  "Test",
+		ID:   utils.CreateID(),
+		Name: "Test",
 	}
-	c.tagsRepo.Create(c.user, &tag)
+	c.tagsRepo.Create(c.user.ID, &tag)
 
 	feed := models.Feed{
-		APIID:        utils.CreateAPIID(),
+		ID:           utils.CreateID(),
 		Title:        "example",
 		Subscription: "http://example.com",
 	}
-	sql.NewFeeds(c.db).Create(c.user, &feed)
+	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
 
 	entry := models.Entry{
-		APIID: utils.CreateAPIID(),
+		ID:    utils.CreateID(),
 		Title: "Test",
 		Feed:  feed,
 	}
-	c.entriesRepo.Create(c.user, &entry)
+	c.entriesRepo.Create(c.user.ID, &entry)
 
-	err := c.entriesRepo.TagEntries(c.user, tag.APIID, []string{entry.APIID})
+	err := c.entriesRepo.TagEntries(c.user.ID, tag.ID, []string{entry.ID})
 	c.NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
-	ctx.Set(userContextKey, *c.user)
+	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.APIID)
+	ctx.SetParamValues(tag.ID)
 
 	ctx.SetPath("/v1/tags/:tagID/entries")
 
@@ -352,7 +352,7 @@ func (c *TagsControllerSuite) TestGetEntriesFromTag() {
 	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
 	c.Require().Len(entries.Entries, 1)
 	c.Equal(entry.Title, entries.Entries[0].Title)
-	c.Equal(entry.APIID, entries.Entries[0].APIID)
+	c.Equal(entry.ID, entries.Entries[0].ID)
 }
 
 func (c *TagsControllerSuite) SetupTest() {
@@ -361,7 +361,7 @@ func (c *TagsControllerSuite) SetupTest() {
 	c.e.Logger.SetLevel(log.OFF)
 
 	c.user = &models.User{
-		APIID: utils.CreateAPIID(),
+		ID: utils.CreateID(),
 	}
 
 	c.db = sql.NewDB("sqlite3", ":memory:")

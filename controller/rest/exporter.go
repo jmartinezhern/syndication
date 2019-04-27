@@ -22,7 +22,6 @@ import (
 
 	"github.com/labstack/echo"
 
-	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/services"
 )
 
@@ -56,12 +55,12 @@ func NewExporterController(exporters Exporters, e *echo.Echo) *ExporterControlle
 // The current supported formats are:
 //    - OPML (application/xml)
 func (s *ExporterController) Export(c echo.Context) error {
-	user := c.Get(userContextKey).(models.User)
+	userID := c.Get(userContextKey).(string)
 
 	contType := c.Request().Header.Get("Accept")
 
 	if exporter, ok := s.exporters[contType]; ok {
-		data, err := exporter.Export(&user)
+		data, err := exporter.Export(userID)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}

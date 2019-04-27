@@ -35,36 +35,36 @@ func NewTags(db *DB) Tags {
 }
 
 // Create a new Tag for user
-func (t Tags) Create(user *models.User, tag *models.Tag) {
-	t.db.db.Model(user).Association("Tags").Append(tag)
+func (t Tags) Create(userID string, tag *models.Tag) {
+	t.db.db.Model(&models.User{ID: userID}).Association("Tags").Append(tag)
 }
 
 // TagWithName returns a Tag that has a matching name and belongs to the given user
-func (t Tags) TagWithName(user *models.User, name string) (tag models.Tag, found bool) {
-	found = !t.db.db.Model(user).Where("name = ?", name).Related(&tag).RecordNotFound()
+func (t Tags) TagWithName(userID, name string) (tag models.Tag, found bool) {
+	found = !t.db.db.Model(&models.User{ID: userID}).Where("name = ?", name).Related(&tag).RecordNotFound()
 	return
 }
 
 // TagWithID returns a Tag with id that belongs to user
-func (t Tags) TagWithID(user *models.User, id string) (tag models.Tag, found bool) {
-	found = !t.db.db.Model(user).Where("api_id = ?", id).Related(&tag).RecordNotFound()
+func (t Tags) TagWithID(userID, id string) (tag models.Tag, found bool) {
+	found = !t.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&tag).RecordNotFound()
 	return
 }
 
 // List all Tags owned by user
-func (t Tags) List(user *models.User, continuationID string, count int) (tags []models.Tag, next string) {
-	query := t.db.db.Model(user)
+func (t Tags) List(userID, continuationID string, count int) (tags []models.Tag, next string) {
+	query := t.db.db.Model(&models.User{ID: userID})
 
 	if continuationID != "" {
-		if tag, found := t.TagWithID(user, continuationID); found {
-			query = query.Where("id >= ?", tag.ID)
+		if tag, found := t.TagWithID(userID, continuationID); found {
+			query = query.Where("created_at >= ?", tag.CreatedAt)
 		}
 	}
 
 	query.Limit(count + 1).Association("Tags").Find(&tags)
 
 	if len(tags) > count {
-		next = tags[len(tags)-1].APIID
+		next = tags[len(tags)-1].ID
 		tags = tags[:len(tags)-1]
 	}
 
@@ -72,8 +72,8 @@ func (t Tags) List(user *models.User, continuationID string, count int) (tags []
 }
 
 // Update a tag owned by user
-func (t Tags) Update(user *models.User, tag *models.Tag) error {
-	if dbTag, found := t.TagWithID(user, tag.APIID); found {
+func (t Tags) Update(userID string, tag *models.Tag) error {
+	if dbTag, found := t.TagWithID(userID, tag.ID); found {
 		t.db.db.Model(&dbTag).Updates(tag)
 		return nil
 	}
@@ -81,8 +81,8 @@ func (t Tags) Update(user *models.User, tag *models.Tag) error {
 }
 
 // Delete a tag owned by user
-func (t Tags) Delete(user *models.User, id string) error {
-	if tag, found := t.TagWithID(user, id); found {
+func (t Tags) Delete(userID, id string) error {
+	if tag, found := t.TagWithID(userID, id); found {
 		t.db.db.Delete(&tag)
 		return nil
 	}
