@@ -24,8 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo"
-	"github.com/labstack/gommon/log"
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -190,7 +189,6 @@ func (s *UsersSuite) TestGetMissingUser() {
 func (s *UsersSuite) SetupTest() {
 	s.e = echo.New()
 	s.e.HideBanner = true
-	s.e.Logger.SetLevel(log.OFF)
 
 	s.db = sql.NewDB("sqlite3", ":memory:")
 	s.usersRepo = sql.NewUsers(s.db)

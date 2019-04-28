@@ -25,8 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo"
-	"github.com/labstack/gommon/log"
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -136,7 +135,6 @@ func (c *AuthControllerSuite) TestRenew() {
 func (c *AuthControllerSuite) SetupTest() {
 	c.e = echo.New()
 	c.e.HideBanner = true
-	c.e.Logger.SetLevel(log.OFF)
 	c.db = sql.NewDB("sqlite3", ":memory:")
 	repo := sql.NewUsers(c.db)
 	c.controller = NewAuthController(services.NewAuthService("secret", repo), "secret", true, c.e)

@@ -23,8 +23,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/labstack/echo"
-	"github.com/labstack/gommon/log"
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -229,7 +228,6 @@ func (c *EntriesControllerSuite) TestGetEntryStats() {
 func (c *EntriesControllerSuite) SetupTest() {
 	c.e = echo.New()
 	c.e.HideBanner = true
-	c.e.Logger.SetLevel(log.OFF)
 
 	c.user = &models.User{
 		ID: utils.CreateID(),

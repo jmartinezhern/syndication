@@ -30,8 +30,8 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/labstack/gommon/log"
 	"github.com/mmcdole/gofeed"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/scrypt"
 
 	"github.com/jmartinezhern/syndication/models"
