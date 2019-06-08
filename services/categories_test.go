@@ -197,7 +197,12 @@ func (t *CategoriesSuite) TestMarkCategory() {
 	err := t.service.Mark(ctg.ID, models.MarkerRead, t.user.ID)
 	t.NoError(err)
 
-	entries, _ := entriesRepo.List(t.user.ID, "", 2, true, models.MarkerRead)
+	entries, _ := entriesRepo.List(t.user.ID, models.Page{
+		ContinuationId: "",
+		Count:          2,
+		Newest:         true,
+		Marker:         models.MarkerRead,
+	})
 	t.Len(entries, 1)
 }
 
@@ -229,14 +234,24 @@ func (t *CategoriesSuite) TestCategoryEntries() {
 		Feed:  feed,
 	})
 
-	entries, _, err := t.service.Entries(ctg.ID, "", 1, true, models.MarkerUnread, t.user.ID)
+	entries, _, err := t.service.Entries(ctg.ID, t.user.ID, models.Page{
+		ContinuationId: "",
+		Count:          1,
+		Newest:         true,
+		Marker:         models.MarkerUnread,
+	})
 	t.Require().Len(entries, 1)
 	t.NoError(err)
 	t.Equal("Test Entries", entries[0].Title)
 }
 
 func (t *CategoriesSuite) TestEntriesForMissingCategory() {
-	_, _, err := t.service.Entries("bogus", "", 1, true, models.MarkerAny, t.user.ID)
+	_, _, err := t.service.Entries("bogus", t.user.ID, models.Page{
+		ContinuationId: "",
+		Count:          1,
+		Newest:         true,
+		Marker:         models.MarkerAny,
+	})
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 

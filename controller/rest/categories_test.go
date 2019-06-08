@@ -300,7 +300,12 @@ func (c *CategoriesControllerSuite) TestMarkCategory() {
 	c.NoError(c.controller.MarkCategory(ctx))
 	c.Equal(http.StatusNoContent, rec.Code)
 
-	entries, _ := entriesRepo.List(c.user.ID, "", 1, true, models.MarkerRead)
+	entries, _ := entriesRepo.List(c.user.ID, models.Page{
+		ContinuationId: "",
+		Count:          1,
+		Newest:         true,
+		Marker:         models.MarkerRead,
+	})
 	c.Require().Len(entries, 1)
 }
 

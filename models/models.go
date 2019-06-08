@@ -216,4 +216,11 @@ type (
 		XMLName xml.Name `xml:"opml"`
 		Body    OPMLBody `xml:"body"`
 	}
+
+	Page struct {
+		ContinuationId string
+		Count int
+		Newest bool
+		Marker Marker
+	}
 )

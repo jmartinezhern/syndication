@@ -66,28 +66,10 @@ type (
 		Create(userID string, entry *models.Entry)
 		EntryWithID(userID, id string) (models.Entry, bool)
 		EntryWithGUID(userID, guid string) (models.Entry, bool)
-		List(
-			userID, continuationID string,
-			count int,
-			orderByNewest bool,
-			marker models.Marker) ([]models.Entry, string)
-		ListFromTags(
-			userID string,
-			tagIDs []string,
-			continuationID string,
-			count int,
-			orderByNewest bool,
-			marker models.Marker) ([]models.Entry, string)
-		ListFromCategory(
-			userID, ctgID, continuationID string,
-			count int,
-			orderByNewest bool,
-			marker models.Marker) ([]models.Entry, string)
-		ListFromFeed(
-			userID, feedID, continuationID string,
-			count int,
-			orderByNewest bool,
-			marked models.Marker) ([]models.Entry, string)
+		List(userID string, page models.Page) ([]models.Entry, string)
+		ListFromTags(userID string, tagIDs []string, page models.Page) ([]models.Entry, string)
+		ListFromCategory(userID, ctgID string, page models.Page) ([]models.Entry, string)
+		ListFromFeed(userID, feedID string, page models.Page) ([]models.Entry, string)
 		TagEntries(userID, tagID string, entryIDs []string) error
 		Mark(userID, id string, marker models.Marker) error
 		MarkAll(userID string, marker models.Marker)

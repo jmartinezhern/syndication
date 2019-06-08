@@ -27,7 +27,6 @@ import (
 )
 
 type (
-
 	// Categories interface defines the Categories service
 	Categories interface {
 		// New creates a new category. If the category conflicts with an existing category,
@@ -59,7 +58,7 @@ type (
 		Mark(id string, marker models.Marker, userID string) error
 
 		// Entries returns all entries associated to a category
-		Entries(id string, continuationID string, count int, order bool, marker models.Marker, userID string) ([]models.Entry, string, error)
+		Entries(id, userID string, page models.Page) ([]models.Entry, string, error)
 
 		// Stats returns statistics on a category items
 		Stats(id string, userID string) (models.Stats, error)
@@ -165,16 +164,11 @@ func (c CategoriesService) Mark(id string, marker models.Marker, userID string) 
 }
 
 // Entries returns all entries associated to a category
-func (c CategoriesService) Entries(
-	id, continuationID string,
-	count int,
-	order bool,
-	marker models.Marker,
-	userID string) ([]models.Entry, string, error) {
+func (c CategoriesService) Entries(id, userID string, page models.Page) ([]models.Entry, string, error) {
 	if _, found := c.ctgsRepo.CategoryWithID(userID, id); !found {
 		return nil, "", ErrCategoryNotFound
 	}
-	entries, next := c.entriesRepo.ListFromCategory(userID, id, continuationID, count, order, marker)
+	entries, next := c.entriesRepo.ListFromCategory(userID, id, page)
 	return entries, next, nil
 }
 

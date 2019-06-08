@@ -60,33 +60,29 @@ func (e Entries) EntryWithGUID(userID, guid string) (entry models.Entry, found b
 }
 
 // List all entries owned by user
-func (e Entries) List(
-	userID, continuationID string,
-	count int,
-	orderByNewest bool,
-	marker models.Marker) (entries []models.Entry, next string) {
+func (e Entries) List(userID string, page models.Page) (entries []models.Entry, next string) {
 	query := e.db.db.Model(&models.User{ID: userID})
 
-	if continuationID != "" {
-		entry, found := e.EntryWithID(userID, continuationID)
+	if page.ContinuationId != "" {
+		entry, found := e.EntryWithID(userID, page.ContinuationId)
 		if found {
 			query = query.Where("created_at >= ?", entry.CreatedAt)
 		}
 	}
 
-	if marker != models.MarkerAny {
-		query = query.Where("mark = ?", marker)
+	if page.Marker != models.MarkerAny {
+		query = query.Where("mark = ?", page.Marker)
 	}
 
-	if orderByNewest {
+	if page.Newest {
 		query = query.Order("published DESC")
 	} else {
 		query = query.Order("published ASC")
 	}
 
-	query.Limit(count + 1).Association("Entries").Find(&entries)
+	query.Limit(page.Count + 1).Association("Entries").Find(&entries)
 
-	if len(entries) > count {
+	if len(entries) > page.Count {
 		next = entries[len(entries)-1].ID
 		entries = entries[:len(entries)-1]
 	}
@@ -95,11 +91,7 @@ func (e Entries) List(
 }
 
 // ListFromFeed returns all Entries associated to a feed
-func (e Entries) ListFromFeed(
-	userID, feedID, continuationID string,
-	count int,
-	orderByNewest bool,
-	marker models.Marker) (entries []models.Entry, next string) {
+func (e Entries) ListFromFeed(userID, feedID string, page models.Page) (entries []models.Entry, next string) {
 	var feed models.Feed
 	if notFound := e.db.db.Model(&models.User{ID: userID}).Where("id = ?", feedID).Related(&feed).RecordNotFound(); notFound {
 		return nil, ""
@@ -107,15 +99,11 @@ func (e Entries) ListFromFeed(
 
 	query := e.db.db.Model(&feed)
 
-	return e.paginateList(userID, query, continuationID, count, orderByNewest, marker)
+	return e.paginateList(userID, query, page)
 }
 
 // ListFromCategory all Entries that are associated to a Category
-func (e Entries) ListFromCategory(
-	userID, ctgID, continuationID string,
-	count int,
-	orderByNewest bool,
-	marker models.Marker) (entries []models.Entry, next string) {
+func (e Entries) ListFromCategory(userID, ctgID string, page models.Page) (entries []models.Entry, next string) {
 	var ctg models.Category
 	if notFound := e.db.db.Model(&models.User{ID: userID}).Where("id = ?", ctgID).Related(&ctg).RecordNotFound(); notFound {
 		return nil, ""
@@ -132,36 +120,30 @@ func (e Entries) ListFromCategory(
 
 	query.Where("feed_id in (?)", feedIds)
 
-	return e.paginateList(userID, query, continuationID, count, orderByNewest, marker)
+	return e.paginateList(userID, query, page)
 }
 
-func (e Entries) paginateList(
-	userID string,
-	query *gorm.DB,
-	continuationID string,
-	count int,
-	orderByNewest bool,
-	marker models.Marker) (entries []models.Entry, next string) {
-	if marker != models.MarkerAny {
-		query = query.Where("mark = ?", marker)
+func (e Entries) paginateList(userID string, query *gorm.DB, page models.Page) (entries []models.Entry, next string) {
+	if page.Marker != models.MarkerAny {
+		query = query.Where("mark = ?", page.Marker)
 	}
 
-	if orderByNewest {
+	if page.Newest {
 		query = query.Order("published DESC")
 	} else {
 		query = query.Order("published ASC")
 	}
 
-	if continuationID != "" {
+	if page.ContinuationId != "" {
 		entry := models.Entry{}
-		if !e.db.db.Model(&models.User{ID: userID}).Where("id = ?", continuationID).Related(&entry).RecordNotFound() {
+		if !e.db.db.Model(&models.User{ID: userID}).Where("id = ?", page.ContinuationId).Related(&entry).RecordNotFound() {
 			query = query.Where("created_at >= ?", entry.CreatedAt)
 		}
 	}
 
-	query.Limit(count + 1).Association("Entries").Find(&entries)
+	query.Limit(page.Count + 1).Association("Entries").Find(&entries)
 
-	if len(entries) > count {
+	if len(entries) > page.Count {
 		next = entries[len(entries)-1].ID
 		entries = entries[:len(entries)-1]
 	}
@@ -214,13 +196,7 @@ func (e Entries) MarkAll(userID string, marker models.Marker) {
 }
 
 // ListFromTags returns all Entries that are related to a list of tags
-func (e Entries) ListFromTags(
-	userID string,
-	tagIDs []string,
-	continuationID string,
-	count int,
-	orderByNewest bool,
-	marker models.Marker) (entries []models.Entry, next string) {
+func (e Entries) ListFromTags(userID string, tagIDs []string, page models.Page) (entries []models.Entry, next string) {
 	query := e.db.db.Model(&models.User{ID: userID})
 
 	tagPrimaryKey := func(id models.ID, userID string) models.ID {
@@ -243,7 +219,7 @@ func (e Entries) ListFromTags(
 
 	query.Joins(sql).Where("entry_tags.tag_id in (?)", tagPrimaryKeys)
 
-	return e.paginateList(userID, query, continuationID, count, orderByNewest, marker)
+	return e.paginateList(userID, query, page)
 }
 
 // DeleteOldEntries deletes entries older than a timestamp

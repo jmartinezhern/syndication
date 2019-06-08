@@ -148,7 +148,12 @@ func (c *EntriesControllerSuite) TestMarkEntry() {
 	}
 	c.entriesRepo.Create(c.user.ID, &entry)
 
-	entries, _ := c.entriesRepo.List(c.user.ID, "", 2, true, models.MarkerRead)
+	entries, _ := c.entriesRepo.List(c.user.ID, models.Page{
+		ContinuationId: "",
+		Count:          2,
+		Newest:         true,
+		Marker:         models.MarkerRead,
+	})
 	c.Empty(entries)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
@@ -196,7 +201,12 @@ func (c *EntriesControllerSuite) TestMarkAllEntries() {
 	}
 	c.entriesRepo.Create(c.user.ID, &entry)
 
-	entries, _ := c.entriesRepo.List(c.user.ID, "", 2, true, models.MarkerRead)
+	entries, _ := c.entriesRepo.List(c.user.ID, models.Page{
+		ContinuationId: "",
+		Count:          2,
+		Newest:         true,
+		Marker:         models.MarkerRead,
+	})
 	c.Empty(entries)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)

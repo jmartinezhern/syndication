@@ -67,7 +67,12 @@ func (t *EntriesSuite) TestEntries() {
 	}
 	t.entriesRepo.Create(t.user.ID, &entry)
 
-	entries, _ := t.service.Entries("", 1, true, models.MarkerAny, t.user.ID)
+	entries, _ := t.service.Entries(t.user.ID, models.Page{
+		ContinuationId: "",
+		Count:          1,
+		Newest:         true,
+		Marker:         models.MarkerAny,
+	})
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
@@ -84,7 +89,12 @@ func (t *EntriesSuite) TestMarkEntry() {
 	err := t.service.Mark(entry.ID, models.MarkerRead, t.user.ID)
 	t.NoError(err)
 
-	entries, _ := t.entriesRepo.List(t.user.ID, "", 2, true, models.MarkerRead)
+	entries, _ := t.entriesRepo.List(t.user.ID, models.Page{
+		ContinuationId: "",
+		Count:          2,
+		Newest:         true,
+		Marker:         models.MarkerRead,
+	})
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
@@ -105,7 +115,12 @@ func (t *EntriesSuite) TestMarkAll() {
 
 	t.service.MarkAll(models.MarkerRead, t.user.ID)
 
-	entries, _ := t.entriesRepo.List(t.user.ID, "", 2, true, models.MarkerRead)
+	entries, _ := t.entriesRepo.List(t.user.ID, models.Page{
+		ContinuationId: "",
+		Count:          2,
+		Newest:         true,
+		Marker:         models.MarkerRead,
+	})
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }

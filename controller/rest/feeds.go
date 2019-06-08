@@ -179,17 +179,16 @@ func (s *FeedsController) GetFeedEntries(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	marker := models.MarkerFromString(params.Marker)
-
 	feedID := c.Param("feedID")
-	entries, next := s.feeds.Entries(
-		feedID,
-		params.ContinuationID,
-		params.Count,
-		convertOrderByParamToValue(params.OrderBy),
-		marker,
-		userID,
-	)
+
+	page := models.Page{
+		ContinuationId: params.ContinuationID,
+		Count:          params.Count,
+		Newest:         convertOrderByParamToValue(params.OrderBy),
+		Marker:         models.MarkerFromString(params.Marker),
+	}
+
+	entries, next := s.feeds.Entries(feedID, userID, page)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"entries":        entries,
