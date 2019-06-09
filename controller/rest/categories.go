@@ -198,17 +198,16 @@ func (s *CategoriesController) GetCategoryEntries(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	marker := models.MarkerFromString(params.Marker)
-
 	ctgID := c.Param("categoryID")
 
-	entries, next, err := s.categories.Entries(
-		ctgID,
-		params.ContinuationID,
-		params.Count,
-		convertOrderByParamToValue(params.OrderBy),
-		marker,
-		userID)
+	page := models.Page{
+		ContinuationID: params.ContinuationID,
+		Count:          params.Count,
+		Newest:         convertOrderByParamToValue(params.OrderBy),
+		Marker:         models.MarkerFromString(params.Marker),
+	}
+
+	entries, next, err := s.categories.Entries(ctgID, userID, page)
 	if err == services.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {

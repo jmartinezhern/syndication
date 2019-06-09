@@ -148,7 +148,12 @@ func (s *FeedsSuite) TestMark() {
 	err := s.repo.Mark(s.user.ID, feed.ID, models.MarkerRead)
 	s.NoError(err)
 
-	entries, _ := NewEntries(s.db).ListFromFeed(s.user.ID, feed.ID, "", 5, false, models.MarkerRead)
+	entries, _ := NewEntries(s.db).ListFromFeed(s.user.ID, feed.ID, models.Page{
+		ContinuationID: "",
+		Count:          5,
+		Newest:         false,
+		Marker:         models.MarkerRead,
+	})
 	s.Len(entries, 5)
 }
 

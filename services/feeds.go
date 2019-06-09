@@ -47,7 +47,7 @@ type (
 		Mark(id string, marker models.Marker, userID string) error
 
 		// Entries returns all entry items associated to a feed
-		Entries(id string, continuationID string, count int, order bool, marker models.Marker, userID string) ([]models.Entry, string)
+		Entries(id, userID string, page models.Page) ([]models.Entry, string)
 
 		// Stats returns statistics of a feed
 		Stats(id string, userID string) (models.Stats, error)
@@ -166,13 +166,8 @@ func (f FeedService) Mark(id string, marker models.Marker, userID string) error 
 }
 
 // Entries returns all entry items associated to a feed
-func (f FeedService) Entries(
-	id, continuationID string,
-	count int,
-	order bool,
-	marker models.Marker,
-	userID string) (entries []models.Entry, next string) {
-	return f.entriesRepo.ListFromFeed(userID, id, continuationID, count, order, marker)
+func (f FeedService) Entries(id, userID string, page models.Page) (entries []models.Entry, next string) {
+	return f.entriesRepo.ListFromFeed(userID, id, page)
 }
 
 // Stats returns statistics of a feed

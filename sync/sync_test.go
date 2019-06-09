@@ -129,7 +129,12 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 	serv := NewService(testSyncInterval, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
 	serv.SyncUser(s.user.ID)
 
-	entries, _ = s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, "", 5, true, models.MarkerAny)
+	entries, _ = s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, models.Page{
+		ContinuationID: "",
+		Count:          5,
+		Newest:         true,
+		Marker:         models.MarkerAny,
+	})
 	s.Require().NoError(err)
 	s.Len(entries, 0)
 }
@@ -145,7 +150,12 @@ func (s *SyncTestSuite) TestSyncUser() {
 	serv := NewService(testSyncInterval, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
 	serv.SyncUser(s.user.ID)
 
-	entries, _ := s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, "", 5, true, models.MarkerAny)
+	entries, _ := s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, models.Page{
+		ContinuationID: "",
+		Count:          5,
+		Newest:         true,
+		Marker:         models.MarkerAny,
+	})
 	s.Len(entries, 5)
 }
 
@@ -173,7 +183,12 @@ func (s *SyncTestSuite) TestSyncUsers() {
 	users = users[1:]
 
 	for idx := range users {
-		entries, _ := s.entriesRepo.List(users[idx].ID, "", 100, true, models.MarkerAny)
+		entries, _ := s.entriesRepo.List(users[idx].ID, models.Page{
+			ContinuationID: "",
+			Count:          100,
+			Newest:         true,
+			Marker:         models.MarkerAny,
+		})
 		s.Len(entries, 5)
 	}
 }
@@ -206,7 +221,12 @@ func (s *SyncTestSuite) TestSyncService() {
 	users = users[1:]
 
 	for idx := range users {
-		entries, _ := s.entriesRepo.List(users[idx].ID, "", 100, true, models.MarkerAny)
+		entries, _ := s.entriesRepo.List(users[idx].ID, models.Page{
+			ContinuationID: "",
+			Count:          100,
+			Newest:         true,
+			Marker:         models.MarkerAny,
+		})
 		s.Len(entries, 5)
 	}
 }

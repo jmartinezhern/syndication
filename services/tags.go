@@ -47,7 +47,7 @@ type (
 		Tag(id string, userID string) (models.Tag, bool)
 
 		// Entries returns all entries associated with a tag with id
-		Entries(id string, continuationID string, count int, order bool, marker models.Marker, userID string) ([]models.Entry, string)
+		Entries(id, userID string, page models.Page) ([]models.Entry, string)
 	}
 
 	// TagsService implementation
@@ -132,11 +132,6 @@ func (t TagsService) Tag(id, userID string) (models.Tag, bool) {
 }
 
 // Entries returns all entries associated with a tag with id
-func (t TagsService) Entries(
-	id, continuationID string,
-	count int,
-	order bool,
-	marker models.Marker,
-	userID string) (entries []models.Entry, next string) {
-	return t.entriesRepo.ListFromTags(userID, []string{id}, continuationID, count, order, marker)
+func (t TagsService) Entries(id, userID string, page models.Page) (entries []models.Entry, next string) {
+	return t.entriesRepo.ListFromTags(userID, []string{id}, page)
 }

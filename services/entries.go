@@ -31,7 +31,7 @@ type (
 		Entry(id string, userID string) (models.Entry, error)
 
 		// Entries returns all entries belong to a user with a marker
-		Entries(continuationID string, count int, order bool, marker models.Marker, userID string) ([]models.Entry, string)
+		Entries(userID string, page models.Page) ([]models.Entry, string)
 
 		// Mark entry with id
 		Mark(id string, marker models.Marker, userID string) error
@@ -71,13 +71,8 @@ func (e EntriesService) Entry(id, userID string) (models.Entry, error) {
 }
 
 // Entries returns all entries belong to a user with a marker
-func (e EntriesService) Entries(
-	continuationID string,
-	count int,
-	order bool,
-	marker models.Marker,
-	userID string) (entries []models.Entry, next string) {
-	return e.repo.List(userID, continuationID, count, order, marker)
+func (e EntriesService) Entries(userID string, page models.Page) (entries []models.Entry, next string) {
+	return e.repo.List(userID, page)
 }
 
 // Mark entry with id

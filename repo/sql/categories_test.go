@@ -216,7 +216,12 @@ func (s *CategoriesSuite) TestMark() {
 	err := s.repo.Mark(s.user.ID, ctg.ID, models.MarkerRead)
 	s.NoError(err)
 
-	entries, _ := NewEntries(s.db).ListFromCategory(s.user.ID, ctg.ID, "", 5, false, models.MarkerRead)
+	entries, _ := NewEntries(s.db).ListFromCategory(s.user.ID, ctg.ID, models.Page{
+		ContinuationID: "",
+		Count:          5,
+		Newest:         false,
+		Marker:         models.MarkerRead,
+	})
 	s.Len(entries, 5)
 }
 

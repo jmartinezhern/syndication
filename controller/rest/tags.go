@@ -175,15 +175,14 @@ func (s *TagsController) GetEntriesFromTag(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	marker := models.MarkerFromString(params.Marker)
+	page := models.Page{
+		ContinuationID: params.ContinuationID,
+		Count:          params.Count,
+		Newest:         convertOrderByParamToValue(params.OrderBy),
+		Marker:         models.MarkerFromString(params.Marker),
+	}
 
-	entries, next := s.tags.Entries(
-		c.Param("tagID"),
-		params.ContinuationID,
-		params.Count,
-		convertOrderByParamToValue(params.OrderBy),
-		marker,
-		userID)
+	entries, next := s.tags.Entries(c.Param("tagID"), userID, page)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"entries":        entries,

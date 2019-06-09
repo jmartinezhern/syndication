@@ -113,7 +113,12 @@ func (t *FeedsSuite) TestMarkFeed() {
 	err := t.service.Mark(t.feed.ID, models.MarkerRead, t.user.ID)
 	t.NoError(err)
 
-	entries, _ := sql.NewEntries(t.db).ListFromFeed(t.user.ID, t.feed.ID, "", 1, false, models.MarkerAny)
+	entries, _ := sql.NewEntries(t.db).ListFromFeed(t.user.ID, t.feed.ID, models.Page{
+		ContinuationID: "",
+		Count:          1,
+		Newest:         false,
+		Marker:         models.MarkerAny,
+	})
 	t.Require().Len(entries, 1)
 	t.Equal(entry.ID, entries[0].ID)
 	t.Equal(entry.Title, entries[0].Title)
@@ -133,13 +138,23 @@ func (t *FeedsSuite) TestFeedEntries() {
 	}
 	t.entriesRepo.Create(t.user.ID, &entry)
 
-	entries, _ := t.service.Entries(t.feed.ID, "", 1, true, models.MarkerAny, t.user.ID)
+	entries, _ := t.service.Entries(t.feed.ID, t.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          1,
+		Newest:         true,
+		Marker:         models.MarkerAny,
+	})
 	t.Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
 
 func (t *FeedsSuite) TestMissingFeedEntries() {
-	entries, _ := t.service.Entries(t.feed.ID, "", 1, true, models.MarkerAny, t.user.ID)
+	entries, _ := t.service.Entries(t.feed.ID, t.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          1,
+		Newest:         true,
+		Marker:         models.MarkerAny,
+	})
 	t.Len(entries, 0)
 }
 

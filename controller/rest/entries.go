@@ -78,15 +78,14 @@ func (s *EntriesController) GetEntries(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	marker := models.MarkerFromString(params.Marker)
+	page := models.Page{
+		ContinuationID: params.ContinuationID,
+		Count:          params.Count,
+		Newest:         convertOrderByParamToValue(params.OrderBy),
+		Marker:         models.MarkerFromString(params.Marker),
+	}
 
-	entries, next := s.entries.Entries(
-		params.ContinuationID,
-		params.Count,
-		convertOrderByParamToValue(params.OrderBy),
-		marker,
-		userID,
-	)
+	entries, next := s.entries.Entries(userID, page)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"entries":        entries,
