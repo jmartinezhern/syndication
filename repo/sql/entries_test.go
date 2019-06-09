@@ -70,7 +70,7 @@ func (s *EntriesSuite) TestList() {
 	}
 
 	entries, next := s.repo.List(s.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          2,
 		Newest:         false,
 		Marker:         models.MarkerUnread,
@@ -81,7 +81,7 @@ func (s *EntriesSuite) TestList() {
 	s.Equal("Test Entry 1", entries[1].Title)
 
 	entries, _ = s.repo.List(s.user.ID, models.Page{
-		ContinuationId: next,
+		ContinuationID: next,
 		Count:          3,
 		Newest:         false,
 		Marker:         models.MarkerUnread,
@@ -125,7 +125,7 @@ func (s *EntriesSuite) TestListFromCategory() {
 	}
 
 	entries, next := s.repo.ListFromCategory(s.user.ID, ctg.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          2,
 		Newest:         false,
 		Marker:         models.MarkerUnread,
@@ -136,7 +136,7 @@ func (s *EntriesSuite) TestListFromCategory() {
 	s.Equal("Entry 1", entries[1].Title)
 
 	entries, _ = s.repo.ListFromCategory(s.user.ID, ctg.ID, models.Page{
-		ContinuationId: next,
+		ContinuationID: next,
 		Count:          3,
 		Newest:         false,
 		Marker:         models.MarkerUnread,
@@ -172,7 +172,7 @@ func (s *EntriesSuite) TestListFromFeed() {
 	}
 
 	entries, next := s.repo.ListFromFeed(s.user.ID, feed.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          2,
 		Newest:         false,
 		Marker:         models.MarkerUnread,
@@ -182,7 +182,7 @@ func (s *EntriesSuite) TestListFromFeed() {
 	s.Equal("Entry 1", entries[1].Title)
 
 	entries, _ = s.repo.ListFromFeed(s.user.ID, feed.ID, models.Page{
-		ContinuationId: next,
+		ContinuationID: next,
 		Count:          3,
 		Newest:         false,
 		Marker:         models.MarkerUnread,
@@ -196,7 +196,7 @@ func (s *EntriesSuite) TestListFromFeed() {
 
 func (s *EntriesSuite) TestEntriesWithMissingCategory() {
 	entries, _ := s.repo.ListFromCategory(s.user.ID, "bogus", models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          5,
 		Newest:         true,
 		Marker:         models.MarkerUnread,
@@ -234,7 +234,7 @@ func (s *EntriesSuite) TestMark() {
 	s.NoError(err)
 
 	entries, _ := s.repo.List(s.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         false,
 		Marker:         models.MarkerRead,
@@ -256,7 +256,7 @@ func (s *EntriesSuite) TestMarkAll() {
 	s.repo.MarkAll(s.user.ID, models.MarkerRead)
 
 	entries, _ := s.repo.List(s.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         false,
 		Marker:         models.MarkerRead,
@@ -303,7 +303,7 @@ func (s *EntriesSuite) TestListFromTags() {
 	s.NoError(s.repo.TagEntries(s.user.ID, secondTagID, []string{entries[1].ID}))
 
 	taggedEntries, _ := s.repo.ListFromTags(s.user.ID, []string{firstTagID, secondTagID}, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          2,
 		Newest:         true,
 		Marker:         models.MarkerAny,

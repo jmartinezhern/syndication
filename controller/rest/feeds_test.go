@@ -279,7 +279,7 @@ func (c *FeedsControllerSuite) TestMarkFeed() {
 	c.Equal(http.StatusNoContent, rec.Code)
 
 	entries, _ := c.entriesRepo.List(c.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         false,
 		Marker:         models.MarkerRead,

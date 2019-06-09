@@ -217,7 +217,7 @@ func (s *CategoriesSuite) TestMark() {
 	s.NoError(err)
 
 	entries, _ := NewEntries(s.db).ListFromCategory(s.user.ID, ctg.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          5,
 		Newest:         false,
 		Marker:         models.MarkerRead,

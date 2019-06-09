@@ -198,7 +198,7 @@ func (t *CategoriesSuite) TestMarkCategory() {
 	t.NoError(err)
 
 	entries, _ := entriesRepo.List(t.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          2,
 		Newest:         true,
 		Marker:         models.MarkerRead,
@@ -235,7 +235,7 @@ func (t *CategoriesSuite) TestCategoryEntries() {
 	})
 
 	entries, _, err := t.service.Entries(ctg.ID, t.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
 		Marker:         models.MarkerUnread,
@@ -247,7 +247,7 @@ func (t *CategoriesSuite) TestCategoryEntries() {
 
 func (t *CategoriesSuite) TestEntriesForMissingCategory() {
 	_, _, err := t.service.Entries("bogus", t.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
 		Marker:         models.MarkerAny,

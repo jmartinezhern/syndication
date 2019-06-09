@@ -130,7 +130,7 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 	serv.SyncUser(s.user.ID)
 
 	entries, _ = s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          5,
 		Newest:         true,
 		Marker:         models.MarkerAny,
@@ -151,7 +151,7 @@ func (s *SyncTestSuite) TestSyncUser() {
 	serv.SyncUser(s.user.ID)
 
 	entries, _ := s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          5,
 		Newest:         true,
 		Marker:         models.MarkerAny,
@@ -184,7 +184,7 @@ func (s *SyncTestSuite) TestSyncUsers() {
 
 	for idx := range users {
 		entries, _ := s.entriesRepo.List(users[idx].ID, models.Page{
-			ContinuationId: "",
+			ContinuationID: "",
 			Count:          100,
 			Newest:         true,
 			Marker:         models.MarkerAny,
@@ -222,7 +222,7 @@ func (s *SyncTestSuite) TestSyncService() {
 
 	for idx := range users {
 		entries, _ := s.entriesRepo.List(users[idx].ID, models.Page{
-			ContinuationId: "",
+			ContinuationID: "",
 			Count:          100,
 			Newest:         true,
 			Marker:         models.MarkerAny,

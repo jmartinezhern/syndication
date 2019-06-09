@@ -201,10 +201,10 @@ func (s *CategoriesController) GetCategoryEntries(c echo.Context) error {
 	ctgID := c.Param("categoryID")
 
 	page := models.Page{
-		ContinuationId: params.ContinuationID,
-		Count: params.Count,
-		Newest: convertOrderByParamToValue(params.OrderBy),
-		Marker: models.MarkerFromString(params.Marker),
+		ContinuationID: params.ContinuationID,
+		Count:          params.Count,
+		Newest:         convertOrderByParamToValue(params.OrderBy),
+		Marker:         models.MarkerFromString(params.Marker),
 	}
 
 	entries, next, err := s.categories.Entries(ctgID, userID, page)

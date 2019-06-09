@@ -149,7 +149,7 @@ func (s *FeedsSuite) TestMark() {
 	s.NoError(err)
 
 	entries, _ := NewEntries(s.db).ListFromFeed(s.user.ID, feed.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          5,
 		Newest:         false,
 		Marker:         models.MarkerRead,

@@ -63,8 +63,8 @@ func (e Entries) EntryWithGUID(userID, guid string) (entry models.Entry, found b
 func (e Entries) List(userID string, page models.Page) (entries []models.Entry, next string) {
 	query := e.db.db.Model(&models.User{ID: userID})
 
-	if page.ContinuationId != "" {
-		entry, found := e.EntryWithID(userID, page.ContinuationId)
+	if page.ContinuationID != "" {
+		entry, found := e.EntryWithID(userID, page.ContinuationID)
 		if found {
 			query = query.Where("created_at >= ?", entry.CreatedAt)
 		}
@@ -134,9 +134,9 @@ func (e Entries) paginateList(userID string, query *gorm.DB, page models.Page) (
 		query = query.Order("published ASC")
 	}
 
-	if page.ContinuationId != "" {
+	if page.ContinuationID != "" {
 		entry := models.Entry{}
-		if !e.db.db.Model(&models.User{ID: userID}).Where("id = ?", page.ContinuationId).Related(&entry).RecordNotFound() {
+		if !e.db.db.Model(&models.User{ID: userID}).Where("id = ?", page.ContinuationID).Related(&entry).RecordNotFound() {
 			query = query.Where("created_at >= ?", entry.CreatedAt)
 		}
 	}

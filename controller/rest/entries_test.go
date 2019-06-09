@@ -149,7 +149,7 @@ func (c *EntriesControllerSuite) TestMarkEntry() {
 	c.entriesRepo.Create(c.user.ID, &entry)
 
 	entries, _ := c.entriesRepo.List(c.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          2,
 		Newest:         true,
 		Marker:         models.MarkerRead,
@@ -202,7 +202,7 @@ func (c *EntriesControllerSuite) TestMarkAllEntries() {
 	c.entriesRepo.Create(c.user.ID, &entry)
 
 	entries, _ := c.entriesRepo.List(c.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          2,
 		Newest:         true,
 		Marker:         models.MarkerRead,

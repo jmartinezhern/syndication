@@ -182,7 +182,7 @@ func (s *FeedsController) GetFeedEntries(c echo.Context) error {
 	feedID := c.Param("feedID")
 
 	page := models.Page{
-		ContinuationId: params.ContinuationID,
+		ContinuationID: params.ContinuationID,
 		Count:          params.Count,
 		Newest:         convertOrderByParamToValue(params.OrderBy),
 		Marker:         models.MarkerFromString(params.Marker),

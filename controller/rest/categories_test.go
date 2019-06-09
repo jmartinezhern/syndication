@@ -301,7 +301,7 @@ func (c *CategoriesControllerSuite) TestMarkCategory() {
 	c.Equal(http.StatusNoContent, rec.Code)
 
 	entries, _ := entriesRepo.List(c.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
 		Marker:         models.MarkerRead,

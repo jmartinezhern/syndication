@@ -218,9 +218,9 @@ type (
 	}
 
 	Page struct {
-		ContinuationId string
-		Count int
-		Newest bool
-		Marker Marker
+		ContinuationID string
+		Count          int
+		Newest         bool
+		Marker         Marker
 	}
 )

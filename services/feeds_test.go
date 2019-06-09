@@ -114,7 +114,7 @@ func (t *FeedsSuite) TestMarkFeed() {
 	t.NoError(err)
 
 	entries, _ := sql.NewEntries(t.db).ListFromFeed(t.user.ID, t.feed.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         false,
 		Marker:         models.MarkerAny,
@@ -139,7 +139,7 @@ func (t *FeedsSuite) TestFeedEntries() {
 	t.entriesRepo.Create(t.user.ID, &entry)
 
 	entries, _ := t.service.Entries(t.feed.ID, t.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
 		Marker:         models.MarkerAny,
@@ -150,7 +150,7 @@ func (t *FeedsSuite) TestFeedEntries() {
 
 func (t *FeedsSuite) TestMissingFeedEntries() {
 	entries, _ := t.service.Entries(t.feed.ID, t.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
 		Marker:         models.MarkerAny,

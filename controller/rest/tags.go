@@ -176,7 +176,7 @@ func (s *TagsController) GetEntriesFromTag(c echo.Context) error {
 	}
 
 	page := models.Page{
-		ContinuationId: params.ContinuationID,
+		ContinuationID: params.ContinuationID,
 		Count:          params.Count,
 		Newest:         convertOrderByParamToValue(params.OrderBy),
 		Marker:         models.MarkerFromString(params.Marker),

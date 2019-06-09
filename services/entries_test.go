@@ -68,7 +68,7 @@ func (t *EntriesSuite) TestEntries() {
 	t.entriesRepo.Create(t.user.ID, &entry)
 
 	entries, _ := t.service.Entries(t.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
 		Marker:         models.MarkerAny,
@@ -90,7 +90,7 @@ func (t *EntriesSuite) TestMarkEntry() {
 	t.NoError(err)
 
 	entries, _ := t.entriesRepo.List(t.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          2,
 		Newest:         true,
 		Marker:         models.MarkerRead,
@@ -116,7 +116,7 @@ func (t *EntriesSuite) TestMarkAll() {
 	t.service.MarkAll(models.MarkerRead, t.user.ID)
 
 	entries, _ := t.entriesRepo.List(t.user.ID, models.Page{
-		ContinuationId: "",
+		ContinuationID: "",
 		Count:          2,
 		Newest:         true,
 		Marker:         models.MarkerRead,
