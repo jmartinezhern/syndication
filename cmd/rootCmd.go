@@ -40,12 +40,6 @@ type (
 		Path string
 	}
 
-	// Admin configuration
-	Admin struct {
-		Enable     bool
-		SocketPath string `mapstructure:"socket_path"`
-	}
-
 	// Host configuration
 	Host struct {
 		Address string
@@ -72,7 +66,6 @@ type (
 		AllowRegistrations bool   `mapstructure:"allow_registrations"`
 		Database           Database
 		Host               Host
-		Admin              Admin
 	}
 )
 

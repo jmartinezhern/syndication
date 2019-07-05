@@ -18,8 +18,6 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
 	"os"
 	"os/signal"
 
@@ -47,27 +45,6 @@ func main() {
 
 	server := rest.NewServer()
 
-	adminsRepo := sql.NewAdmins(db)
-	adminsService := services.NewAdminsService(adminsRepo)
-
-	if admins, _ := adminsRepo.List("", 1); len(admins) == 0 {
-		reader := bufio.NewReader(os.Stdin)
-
-		fmt.Println("An initial admin needs to be configured: ")
-
-		fmt.Print("Username: ")
-		username, _ := reader.ReadString('\n')
-
-		fmt.Print("Password: ")
-		password, _ := reader.ReadString('\n')
-
-		_, err := adminsService.NewAdmin(username[:len(username)-1], password[:len(password)-1])
-		if err != nil {
-			log.Error(err)
-			os.Exit(-1)
-		}
-	}
-
 	usersRepo := sql.NewUsers(db)
 	ctgsRepo := sql.NewCategories(db)
 	entriesRepo := sql.NewEntries(db)
@@ -79,10 +56,8 @@ func main() {
 	feedsService := services.NewFeedsService(feedsRepo, ctgsRepo, entriesRepo)
 	entriesService := services.NewEntriesService(entriesRepo)
 	tagsService := services.NewTagsService(tagsRepo, entriesRepo)
-	adminAuthService := services.NewAdminAuthService(config.AuthSecret, adminsRepo)
 	usersService := services.NewUsersService(usersRepo)
 
-	server.RegisterAdminAuthService(adminAuthService, config.AuthSecret)
 	server.RegisterAuthService(authService, config.AuthSecret, config.AllowRegistrations)
 	server.RegisterUsersService(usersService)
 	server.RegisterCategoriesService(ctgsService)

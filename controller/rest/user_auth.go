@@ -30,8 +30,6 @@ import (
 
 var (
 	unauthorizedPaths = []string{
-		"/v1/admin/login",
-		"/v1/admin/register",
 		"/v1/auth/login",
 		"/v1/auth/register",
 		"/v1/auth/renew",

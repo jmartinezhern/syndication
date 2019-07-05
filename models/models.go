@@ -60,19 +60,6 @@ func MarkerFromString(marker string) Marker {
 }
 
 type (
-	Admin struct {
-		ID        ID         `json:"id" gorm:"primary_key"`
-		CreatedAt time.Time  `json:"created_at"`
-		UpdatedAt time.Time  `json:"updated_at"`
-		DeletedAt *time.Time `json:"deleted_at" sql:"index"`
-
-		APIKeys []APIKey `json:"-"`
-
-		Username     string `json:"username,required"`
-		Email        string `json:"email,optional"`
-		PasswordHash []byte `json:"-"`
-		PasswordSalt []byte `json:"-"`
-	}
 	// User represents a user and owner of all other entities.
 	User struct {
 		ID        ID         `json:"id" gorm:"primary_key"`
