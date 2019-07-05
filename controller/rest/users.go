@@ -40,51 +40,14 @@ func NewUsersController(service services.Users, e *echo.Echo) *UsersController {
 		service,
 	}
 
-	v1.POST("/users", controller.CreateUser)
-	v1.GET("/users", controller.ListUsers)
-	v1.GET("/users/:userID", controller.GetUser)
-	v1.DELETE("/users/:userID", controller.DeleteUser)
+	v1.GET("/users", controller.GetUser)
+	v1.DELETE("/users", controller.DeleteUser)
 
 	return &controller
 }
 
-func (c *UsersController) CreateUser(ctx echo.Context) error {
-	type NewUser struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-
-	var user NewUser
-	if err := ctx.Bind(&user); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest)
-	}
-
-	newUser, err := c.service.NewUser(user.Username, user.Password)
-	if err == services.ErrUsernameConflicts {
-		return echo.NewHTTPError(http.StatusConflict)
-	} else if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError)
-	}
-
-	return ctx.JSON(http.StatusCreated, newUser)
-}
-
-func (c *UsersController) ListUsers(ctx echo.Context) error {
-	params := paginationParams{}
-	if err := ctx.Bind(&params); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest)
-	}
-
-	users, next := c.service.Users(params.ContinuationID, params.Count)
-
-	return ctx.JSON(http.StatusOK, map[string]interface{}{
-		"users":          users,
-		"continuationID": next,
-	})
-}
-
 func (c *UsersController) DeleteUser(ctx echo.Context) error {
-	userID := ctx.Param("userID")
+	userID := ctx.Get(userContextKey).(string)
 
 	err := c.service.DeleteUser(userID)
 	if err == services.ErrUserNotFound {
@@ -97,7 +60,7 @@ func (c *UsersController) DeleteUser(ctx echo.Context) error {
 }
 
 func (c *UsersController) GetUser(ctx echo.Context) error {
-	userID := ctx.Param("userID")
+	userID := ctx.Get(userContextKey).(string)
 
 	user, found := c.service.User(userID)
 	if !found {

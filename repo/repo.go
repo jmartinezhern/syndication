@@ -30,15 +30,6 @@ var (
 )
 
 type (
-	Admins interface {
-		Create(admin *models.Admin)
-		Update(id string, admin *models.Admin) error
-		AdminWithName(name string) (models.Admin, bool)
-		AdminWithID(id string) (models.Admin, bool)
-		List(continuationID string, count int) ([]models.Admin, string)
-		Delete(id string) error
-	}
-
 	Categories interface {
 		Create(userID string, ctg *models.Category)
 		Update(userID string, ctg *models.Category) error

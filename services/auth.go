@@ -47,12 +47,6 @@ type (
 		AuthSecret string
 		repo       repo.Users
 	}
-
-	// AdminAuthService implements Auth service for admins
-	AdminAuthService struct {
-		AuthSecret string
-		repo       repo.Admins
-	}
 )
 
 const (
@@ -130,54 +124,4 @@ func (a AuthService) Renew(token string) (models.APIKey, error) {
 	}
 
 	return utils.NewAPIKey(a.AuthSecret, models.AccessKey, user.ID)
-}
-
-func NewAdminAuthService(authSecret string, adminsRepo repo.Admins) AdminAuthService {
-	return AdminAuthService{
-		authSecret,
-		adminsRepo,
-	}
-}
-
-// Login a user
-func (a AdminAuthService) Login(username, password string) (models.APIKeyPair, error) {
-	admin, found := a.repo.AdminWithName(username)
-	if !found {
-		return models.APIKeyPair{}, ErrUserUnauthorized
-	}
-
-	if !utils.VerifyPasswordHash(password, admin.PasswordHash, admin.PasswordSalt) {
-		return models.APIKeyPair{}, ErrUserUnauthorized
-	}
-
-	keys, err := utils.NewKeyPair(a.AuthSecret, admin.ID)
-	if err != nil {
-		return models.APIKeyPair{}, err
-	}
-
-	return keys, nil
-}
-
-// Register a user
-func (a AdminAuthService) Register(username, password string) error {
-	return errors.New("not implemented")
-}
-
-// Renew an API token
-func (a AdminAuthService) Renew(token string) (models.APIKey, error) {
-	claims, err := utils.ParseJWTClaims(a.AuthSecret, signingMethod, token)
-	if err != nil {
-		return models.APIKey{}, ErrUserUnauthorized
-	}
-
-	if claims["type"].(string) != "refresh" {
-		return models.APIKey{}, ErrUserUnauthorized
-	}
-
-	admin, found := a.repo.AdminWithID(claims["sub"].(string))
-	if !found {
-		return models.APIKey{}, ErrUserUnauthorized
-	}
-
-	return utils.NewAPIKey(a.AuthSecret, models.AccessKey, admin.ID)
 }

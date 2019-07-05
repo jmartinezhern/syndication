@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -46,71 +45,6 @@ type (
 	}
 )
 
-func (s *UsersSuite) TestNewUser() {
-	user := `{ "username": "gopher", "password": "Passw0rd!" }`
-
-	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(user))
-	req.Header.Set("Content-Type", "application/json")
-
-	rec := httptest.NewRecorder()
-	ctx := s.e.NewContext(req, rec)
-
-	ctx.SetPath("/v1/users")
-
-	s.NoError(s.controller.CreateUser(ctx))
-	s.Equal(http.StatusCreated, rec.Code)
-}
-
-func (s *UsersSuite) TestNewConflictingUser() {
-	s.usersRepo.Create(&models.User{
-		ID:       utils.CreateID(),
-		Username: "test",
-	})
-
-	user := `{ "username": "test", "password": "password!" }`
-
-	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(user))
-	req.Header.Set("Content-Type", "application/json")
-
-	rec := httptest.NewRecorder()
-	ctx := s.e.NewContext(req, rec)
-
-	ctx.SetPath("/v1/users")
-
-	s.EqualError(
-		s.controller.CreateUser(ctx),
-		echo.NewHTTPError(http.StatusConflict).Error(),
-	)
-}
-
-func (s *UsersSuite) TestListUsers() {
-	user := models.User{
-		ID:       utils.CreateID(),
-		Username: "gopher",
-	}
-	s.usersRepo.Create(&user)
-
-	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
-
-	rec := httptest.NewRecorder()
-	ctx := s.e.NewContext(req, rec)
-
-	ctx.SetPath("/v1/users")
-
-	s.NoError(s.controller.ListUsers(ctx))
-	s.Equal(http.StatusOK, rec.Code)
-
-	type Users struct {
-		Users []models.User `json:"users"`
-	}
-
-	var users Users
-	s.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &users))
-
-	s.Require().Len(users.Users, 1)
-	s.Equal(user.Username, users.Users[0].Username)
-}
-
 func (s *UsersSuite) TestDeleteUser() {
 	user := models.User{
 		ID:       utils.CreateID(),
@@ -122,10 +56,9 @@ func (s *UsersSuite) TestDeleteUser() {
 
 	rec := httptest.NewRecorder()
 	ctx := s.e.NewContext(req, rec)
-	ctx.SetParamNames("userID")
-	ctx.SetParamValues(user.ID)
+	ctx.Set(userContextKey, user.ID)
 
-	ctx.SetPath("/v1/users/:userID")
+	ctx.SetPath("/v1/users")
 
 	s.NoError(s.controller.DeleteUser(ctx))
 	s.Equal(http.StatusNoContent, rec.Code)
@@ -136,10 +69,9 @@ func (s *UsersSuite) TestDeleteMissingUser() {
 
 	rec := httptest.NewRecorder()
 	ctx := s.e.NewContext(req, rec)
-	ctx.SetParamNames("userID")
-	ctx.SetParamValues("bogus")
+	ctx.Set(userContextKey, "bogus")
 
-	ctx.SetPath("/v1/users/:userID")
+	ctx.SetPath("/v1/users")
 
 	s.EqualError(
 		s.controller.DeleteUser(ctx),
@@ -158,10 +90,9 @@ func (s *UsersSuite) TestGetUser() {
 
 	rec := httptest.NewRecorder()
 	ctx := s.e.NewContext(req, rec)
-	ctx.SetParamNames("userID")
-	ctx.SetParamValues(user.ID)
+	ctx.Set(userContextKey, user.ID)
 
-	ctx.SetPath("/v1/users/:userID")
+	ctx.SetPath("/v1/users")
 
 	s.NoError(s.controller.GetUser(ctx))
 
@@ -175,10 +106,9 @@ func (s *UsersSuite) TestGetMissingUser() {
 
 	rec := httptest.NewRecorder()
 	ctx := s.e.NewContext(req, rec)
-	ctx.SetParamNames("userID")
-	ctx.SetParamValues("bogus")
+	ctx.Set(userContextKey, "bogus")
 
-	ctx.SetPath("/v1/users/:userID")
+	ctx.SetPath("/v1/users")
 
 	s.EqualError(
 		s.controller.GetUser(ctx),

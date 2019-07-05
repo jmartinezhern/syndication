@@ -18,8 +18,6 @@
 package sql
 
 import (
-	"sync"
-
 	"github.com/jinzhu/gorm"
 	// GORM dialect packages
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -35,20 +33,6 @@ type (
 	}
 )
 
-var (
-	once sync.Once
-
-	instance *DB
-)
-
-func GetInstance(dbType, connection string) *DB {
-	once.Do(func() {
-		instance = NewDB(dbType, connection)
-	})
-
-	return instance
-}
-
 func NewDB(dbType, connection string) *DB {
 	gormDB, err := gorm.Open(dbType, connection)
 	if err != nil {
@@ -61,7 +45,6 @@ func NewDB(dbType, connection string) *DB {
 	gormDB.AutoMigrate(&models.Entry{})
 	gormDB.AutoMigrate(&models.Tag{})
 	gormDB.AutoMigrate(&models.APIKey{})
-	gormDB.AutoMigrate(&models.Admin{})
 
 	return &DB{
 		db: gormDB,

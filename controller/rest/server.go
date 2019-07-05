@@ -41,7 +41,6 @@ const (
 
 var (
 	usersController      *UsersController
-	adminAuthController  *AdminAuthController
 	authController       *AuthController
 	feedsController      *FeedsController
 	categoriesController *CategoriesController
@@ -140,10 +139,6 @@ func (s *Server) registerMiddleware() {
 	}))
 
 	s.handle.Use(middleware.Logger())
-}
-
-func (s *Server) RegisterAdminAuthService(auth services.Auth, secret string) {
-	adminAuthController = NewAdminAuthController(auth, secret, s.handle)
 }
 
 func (s *Server) RegisterAuthService(auth services.Auth, secret string, allowRegistration bool) {
