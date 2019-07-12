@@ -18,10 +18,10 @@
 package sync
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
@@ -35,16 +35,90 @@ import (
 )
 
 const (
-	rssFeedTag = "123456"
+	rssFile = `
+	<rss>
+	  <channel>
+	    <title>RSS Test</title>
+	    <link>http://localhost:8090</link>
+	    <author>webmaster@example.com</author>
+	    <description>Testing rss feeds</description>
+	    <language>en</language>
+	    <lastBuildDate></lastBuildDate>
+	    <item>
+	      <title>Item 1</title>
+	      <link>http://localhost:8090/item_1</link>
+	      <description>Single test item</description>
+	      <author>jmartinezhern</author>
+	      <guid>item1@test</guid>
+	      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
+	      <source>http://localhost:8090/rss.xml</source>
+	    </item>
+	    <item>
+	      <title>Item 2</title>
+	      <link>http://localhost:8090/item_2</link>
+	      <description>Single test item</description>
+	      <author>jmartinezhern</author>
+	      <guid>item2@test</guid>
+	      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
+	      <source>http://localhost:8090/rss.xml</source>
+	    </item>
+	    <item>
+	      <title>Item 3</title>
+	      <link>http://localhost:8090/item_3</link>
+	      <description>Single test item</description>
+	      <author>jmartinezhern</author>
+	      <guid>item3@test</guid>
+	      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
+	      <source>http://localhost:8090/rss.xml</source>
+	    </item>
+	    <item>
+	      <title>Item 4</title>
+	      <link>http://localhost:8090/item_4</link>
+	      <description>Single test item</description>
+	      <author>jmartinezhern</author>
+	      <guid>item4@test</guid>
+	      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
+	      <source>http://localhost:8090/rss.xml</source>
+	    </item>
+	    <item>
+	      <title>Item 5</title>
+	      <link>http://localhost:8090/item_5</link>
+	      <description>Single test item</description>
+	      <author>jmartinezhern</author>
+	      <guid>item5@test</guid>
+	      <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
+	      <source>http://localhost:8090/rss.xml</source>
+	    </item>
+	  </channel>
+	</rss>
+	`
 
-	feedPort = ":9090"
+	rssMinimalFile = `
+	<rss>
+	  <channel>
+	    <title>Science News of yesterday, today!</title>
+	    <link>https://example.com/news</link>
+	    <description>Yesterday's news in science delivered today</description>
+	    <item>
+	      <title>Item 1</title>
+	    </item>
+	    <item>
+	      <title>Item 2</title>
+	    </item>
+	    <item>
+	      <title>Item 3</title>
+	    </item>
+	    <item>
+	      <title>Item 4</title>
+	    </item>
+	    <item>
+	      <title>Item 5</title>
+	    </item>
+	  </channel>
+	</rss>
+	`
 
-	baseURL = "http://localhost"
-
-	rssMinimalURL = baseURL + feedPort + "/rss_minimal.xml"
-
-	rssURL = baseURL + feedPort + "/rss.xml"
-
+	rssFeedTag       = "123456"
 	testSyncInterval = time.Second * 5
 )
 
@@ -52,8 +126,8 @@ type (
 	SyncTestSuite struct {
 		suite.Suite
 
+		ts          *httptest.Server
 		user        *models.User
-		server      *http.Server
 		db          *sql.DB
 		ctgsRepo    repo.Categories
 		feedsRepo   repo.Feeds
@@ -70,12 +144,6 @@ func RandStringRunes(n int) string {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
 	return string(b)
-}
-
-func (s *SyncTestSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("If-None-Match") != rssFeedTag {
-		http.FileServer(http.Dir(".")).ServeHTTP(w, r)
-	}
 }
 
 func (s *SyncTestSuite) SetupTest() {
@@ -100,7 +168,7 @@ func (s *SyncTestSuite) TearDownTest() {
 }
 
 func (s *SyncTestSuite) TestPullUnreachableFeed() {
-	_, _, err := utils.PullFeed("Sync Test", baseURL+feedPort+"/bogus.xml")
+	_, _, err := utils.PullFeed("Sync Test", s.ts.URL+"/bogus.xml")
 	s.Error(err)
 }
 
@@ -113,7 +181,7 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 	feed := models.Feed{
 		ID:           utils.CreateID(),
 		Title:        "Sync Test",
-		Subscription: rssURL,
+		Subscription: s.ts.URL + "/rss.xml",
 	}
 
 	s.feedsRepo.Create(s.user.ID, &feed)
@@ -126,7 +194,7 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 		s.entriesRepo.Create(s.user.ID, &entries[idx])
 	}
 
-	serv := NewService(testSyncInterval, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
+	serv := NewService(testSyncInterval, s.feedsRepo, s.usersRepo, s.entriesRepo)
 	serv.SyncUser(s.user.ID)
 
 	entries, _ = s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, models.Page{
@@ -143,11 +211,11 @@ func (s *SyncTestSuite) TestSyncUser() {
 	feed := models.Feed{
 		ID:           utils.CreateID(),
 		Title:        "Sync Test",
-		Subscription: rssURL,
+		Subscription: s.ts.URL + "/rss.xml",
 	}
 	s.feedsRepo.Create(s.user.ID, &feed)
 
-	serv := NewService(testSyncInterval, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
+	serv := NewService(testSyncInterval, s.feedsRepo, s.usersRepo, s.entriesRepo)
 	serv.SyncUser(s.user.ID)
 
 	entries, _ := s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, models.Page{
@@ -157,40 +225,6 @@ func (s *SyncTestSuite) TestSyncUser() {
 		Marker:         models.MarkerAny,
 	})
 	s.Len(entries, 5)
-}
-
-func (s *SyncTestSuite) TestSyncUsers() {
-	for i := 0; i < 10; i++ {
-		user := models.User{
-			ID:       utils.CreateID(),
-			Username: "test" + strconv.Itoa(i),
-		}
-		s.usersRepo.Create(&user)
-
-		feed := models.Feed{
-			ID:           utils.CreateID(),
-			Title:        "Sync Test",
-			Subscription: rssMinimalURL,
-		}
-		s.feedsRepo.Create(user.ID, &feed)
-	}
-
-	serv := NewService(testSyncInterval, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
-
-	serv.SyncUsers()
-
-	users, _ := s.usersRepo.List("", 11)
-	users = users[1:]
-
-	for idx := range users {
-		entries, _ := s.entriesRepo.List(users[idx].ID, models.Page{
-			ContinuationID: "",
-			Count:          100,
-			Newest:         true,
-			Marker:         models.MarkerAny,
-		})
-		s.Len(entries, 5)
-	}
 }
 
 func (s *SyncTestSuite) TestSyncService() {
@@ -204,20 +238,20 @@ func (s *SyncTestSuite) TestSyncService() {
 		feed := models.Feed{
 			ID:           utils.CreateID(),
 			Title:        "Sync Test",
-			Subscription: rssMinimalURL,
+			Subscription: s.ts.URL + "/rss_minimal.xml",
 		}
 		s.feedsRepo.Create(user.ID, &feed)
 	}
 
-	serv := NewService(time.Second, 1, s.feedsRepo, s.usersRepo, s.entriesRepo)
+	serv := NewService(time.Second, s.feedsRepo, s.usersRepo, s.entriesRepo)
 
 	serv.Start()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second)
 
 	serv.Stop()
 
-	users, _ := s.usersRepo.List("", 10)
+	users, _ := s.usersRepo.List(s.user.ID, 10)
 	users = users[1:]
 
 	for idx := range users {
@@ -231,30 +265,34 @@ func (s *SyncTestSuite) TestSyncService() {
 	}
 }
 
-func (s *SyncTestSuite) startServer() {
-	s.server = &http.Server{
-		Addr:    feedPort,
-		Handler: s,
-	}
-
-	go func() {
-		err := s.server.ListenAndServe()
-		fmt.Println(err)
-	}()
-
-	time.Sleep(time.Second)
-}
-
 func TestSyncTestSuite(t *testing.T) {
 	syncSuite := SyncTestSuite{}
-	syncSuite.startServer()
+
+	syncSuite.ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var resp string
+
+		match := r.Header.Get("If-None-Match")
+
+		if match == rssFeedTag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+
+		switch r.URL.Path {
+		case "/rss.xml":
+			resp = rssFile
+		case "/rss_minimal.xml":
+			resp = rssMinimalFile
+		default:
+			resp = ""
+		}
+
+		if _, err := fmt.Fprint(w, resp); err != nil {
+			panic(err)
+		}
+
+	}))
+	defer syncSuite.ts.Close()
 
 	suite.Run(t, &syncSuite)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	err := syncSuite.server.Shutdown(ctx)
-	if err != nil {
-		t.Log(err)
-	}
 }

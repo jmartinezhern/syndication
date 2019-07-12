@@ -42,9 +42,11 @@ type Service struct {
 	ticker          *time.Ticker
 	userWaitGroup   sync.WaitGroup
 	status          chan syncStatus
-	interval        time.Duration
-	deleteAfterDays int
+	userQueue       chan models.User
 	dbLock          sync.Mutex
+
+	interval        time.Duration
+
 	usersRepo       repo.Users
 	feedsRepo       repo.Feeds
 	entriesRepo     repo.Entries
@@ -52,21 +54,34 @@ type Service struct {
 
 // SyncUsers sync's all user's feeds.
 func (s *Service) SyncUsers() {
-	var continuationID string
-	var users []models.User
-	for {
-		users, continuationID = s.usersRepo.List(continuationID, maxThreads)
-		if len(users) == 0 {
-			break
-		}
+	s.userQueue = make(chan models.User)
 
-		s.userWaitGroup.Add(len(users))
+	// List up to maxThreads of users per iteration
+	users, continuationID := s.usersRepo.List("", maxThreads)
+	if len(users) == 0 {
+		return
+	}
 
-		for idx := range users {
-			go func(user models.User) {
+	s.userWaitGroup.Add(len(users))
+
+	// We may have less users than we do maxThreads.
+	// Start length of users of goroutines which cannot be more than maxThreads.
+	for i := 0; i < len(users); i++ {
+		go func() {
+			for {
+				user, more := <-s.userQueue
+				if !more {
+					return
+				}
 				s.SyncUser(user.ID)
 				s.userWaitGroup.Done()
-			}(users[idx])
+			}
+		}()
+	}
+
+	for {
+		for idx := range users {
+			s.userQueue <- users[idx]
 		}
 
 		s.userWaitGroup.Wait()
@@ -74,7 +89,16 @@ func (s *Service) SyncUsers() {
 		if continuationID == "" {
 			break
 		}
+
+		users, continuationID = s.usersRepo.List(continuationID, maxThreads)
+		if len(users) == 0 {
+			break
+		}
+
+		s.userWaitGroup.Add(len(users))
 	}
+
+	close(s.userQueue)
 }
 
 // SyncUser sync's all feeds owned by user
@@ -144,17 +168,16 @@ func (s *Service) Start() {
 // Stop a SyncService
 func (s *Service) Stop() {
 	s.ticker.Stop()
+	s.userWaitGroup.Wait()
 	s.status <- stopping
 	<-s.status
-	s.userWaitGroup.Wait()
 }
 
 // NewService creates a new SyncService object
-func NewService(syncInterval time.Duration, deleteAfter int, feedsRepo repo.Feeds, usersRepo repo.Users, entriesRepo repo.Entries) Service {
+func NewService(syncInterval time.Duration, feedsRepo repo.Feeds, usersRepo repo.Users, entriesRepo repo.Entries) Service {
 	return Service{
 		status:          make(chan syncStatus),
 		interval:        syncInterval,
-		deleteAfterDays: deleteAfter,
 		feedsRepo:       feedsRepo,
 		usersRepo:       usersRepo,
 		entriesRepo:     entriesRepo,

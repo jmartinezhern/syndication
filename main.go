@@ -67,7 +67,7 @@ func main() {
 	server.RegisterImporters(rest.Importers{"application/xml": services.NewOPMLImporter(ctgsRepo, feedsRepo)})
 	server.RegisterExporters(rest.Exporters{"application/xml": services.NewOPMLExporter(ctgsRepo)})
 
-	syncService := sync.NewService(config.Sync.Interval, config.Sync.DeleteAfter, feedsRepo, usersRepo, entriesRepo)
+	syncService := sync.NewService(config.Sync.Interval, feedsRepo, usersRepo, entriesRepo)
 	syncService.Start()
 	defer syncService.Stop()
 
