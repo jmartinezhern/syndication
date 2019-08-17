@@ -1,0 +1,19 @@
+version: 2.1
+orbs:
+  codecov: codecov/codecov@1.0.5
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.12
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - checkout
+      - run: |
+        for d in $(go list ./... | grep -v vendor); do
+          go test -race -coverprofile=profile.out -covermode=atomic $d
+          if [[ -f profile.out ]]; then
+            cat profile.out >> coverage.txt
+            rm profile.out
+          fi
+        done
+      - codecov/upload
