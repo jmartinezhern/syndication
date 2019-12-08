@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/jmartinezhern/syndication.svg?branch=master)](https://travis-ci.org/jmartinezhern/syndication)
+![](https://github.com/jmartinezhern/syndication/workflows/Go/badge.svg)
 [![codecov](https://codecov.io/gh/jmartinezhern/syndication/branch/master/graph/badge.svg)](https://codecov.io/gh/jmartinezhern/syndication)
 
 # Syndication - A simple news aggregation server
