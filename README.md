@@ -12,7 +12,6 @@
 ## Building
 
 ```bash
-$ dep ensure
 $ go build
 ```
 
