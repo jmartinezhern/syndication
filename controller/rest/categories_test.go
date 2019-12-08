@@ -85,7 +85,7 @@ func (c *CategoriesControllerSuite) TestNewConflictingCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestNewCategoryWithBadInput() {
-	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(""))
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader("{"))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
