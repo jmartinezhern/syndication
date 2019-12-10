@@ -39,17 +39,17 @@ type syncStatus = int
 // Service defines properties for running a Feed Sync Service.
 // Service will update all feeds for all users periodically.
 type Service struct {
-	ticker          *time.Ticker
-	userWaitGroup   sync.WaitGroup
-	status          chan syncStatus
-	userQueue       chan models.User
-	dbLock          sync.Mutex
+	ticker        *time.Ticker
+	userWaitGroup sync.WaitGroup
+	status        chan syncStatus
+	userQueue     chan models.User
+	dbLock        sync.Mutex
 
-	interval        time.Duration
+	interval time.Duration
 
-	usersRepo       repo.Users
-	feedsRepo       repo.Feeds
-	entriesRepo     repo.Entries
+	usersRepo   repo.Users
+	feedsRepo   repo.Feeds
+	entriesRepo repo.Entries
 }
 
 // SyncUsers sync's all user's feeds.
@@ -176,10 +176,10 @@ func (s *Service) Stop() {
 // NewService creates a new SyncService object
 func NewService(syncInterval time.Duration, feedsRepo repo.Feeds, usersRepo repo.Users, entriesRepo repo.Entries) Service {
 	return Service{
-		status:          make(chan syncStatus),
-		interval:        syncInterval,
-		feedsRepo:       feedsRepo,
-		usersRepo:       usersRepo,
-		entriesRepo:     entriesRepo,
+		status:      make(chan syncStatus),
+		interval:    syncInterval,
+		feedsRepo:   feedsRepo,
+		usersRepo:   usersRepo,
+		entriesRepo: entriesRepo,
 	}
 }
