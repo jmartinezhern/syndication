@@ -167,7 +167,7 @@ func (s *Server) RegisterTagsController(tags services.Tag) {
 }
 
 func (s *Server) RegisterImporters(importers Importers) {
-	importerController = NewCImporterController(importers, s.handle)
+	importerController = NewImporterController(importers, s.handle)
 }
 
 func (s *Server) RegisterExporters(exporters Exporters) {

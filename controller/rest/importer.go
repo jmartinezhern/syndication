@@ -36,7 +36,7 @@ type (
 	}
 )
 
-func NewCImporterController(importers Importers, e *echo.Echo) *ImporterController {
+func NewImporterController(importers Importers, e *echo.Echo) *ImporterController {
 	v1 := e.Group("v1")
 	controller := ImporterController{
 		Controller{

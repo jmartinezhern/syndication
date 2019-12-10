@@ -114,7 +114,7 @@ func (c *ImporterControllerSuite) SetupTest() {
 	importers := Importers{
 		"application/xml": services.NewOPMLImporter(ctgsRepo, sql.NewFeeds(c.db)),
 	}
-	c.controller = NewCImporterController(importers, c.e)
+	c.controller = NewImporterController(importers, c.e)
 }
 
 func (c *ImporterControllerSuite) TearDownTest() {
