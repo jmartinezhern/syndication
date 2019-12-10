@@ -18,9 +18,14 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
+	"strconv"
+	"time"
 
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/jmartinezhern/syndication/cmd"
@@ -43,8 +48,6 @@ func main() {
 	config := config()
 	db := sql.NewDB(config.Database.Type, config.Database.Connection)
 
-	server := rest.NewServer()
-
 	usersRepo := sql.NewUsers(db)
 	ctgsRepo := sql.NewCategories(db)
 	entriesRepo := sql.NewEntries(db)
@@ -58,21 +61,42 @@ func main() {
 	tagsService := services.NewTagsService(tagsRepo, entriesRepo)
 	usersService := services.NewUsersService(usersRepo)
 
-	server.RegisterAuthService(authService, config.AuthSecret, config.AllowRegistrations)
-	server.RegisterUsersService(usersService)
-	server.RegisterCategoriesService(ctgsService)
-	server.RegisterFeedsService(feedsService)
-	server.RegisterEntriesService(entriesService)
-	server.RegisterTagsController(tagsService)
-	server.RegisterImporters(rest.Importers{"application/xml": services.NewOPMLImporter(ctgsRepo, feedsRepo)})
-	server.RegisterExporters(rest.Exporters{"application/xml": services.NewOPMLExporter(ctgsRepo)})
+	e := echo.New()
+	e.HideBanner = true
+	e.Use(middleware.CORS())
+
+	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+		XSSProtection:         "",
+		XFrameOptions:         "",
+		ContentTypeNosniff:    "nosniff",
+		HSTSMaxAge:            3600,
+		ContentSecurityPolicy: "default-src 'self'",
+	}))
+
+	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
+		StackSize:         1 << 10, // 1 KB
+		DisablePrintStack: false,
+	}))
+
+	e.Use(middleware.Logger())
+
+	rest.NewAuthController(authService, config.AuthSecret, config.AllowRegistrations, e)
+	rest.NewUsersController(usersService, e)
+	rest.NewCategoriesController(ctgsService, e)
+	rest.NewFeedsController(feedsService, e)
+	rest.NewEntriesController(entriesService, e)
+	rest.NewTagsController(tagsService, e)
+	rest.NewImporterController(rest.Importers{
+		"application/xml": services.NewOPMLImporter(ctgsRepo, feedsRepo)}, e)
+	rest.NewExporterController(rest.Exporters{
+		"application/xml": services.NewOPMLExporter(ctgsRepo)}, e)
 
 	syncService := sync.NewService(config.Sync.Interval, feedsRepo, usersRepo, entriesRepo)
 	syncService.Start()
 	defer syncService.Stop()
 
 	go func() {
-		if err := server.Start(config.Host.Address, config.Host.Port); err != nil {
+		if err := e.Start(config.Host.Address + ":" + strconv.Itoa(config.Host.Port)); err != nil {
 			log.Info("Shutting down...")
 		}
 	}()
@@ -81,7 +105,10 @@ func main() {
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 
-	if err := server.Stop(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	if err := e.Shutdown(ctx); err != nil {
 		log.Warn(err)
 	}
 }
