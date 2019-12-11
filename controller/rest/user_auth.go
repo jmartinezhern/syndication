@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
@@ -74,12 +75,15 @@ func NewAuthController(service services.Auth, secret string, allowRegistration b
 				return next(c)
 			}
 
-			userID := getUserID(c)
-			if userID == "" {
+			token := c.Get("token").(*jwt.Token)
+
+			claims := token.Claims.(jwt.MapClaims)
+
+			if claims["type"] != "access" {
 				return echo.NewHTTPError(http.StatusUnauthorized)
 			}
 
-			c.Set(userContextKey, userID)
+			c.Set(userContextKey, claims["sub"].(string))
 
 			return next(c)
 		}

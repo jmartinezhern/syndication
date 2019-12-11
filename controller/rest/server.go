@@ -23,7 +23,6 @@ package rest
 import (
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
 )
 
@@ -52,16 +51,4 @@ type (
 
 func convertOrderByParamToValue(param string) bool {
 	return !(param != "" && strings.EqualFold(param, "oldest"))
-}
-
-func getUserID(ctx echo.Context) string {
-	token := ctx.Get("token").(*jwt.Token)
-
-	claims := token.Claims.(jwt.MapClaims)
-
-	if claims["type"] != "access" {
-		return ""
-	}
-
-	return claims["sub"].(string)
 }
