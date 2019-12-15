@@ -64,7 +64,7 @@ func (c *CategoriesControllerSuite) TestNewCategory() {
 func (c *CategoriesControllerSuite) TestNewConflictingCategory() {
 	ctg := `{ "name": "test" }`
 
-	_, err := c.controller.categories.New("test", c.user.ID)
+	_, err := c.controller.categories.New(c.user.ID, "test")
 	c.NoError(err)
 
 	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(ctg))
@@ -101,7 +101,7 @@ func (c *CategoriesControllerSuite) TestNewCategoryWithBadInput() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategory() {
-	ctg, err := c.controller.categories.New("Test", c.user.ID)
+	ctg, err := c.controller.categories.New(c.user.ID, "Test")
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
@@ -118,6 +118,7 @@ func (c *CategoriesControllerSuite) TestGetCategory() {
 	c.Equal(http.StatusOK, rec.Code)
 
 	var sCtg models.Category
+
 	c.NoError(json.Unmarshal(rec.Body.Bytes(), &sCtg))
 	c.Equal(ctg.Name, sCtg.Name)
 }
@@ -140,7 +141,7 @@ func (c *CategoriesControllerSuite) TestGetMissingCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategories() {
-	ctg, err := c.controller.categories.New("Test", c.user.ID)
+	ctg, err := c.controller.categories.New(c.user.ID, "Test")
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
@@ -160,13 +161,14 @@ func (c *CategoriesControllerSuite) TestGetCategories() {
 	}
 
 	var categories ctgs
+
 	c.NoError(json.Unmarshal(rec.Body.Bytes(), &categories))
 	c.Require().Len(categories.Categories, 1)
 	c.Equal(ctg.Name, categories.Categories[0].Name)
 }
 
 func (c *CategoriesControllerSuite) TestGetCategoryFeeds() {
-	ctg, err := c.controller.categories.New("test", c.user.ID)
+	ctg, err := c.controller.categories.New(c.user.ID, "test")
 	c.Require().NoError(err)
 
 	feed := models.Feed{
@@ -195,13 +197,14 @@ func (c *CategoriesControllerSuite) TestGetCategoryFeeds() {
 	}
 
 	var ctgFeeds feeds
+
 	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &ctgFeeds))
 
 	c.Len(ctgFeeds.Feeds, 1)
 }
 
 func (c *CategoriesControllerSuite) TestEditCategory() {
-	ctg, err := c.controller.categories.New("test", c.user.ID)
+	ctg, err := c.controller.categories.New(c.user.ID, "test")
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{"name": "gopher"}`))
@@ -220,7 +223,7 @@ func (c *CategoriesControllerSuite) TestEditCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestAppendFeeds() {
-	ctg, err := c.controller.categories.New("test", c.user.ID)
+	ctg, err := c.controller.categories.New(c.user.ID, "test")
 	c.Require().NoError(err)
 
 	feed := models.Feed{
@@ -249,7 +252,7 @@ func (c *CategoriesControllerSuite) TestAppendFeeds() {
 }
 
 func (c *CategoriesControllerSuite) TestDeleteCategory() {
-	ctg, err := c.controller.categories.New("test", c.user.ID)
+	ctg, err := c.controller.categories.New(c.user.ID, "test")
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
@@ -267,7 +270,7 @@ func (c *CategoriesControllerSuite) TestDeleteCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestMarkCategory() {
-	ctg, err := c.controller.categories.New("test", c.user.ID)
+	ctg, err := c.controller.categories.New(c.user.ID, "test")
 	c.Require().NoError(err)
 
 	feed := models.Feed{
@@ -327,7 +330,7 @@ func (c *CategoriesControllerSuite) TestMarkUnknownCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategoryEntries() {
-	ctg, err := c.controller.categories.New("test", c.user.ID)
+	ctg, err := c.controller.categories.New(c.user.ID, "test")
 	c.Require().NoError(err)
 
 	feed := models.Feed{
@@ -365,6 +368,7 @@ func (c *CategoriesControllerSuite) TestGetCategoryEntries() {
 	}
 
 	var entries Entries
+
 	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
 
 	c.Require().Len(entries.Entries, 1)
@@ -389,7 +393,7 @@ func (c *CategoriesControllerSuite) TestGetUnknownCategoryEntries() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategoryStats() {
-	ctg, err := c.controller.categories.New("test", c.user.ID)
+	ctg, err := c.controller.categories.New(c.user.ID, "test")
 	c.Require().NoError(err)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
@@ -405,6 +409,7 @@ func (c *CategoriesControllerSuite) TestGetCategoryStats() {
 	c.NoError(c.controller.GetCategoryStats(ctx))
 
 	var stats models.Stats
+
 	c.NoError(json.Unmarshal(rec.Body.Bytes(), &stats))
 }
 

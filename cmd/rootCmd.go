@@ -118,8 +118,8 @@ func generateSecret() string {
 	log.Info("No auth secret found. Generating new one...")
 
 	b := make([]byte, generatedSecretLength)
-	_, err := rand.Read(b)
-	if err != nil {
+
+	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
 

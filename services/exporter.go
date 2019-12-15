@@ -56,7 +56,6 @@ func marshal(feeds []models.Feed) []models.OPMLOutline {
 			XMLUrl:  feed.Subscription,
 			HTMLUrl: feed.Subscription,
 		}
-
 	}
 
 	return items
@@ -64,19 +63,25 @@ func marshal(feeds []models.Feed) []models.OPMLOutline {
 
 // Export categories and feeds to data in OPML 2.0 format.
 func (e OPMLExporter) Export(userID string) ([]byte, error) {
-	var continuationID string
-	var ctgs []models.Category
+	var (
+		continuationID string
+		ctgs           []models.Category
+	)
 
 	b := models.OPML{
 		Body: models.OPMLBody{},
 	}
 
 	for {
-		ctgs, continuationID = e.repo.List(userID, continuationID, 100)
+		ctgs, continuationID = e.repo.List(userID, models.Page{ContinuationID: continuationID, Count: 100})
 
 		for idx := range ctgs {
 			ctg := ctgs[idx]
-			feeds, _ := e.repo.Feeds(userID, ctg.ID, "", 100)
+			feeds, _ := e.repo.Feeds(userID, models.Page{
+				FilterID:       ctg.ID,
+				ContinuationID: "",
+				Count:          100,
+			})
 			items := marshal(feeds)
 			ctgOutline := models.OPMLOutline{
 				Text:  ctg.Name,
@@ -93,7 +98,7 @@ func (e OPMLExporter) Export(userID string) ([]byte, error) {
 
 	for {
 		var feeds []models.Feed
-		feeds, continuationID = e.repo.Uncategorized(userID, continuationID, 100)
+		feeds, continuationID = e.repo.Uncategorized(userID, models.Page{ContinuationID: continuationID, Count: 100})
 
 		items := marshal(feeds)
 		b.Body.Items = append(b.Body.Items, items...)

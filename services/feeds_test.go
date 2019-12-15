@@ -64,19 +64,22 @@ func (t *FeedsSuite) TestUnreachableNewFeed() {
 }
 
 func (t *FeedsSuite) TestFeeds() {
-	feeds, _ := t.service.Feeds("", 2, t.user.ID)
+	feeds, _ := t.service.Feeds(t.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          2,
+	})
 	t.Len(feeds, 1)
 	t.Equal(t.feed.Title, feeds[0].Title)
 }
 
 func (t *FeedsSuite) TestFeed() {
-	_, found := t.service.Feed(t.feed.ID, t.user.ID)
+	_, found := t.service.Feed(t.user.ID, t.feed.ID)
 	t.True(found)
 }
 
 func (t *FeedsSuite) TestEditFeed() {
 	feed := models.Feed{ID: t.feed.ID, Title: "New Title"}
-	err := t.service.Update(&feed, t.user.ID)
+	err := t.service.Update(t.user.ID, &feed)
 	t.NoError(err)
 
 	updatedFeed, _ := t.feedsRepo.FeedWithID(t.user.ID, t.feed.ID)
@@ -84,12 +87,12 @@ func (t *FeedsSuite) TestEditFeed() {
 }
 
 func (t *FeedsSuite) TestEditMissingFeed() {
-	err := t.service.Update(&models.Feed{}, t.user.ID)
+	err := t.service.Update(t.user.ID, &models.Feed{})
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
 func (t *FeedsSuite) TestDeleteFeed() {
-	err := t.service.Delete(t.feed.ID, t.user.ID)
+	err := t.service.Delete(t.user.ID, t.feed.ID)
 	t.NoError(err)
 
 	_, found := t.feedsRepo.FeedWithID(t.user.ID, t.feed.ID)
@@ -97,7 +100,7 @@ func (t *FeedsSuite) TestDeleteFeed() {
 }
 
 func (t *FeedsSuite) TestDeleteMissingFeed() {
-	err := t.service.Delete("bogus", t.user.ID)
+	err := t.service.Delete(t.user.ID, "bogus")
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
@@ -110,10 +113,11 @@ func (t *FeedsSuite) TestMarkFeed() {
 	}
 	t.entriesRepo.Create(t.user.ID, &entry)
 
-	err := t.service.Mark(t.feed.ID, models.MarkerRead, t.user.ID)
+	err := t.service.Mark(t.user.ID, t.feed.ID, models.MarkerRead)
 	t.NoError(err)
 
-	entries, _ := sql.NewEntries(t.db).ListFromFeed(t.user.ID, t.feed.ID, models.Page{
+	entries, _ := sql.NewEntries(t.db).ListFromFeed(t.user.ID, models.Page{
+		FilterID:       t.feed.ID,
 		ContinuationID: "",
 		Count:          1,
 		Newest:         false,
@@ -125,7 +129,7 @@ func (t *FeedsSuite) TestMarkFeed() {
 }
 
 func (t *FeedsSuite) TestMarkMissingFeed() {
-	err := t.service.Mark("bogus", models.MarkerRead, t.user.ID)
+	err := t.service.Mark(t.user.ID, "bogus", models.MarkerRead)
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 
@@ -138,18 +142,20 @@ func (t *FeedsSuite) TestFeedEntries() {
 	}
 	t.entriesRepo.Create(t.user.ID, &entry)
 
-	entries, _ := t.service.Entries(t.feed.ID, t.user.ID, models.Page{
+	entries, _ := t.service.Entries(t.user.ID, models.Page{
+		FilterID:       t.feed.ID,
 		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
 		Marker:         models.MarkerAny,
 	})
-	t.Len(entries, 1)
+	t.Require().Len(entries, 1)
 	t.Equal(entry.Title, entries[0].Title)
 }
 
 func (t *FeedsSuite) TestMissingFeedEntries() {
-	entries, _ := t.service.Entries(t.feed.ID, t.user.ID, models.Page{
+	entries, _ := t.service.Entries(t.user.ID, models.Page{
+		FilterID:       t.feed.ID,
 		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
@@ -159,12 +165,12 @@ func (t *FeedsSuite) TestMissingFeedEntries() {
 }
 
 func (t *FeedsSuite) TestFeedStats() {
-	_, err := t.service.Stats(t.feed.ID, t.user.ID)
+	_, err := t.service.Stats(t.user.ID, t.feed.ID)
 	t.NoError(err)
 }
 
 func (t *FeedsSuite) TestMissingFeedStats() {
-	_, err := t.service.Stats("bogus", t.user.ID)
+	_, err := t.service.Stats(t.user.ID, "bogus")
 	t.EqualError(err, ErrFeedNotFound.Error())
 }
 

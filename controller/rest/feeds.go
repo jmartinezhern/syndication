@@ -86,16 +86,22 @@ func (s *FeedsController) GetFeeds(c echo.Context) error {
 	continuationID := c.QueryParam("continuationID")
 
 	count := 100
+
 	countParam := c.QueryParam("count")
 	if countParam != "" {
 		var err error
+
 		count, err = strconv.Atoi(countParam)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "count must be an integer")
 		}
 	}
 
-	feeds, next := s.feeds.Feeds(continuationID, count, userID)
+	feeds, next := s.feeds.Feeds(userID, models.Page{
+		ContinuationID: continuationID,
+		Count:          count,
+	})
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"feeds":          feeds,
 		"continuationID": next,
@@ -106,7 +112,7 @@ func (s *FeedsController) GetFeeds(c echo.Context) error {
 func (s *FeedsController) GetFeed(c echo.Context) error {
 	userID := c.Get(userContextKey).(string)
 
-	feed, found := s.feeds.Feed(c.Param("feedID"), userID)
+	feed, found := s.feeds.Feed(userID, c.Param("feedID"))
 	if !found {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
@@ -125,7 +131,7 @@ func (s *FeedsController) EditFeed(c echo.Context) error {
 
 	feed.ID = c.Param("feedID")
 
-	err := s.feeds.Update(&feed, userID)
+	err := s.feeds.Update(userID, &feed)
 	if err == services.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -139,7 +145,7 @@ func (s *FeedsController) EditFeed(c echo.Context) error {
 func (s *FeedsController) DeleteFeed(c echo.Context) error {
 	userID := c.Get(userContextKey).(string)
 
-	err := s.feeds.Delete(c.Param("feedID"), userID)
+	err := s.feeds.Delete(userID, c.Param("feedID"))
 	if err == services.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -160,7 +166,7 @@ func (s *FeedsController) MarkFeed(c echo.Context) error {
 
 	marker := models.MarkerFromString(asParam)
 
-	err := s.feeds.Mark(c.Param("feedID"), marker, userID)
+	err := s.feeds.Mark(userID, c.Param("feedID"), marker)
 	if err == services.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -179,16 +185,15 @@ func (s *FeedsController) GetFeedEntries(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	feedID := c.Param("feedID")
-
 	page := models.Page{
+		FilterID:       c.Param("feedID"),
 		ContinuationID: params.ContinuationID,
 		Count:          params.Count,
 		Newest:         convertOrderByParamToValue(params.OrderBy),
 		Marker:         models.MarkerFromString(params.Marker),
 	}
 
-	entries, next := s.feeds.Entries(feedID, userID, page)
+	entries, next := s.feeds.Entries(userID, page)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"entries":        entries,
@@ -200,7 +205,7 @@ func (s *FeedsController) GetFeedEntries(c echo.Context) error {
 func (s *FeedsController) GetFeedStats(c echo.Context) error {
 	userID := c.Get(userContextKey).(string)
 
-	stats, err := s.feeds.Stats(c.Param("feedID"), userID)
+	stats, err := s.feeds.Stats(userID, c.Param("feedID"))
 	if err == services.ErrFeedNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}

@@ -49,6 +49,7 @@ type (
 func isPathUnauthorized(c echo.Context) bool {
 	path := c.Path()
 	i := sort.SearchStrings(unauthorizedPaths, path)
+
 	return i < len(unauthorizedPaths) && unauthorizedPaths[i] == path
 }
 

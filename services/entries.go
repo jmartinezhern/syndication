@@ -28,16 +28,16 @@ type (
 	// Entries interface defines the Entries service
 	Entries interface {
 		// Entry returns an entry with id that belongs to user
-		Entry(id string, userID string) (models.Entry, error)
+		Entry(userID, id string) (models.Entry, error)
 
 		// Entries returns all entries belong to a user with a marker
 		Entries(userID string, page models.Page) ([]models.Entry, string)
 
 		// Mark entry with id
-		Mark(id string, marker models.Marker, userID string) error
+		Mark(userID string, id string, marker models.Marker) error
 
 		// MarkAll entries
-		MarkAll(marker models.Marker, userID string)
+		MarkAll(userID string, marker models.Marker)
 
 		// Stats returns statistics for all entries
 		Stats(userID string) models.Stats
@@ -61,7 +61,7 @@ func NewEntriesService(entriesRepo repo.Entries) EntriesService {
 }
 
 // Entry returns an entry with ID that belongs to user
-func (e EntriesService) Entry(id, userID string) (models.Entry, error) {
+func (e EntriesService) Entry(userID, id string) (models.Entry, error) {
 	entry, found := e.repo.EntryWithID(userID, id)
 	if !found {
 		return models.Entry{}, ErrEntryNotFound
@@ -76,7 +76,7 @@ func (e EntriesService) Entries(userID string, page models.Page) (entries []mode
 }
 
 // Mark entry with id
-func (e EntriesService) Mark(id string, marker models.Marker, userID string) error {
+func (e EntriesService) Mark(userID, id string, marker models.Marker) error {
 	err := e.repo.Mark(userID, id, marker)
 	if err == repo.ErrModelNotFound {
 		return ErrEntryNotFound
@@ -86,7 +86,7 @@ func (e EntriesService) Mark(id string, marker models.Marker, userID string) err
 }
 
 // MarkAll entries
-func (e EntriesService) MarkAll(marker models.Marker, userID string) {
+func (e EntriesService) MarkAll(userID string, marker models.Marker) {
 	e.repo.MarkAll(userID, marker)
 }
 

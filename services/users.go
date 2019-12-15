@@ -38,7 +38,7 @@ type (
 		User(id string) (models.User, bool)
 
 		// Users gets a list of users
-		Users(continuationID string, count int) ([]models.User, string)
+		Users(page models.Page) ([]models.User, string)
 	}
 
 	// UsersService implement the Users interface
@@ -97,6 +97,6 @@ func (a UsersService) User(id string) (models.User, bool) {
 }
 
 // Users returns all users
-func (a UsersService) Users(continuationID string, count int) (users []models.User, next string) {
-	return a.usersRepo.List(continuationID, count)
+func (a UsersService) Users(page models.Page) (users []models.User, next string) {
+	return a.usersRepo.List(page)
 }

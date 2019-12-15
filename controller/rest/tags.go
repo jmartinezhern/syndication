@@ -64,7 +64,7 @@ func (s *TagsController) NewTag(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	newTag, err := s.tags.New(tag.Name, userID)
+	newTag, err := s.tags.New(userID, tag.Name)
 	if err == services.ErrTagConflicts {
 		return echo.NewHTTPError(http.StatusConflict, "tag with name "+tag.Name+" already exists")
 	} else if err != nil {
@@ -83,7 +83,10 @@ func (s *TagsController) GetTags(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	tags, next := s.tags.List(params.ContinuationID, params.Count, userID)
+	tags, next := s.tags.List(userID, models.Page{
+		ContinuationID: params.ContinuationID,
+		Count:          params.Count,
+	})
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"tags":           tags,
@@ -95,7 +98,7 @@ func (s *TagsController) GetTags(c echo.Context) error {
 func (s *TagsController) DeleteTag(c echo.Context) error {
 	userID := c.Get(userContextKey).(string)
 
-	err := s.tags.Delete(c.Param("tagID"), userID)
+	err := s.tags.Delete(userID, c.Param("tagID"))
 	if err == services.ErrTagNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -117,7 +120,7 @@ func (s *TagsController) UpdateTag(c echo.Context) error {
 
 	tagID := c.Param("tagID")
 
-	newTag, err := s.tags.Update(tagID, tag.Name, userID)
+	newTag, err := s.tags.Update(userID, tagID, tag.Name)
 	switch err {
 	case nil:
 		return c.JSON(http.StatusOK, newTag)
@@ -143,7 +146,7 @@ func (s *TagsController) TagEntries(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
-	err := s.tags.Apply(c.Param("tagID"), entryIds.Entries, userID)
+	err := s.tags.Apply(userID, c.Param("tagID"), entryIds.Entries)
 	if err == services.ErrTagNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -157,7 +160,7 @@ func (s *TagsController) TagEntries(c echo.Context) error {
 func (s *TagsController) GetTag(c echo.Context) error {
 	userID := c.Get(userContextKey).(string)
 
-	tag, found := s.tags.Tag(c.Param("tagID"), userID)
+	tag, found := s.tags.Tag(userID, c.Param("tagID"))
 	if !found {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
@@ -182,7 +185,7 @@ func (s *TagsController) GetEntriesFromTag(c echo.Context) error {
 		Marker:         models.MarkerFromString(params.Marker),
 	}
 
-	entries, next := s.tags.Entries(c.Param("tagID"), userID, page)
+	entries, next := s.tags.Entries(userID, page)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"entries":        entries,

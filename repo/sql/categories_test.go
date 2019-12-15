@@ -52,24 +52,30 @@ func (s *CategoriesSuite) TestCreate() {
 }
 
 func (s *CategoriesSuite) TestCategories() {
-	var ctgs []models.Category
-	for i := 0; i < 5; i++ {
+	ctgs := make([]models.Category, 5)
+	for idx := range ctgs {
 		ctg := models.Category{
 			ID:   utils.CreateID(),
-			Name: "Test Category " + strconv.Itoa(i),
+			Name: "Test Category " + strconv.Itoa(idx),
 		}
 		s.repo.Create(s.user.ID, &ctg)
-		ctgs = append(ctgs, ctg)
+		ctgs[idx] = ctg
 	}
 
-	cCtgs, continuationID := s.repo.List(s.user.ID, "", 2)
-	s.Equal(ctgs[2].ID, continuationID)
+	cCtgs, next := s.repo.List(s.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          2,
+	})
 	s.Require().Len(cCtgs, 2)
+	s.Equal(ctgs[2].ID, next)
 	s.Equal(ctgs[0].Name, cCtgs[0].Name)
 	s.Equal(ctgs[1].Name, cCtgs[1].Name)
 
-	cCtgs, continuationID = s.repo.List(s.user.ID, continuationID, 3)
-	s.Len(continuationID, 0)
+	cCtgs, next = s.repo.List(s.user.ID, models.Page{
+		ContinuationID: next,
+		Count:          3,
+	})
+	s.Len(next, 0)
 	s.Require().Len(cCtgs, 3)
 	s.Equal(ctgs[2].Name, cCtgs[0].Name)
 	s.Equal(ctgs[3].Name, cCtgs[1].Name)
@@ -93,13 +99,21 @@ func (s *CategoriesSuite) TestFeeds() {
 		s.db.db.Model(s.user).Association("Feeds").Append(&feed)
 	}
 
-	feeds, next := s.repo.Feeds(s.user.ID, ctg.ID, "", 2)
+	feeds, next := s.repo.Feeds(s.user.ID, models.Page{
+		FilterID:       ctg.ID,
+		ContinuationID: "",
+		Count:          2,
+	})
 	s.NotEmpty(next)
 	s.Require().Len(feeds, 2)
 	s.Equal("Feed 0", feeds[0].Title)
 	s.Equal("Feed 1", feeds[1].Title)
 
-	feeds, _ = s.repo.Feeds(s.user.ID, ctg.ID, next, 3)
+	feeds, _ = s.repo.Feeds(s.user.ID, models.Page{
+		FilterID:       ctg.ID,
+		ContinuationID: next,
+		Count:          3,
+	})
 	s.Require().Len(feeds, 3)
 	s.Equal(feeds[0].ID, next)
 	s.Equal("Feed 2", feeds[0].Title)
@@ -117,13 +131,19 @@ func (s *CategoriesSuite) TestUncategorized() {
 		s.db.db.Model(s.user).Association("Feeds").Append(&feed)
 	}
 
-	feeds, next := s.repo.Uncategorized(s.user.ID, "", 2)
+	feeds, next := s.repo.Uncategorized(s.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          2,
+	})
 	s.NotEmpty(next)
 	s.Require().Len(feeds, 2)
 	s.Equal("Feed 0", feeds[0].Title)
 	s.Equal("Feed 1", feeds[1].Title)
 
-	feeds, _ = s.repo.Uncategorized(s.user.ID, next, 3)
+	feeds, _ = s.repo.Uncategorized(s.user.ID, models.Page{
+		ContinuationID: next,
+		Count:          3,
+	})
 	s.Require().Len(feeds, 3)
 	s.Equal(feeds[0].ID, next)
 	s.Equal("Feed 2", feeds[0].Title)
@@ -166,6 +186,7 @@ func (s *CategoriesSuite) TestUpdateMissing() {
 
 func (s *CategoriesSuite) TestDelete() {
 	ctgID := utils.CreateID()
+
 	s.repo.Create(s.user.ID, &models.Category{
 		ID:   ctgID,
 		Name: "news",
@@ -216,7 +237,8 @@ func (s *CategoriesSuite) TestMark() {
 	err := s.repo.Mark(s.user.ID, ctg.ID, models.MarkerRead)
 	s.NoError(err)
 
-	entries, _ := NewEntries(s.db).ListFromCategory(s.user.ID, ctg.ID, models.Page{
+	entries, _ := NewEntries(s.db).ListFromCategory(s.user.ID, models.Page{
+		FilterID:       ctg.ID,
 		ContinuationID: "",
 		Count:          5,
 		Newest:         false,
@@ -247,7 +269,11 @@ func (s *CategoriesSuite) TestAddFeed() {
 
 	s.NoError(s.repo.AddFeed(s.user.ID, feed.ID, ctg.ID))
 
-	feeds, _ := s.repo.Feeds(s.user.ID, ctg.ID, "", 1)
+	feeds, _ := s.repo.Feeds(s.user.ID, models.Page{
+		FilterID:       ctg.ID,
+		ContinuationID: "",
+		Count:          1,
+	})
 	s.Require().Len(feeds, 1)
 	s.Equal(feed.Title, feeds[0].Title)
 	s.Equal(feed.ID, feeds[0].ID)
@@ -272,11 +298,13 @@ func (s *CategoriesSuite) TestCategoryStats() {
 
 	for i := 0; i < 10; i++ {
 		var marker models.Marker
+
 		if i < 3 {
 			marker = models.MarkerRead
 		} else {
 			marker = models.MarkerUnread
 		}
+
 		entry := models.Entry{
 			ID:        utils.CreateID(),
 			Title:     "Item",

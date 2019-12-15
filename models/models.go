@@ -73,8 +73,8 @@ type (
 		APIKeys    []APIKey   `json:"-"`
 		Tags       []Tag      `json:"tags,omitempty"`
 
-		Username     string `json:"username,required"`
-		Email        string `json:"email,optional"`
+		Username     string `json:"username"`
+		Email        string `json:"email"`
 		PasswordHash []byte `json:"-"`
 		PasswordSalt []byte `json:"-"`
 	}
@@ -107,7 +107,7 @@ type (
 
 		Entries []Entry `json:"-"`
 
-		Title        string    `json:"title,optional"`
+		Title        string    `json:"title"`
 		Description  string    `json:"description,omitempty"`
 		Subscription string    `json:"subscription"`
 		Source       string    `json:"source,omitempty"`
@@ -205,6 +205,7 @@ type (
 	}
 
 	Page struct {
+		FilterID       string
 		ContinuationID string
 		Count          int
 		Newest         bool

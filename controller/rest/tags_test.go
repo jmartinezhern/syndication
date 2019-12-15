@@ -109,8 +109,8 @@ func (c *TagsControllerSuite) TestGetTags() {
 	}
 
 	var tags Tags
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &tags))
 
+	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &tags))
 	c.Require().Len(tags.Tags, 1)
 	c.Equal(tag.Name, tags.Tags[0].Name)
 }
@@ -285,6 +285,7 @@ func (c *TagsControllerSuite) TestGetTag() {
 	c.NoError(c.controller.GetTag(ctx))
 
 	var sTag models.Tag
+
 	c.NoError(json.Unmarshal(rec.Body.Bytes(), &sTag))
 	c.Equal(tag.Name, sTag.Name)
 }
@@ -348,6 +349,7 @@ func (c *TagsControllerSuite) TestGetEntriesFromTag() {
 	}
 
 	var entries Entries
+
 	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
 	c.Require().Len(entries.Entries, 1)
 	c.Equal(entry.Title, entries.Entries[0].Title)

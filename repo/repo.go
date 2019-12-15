@@ -36,9 +36,9 @@ type (
 		Delete(userID, id string) error
 		CategoryWithID(userID, id string) (models.Category, bool)
 		CategoryWithName(userID, name string) (models.Category, bool)
-		List(userID, continuationID string, count int) ([]models.Category, string)
-		Feeds(userID, ctgID, continuationID string, count int) ([]models.Feed, string)
-		Uncategorized(userID, continuationID string, count int) ([]models.Feed, string)
+		List(userID string, page models.Page) ([]models.Category, string)
+		Feeds(userID string, page models.Page) ([]models.Feed, string)
+		Uncategorized(userID string, page models.Page) ([]models.Feed, string)
 		AddFeed(userID, feedID, ctgID string) error
 		Stats(userID, ctgID string) (models.Stats, error)
 		Mark(userID, ctgID string, marker models.Marker) error
@@ -50,7 +50,7 @@ type (
 		UserWithName(name string) (models.User, bool)
 		UserWithID(id string) (models.User, bool)
 		Delete(id string) error
-		List(continuationID string, count int) ([]models.User, string)
+		List(page models.Page) ([]models.User, string)
 	}
 
 	Entries interface {
@@ -59,8 +59,8 @@ type (
 		EntryWithGUID(userID, guid string) (models.Entry, bool)
 		List(userID string, page models.Page) ([]models.Entry, string)
 		ListFromTags(userID string, tagIDs []string, page models.Page) ([]models.Entry, string)
-		ListFromCategory(userID, ctgID string, page models.Page) ([]models.Entry, string)
-		ListFromFeed(userID, feedID string, page models.Page) ([]models.Entry, string)
+		ListFromCategory(userID string, page models.Page) ([]models.Entry, string)
+		ListFromFeed(userID string, page models.Page) ([]models.Entry, string)
 		TagEntries(userID, tagID string, entryIDs []string) error
 		Mark(userID, id string, marker models.Marker) error
 		MarkAll(userID string, marker models.Marker)
@@ -72,7 +72,7 @@ type (
 		Update(userID string, feed *models.Feed) error
 		Delete(userID, id string) error
 		FeedWithID(userID, id string) (models.Feed, bool)
-		List(userID, continuationID string, count int) ([]models.Feed, string)
+		List(userID string, page models.Page) ([]models.Feed, string)
 		Mark(userID, id string, marker models.Marker) error
 		Stats(userID, ctgID string) (models.Stats, error)
 	}
@@ -83,6 +83,6 @@ type (
 		Delete(userID, id string) error
 		TagWithID(userID, id string) (models.Tag, bool)
 		TagWithName(userID, name string) (models.Tag, bool)
-		List(userID, continuationID string, count int) ([]models.Tag, string)
+		List(userID string, page models.Page) ([]models.Tag, string)
 	}
 )

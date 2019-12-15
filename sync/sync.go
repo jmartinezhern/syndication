@@ -57,7 +57,10 @@ func (s *Service) SyncUsers() {
 	s.userQueue = make(chan models.User)
 
 	// List up to maxThreads of users per iteration
-	users, continuationID := s.usersRepo.List("", maxThreads)
+	users, continuationID := s.usersRepo.List(models.Page{
+		ContinuationID: "",
+		Count:          maxThreads,
+	})
 	if len(users) == 0 {
 		return
 	}
@@ -66,7 +69,7 @@ func (s *Service) SyncUsers() {
 
 	// We may have less users than we do maxThreads.
 	// Start length of users of goroutines which cannot be more than maxThreads.
-	for i := 0; i < len(users); i++ {
+	for range users {
 		go func() {
 			for {
 				user, more := <-s.userQueue
@@ -90,7 +93,7 @@ func (s *Service) SyncUsers() {
 			break
 		}
 
-		users, continuationID = s.usersRepo.List(continuationID, maxThreads)
+		users, continuationID = s.usersRepo.List(models.Page{ContinuationID: continuationID, Count: maxThreads})
 		if len(users) == 0 {
 			break
 		}
@@ -106,34 +109,37 @@ func (s *Service) SyncUser(userID string) {
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
-	continuationID := ""
+	var (
+		feeds          []models.Feed
+		continuationID string
+	)
+
 	for {
-		var feeds []models.Feed
-		feeds, continuationID = s.feedsRepo.List(userID, continuationID, 100)
-		for idx := range feeds {
-			feed := feeds[idx]
-			if !time.Now().After(feed.LastUpdated.Add(s.interval)) {
+		feeds, continuationID = s.feedsRepo.List(userID, models.Page{ContinuationID: continuationID, Count: 100})
+
+		for feedIdx := range feeds {
+			if !time.Now().After(feeds[feedIdx].LastUpdated.Add(s.interval)) {
 				continue
 			}
 
-			fetchedFeed, fetchedEntries, err := utils.PullFeed(feed.Subscription, feed.Etag)
+			fetchedFeed, entries, err := utils.PullFeed(feeds[feedIdx].Subscription, feeds[feedIdx].Etag)
 			if err != nil {
 				log.Error(err)
+				continue
 			}
 
-			fetchedFeed.ID = feed.ID
+			fetchedFeed.ID = feeds[feedIdx].ID
 
-			err = s.feedsRepo.Update(userID, &fetchedFeed)
-			if err != nil {
+			if err = s.feedsRepo.Update(userID, &fetchedFeed); err != nil {
 				log.Error(err)
+				continue
 			}
 
-			for idx := range fetchedEntries {
-				entry := fetchedEntries[idx]
-				if _, found := s.entriesRepo.EntryWithGUID(userID, entry.GUID); !found {
-					entry.ID = utils.CreateID()
-					entry.Feed = feed
-					s.entriesRepo.Create(userID, &entry)
+			for idx := range entries {
+				if _, found := s.entriesRepo.EntryWithGUID(userID, entries[idx].GUID); !found {
+					entries[idx].ID = utils.CreateID()
+					entries[idx].Feed = feeds[feedIdx]
+					s.entriesRepo.Create(userID, &entries[idx])
 				}
 			}
 		}
@@ -174,7 +180,8 @@ func (s *Service) Stop() {
 }
 
 // NewService creates a new SyncService object
-func NewService(syncInterval time.Duration, feedsRepo repo.Feeds, usersRepo repo.Users, entriesRepo repo.Entries) Service {
+func NewService(syncInterval time.Duration, feedsRepo repo.Feeds, usersRepo repo.Users,
+	entriesRepo repo.Entries) Service {
 	return Service{
 		status:      make(chan syncStatus),
 		interval:    syncInterval,

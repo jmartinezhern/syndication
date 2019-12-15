@@ -72,8 +72,8 @@ func (c *ExporterControllerSuite) TestOPMLExport() {
 	c.Equal(http.StatusOK, rec.Code)
 
 	var exp models.OPML
-	c.NoError(xml.Unmarshal(rec.Body.Bytes(), &exp))
 
+	c.NoError(xml.Unmarshal(rec.Body.Bytes(), &exp))
 	c.NotEqual(sort.Search(len(exp.Body.Items), func(i int) bool {
 		item := exp.Body.Items[i]
 		return item.Title == ctg.Name && item.Items[0].Title == feed.Title

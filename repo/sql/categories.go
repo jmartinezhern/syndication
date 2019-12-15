@@ -47,6 +47,7 @@ func (c Categories) Update(userID string, ctg *models.Category) error {
 	}
 
 	c.db.db.Model(&dbCtg).Updates(ctg)
+
 	return nil
 }
 
@@ -58,6 +59,7 @@ func (c Categories) Delete(userID, id string) error {
 	}
 
 	c.db.db.Delete(ctg)
+
 	return nil
 }
 
@@ -68,18 +70,18 @@ func (c Categories) CategoryWithID(userID, id string) (ctg models.Category, foun
 }
 
 // List all Categories owned by user
-func (c Categories) List(userID, continuationID string, count int) (categories []models.Category, next string) {
+func (c Categories) List(userID string, page models.Page) (categories []models.Category, next string) {
 	query := c.db.db.Model(&models.User{ID: userID})
 
-	if continuationID != "" {
-		if ctg, found := c.CategoryWithID(userID, continuationID); found {
+	if page.ContinuationID != "" {
+		if ctg, found := c.CategoryWithID(userID, page.ContinuationID); found {
 			query = query.Where("created_at >= ?", ctg.CreatedAt)
 		}
 	}
 
-	query.Limit(count + 1).Association("Categories").Find(&categories)
+	query.Limit(page.Count + 1).Association("Categories").Find(&categories)
 
-	if len(categories) > count {
+	if len(categories) > page.Count {
 		next = categories[len(categories)-1].ID
 		categories = categories[:len(categories)-1]
 	}
@@ -88,24 +90,26 @@ func (c Categories) List(userID, continuationID string, count int) (categories [
 }
 
 // Feeds returns all Feeds in category with ctgID owned by user
-func (c Categories) Feeds(userID, ctgID, continuationID string, count int) (feeds []models.Feed, next string) {
-	ctg, found := c.CategoryWithID(userID, ctgID)
+func (c Categories) Feeds(userID string, page models.Page) (feeds []models.Feed, next string) {
+	ctg, found := c.CategoryWithID(userID, page.FilterID)
 	if !found {
 		return nil, ""
 	}
 
 	query := c.db.db.Model(&ctg)
 
-	if continuationID != "" {
+	if page.ContinuationID != "" {
 		feed := models.Feed{}
-		if !c.db.db.Model(&models.User{ID: userID}).Where("id = ?", continuationID).Related(&feed).RecordNotFound() {
+		if !c.db.db.Model(&models.User{
+			ID: userID,
+		}).Where("id = ?", page.ContinuationID).Related(&feed).RecordNotFound() {
 			query = query.Where("created_at >= ?", feed.CreatedAt)
 		}
 	}
 
-	query.Limit(count + 1).Association("Feeds").Find(&feeds)
+	query.Limit(page.Count + 1).Association("Feeds").Find(&feeds)
 
-	if len(feeds) > count {
+	if len(feeds) > page.Count {
 		next = feeds[len(feeds)-1].ID
 		feeds = feeds[:len(feeds)-1]
 	}
@@ -114,19 +118,21 @@ func (c Categories) Feeds(userID, ctgID, continuationID string, count int) (feed
 }
 
 // Uncategorized returns all Feeds that belong to a category with categoryID
-func (c Categories) Uncategorized(userID, continuationID string, count int) (feeds []models.Feed, next string) {
+func (c Categories) Uncategorized(userID string, page models.Page) (feeds []models.Feed, next string) {
 	query := c.db.db.Model(&models.User{ID: userID}).Where("category_id = ?", "")
 
-	if continuationID != "" {
+	if page.ContinuationID != "" {
 		feed := models.Feed{}
-		if !c.db.db.Model(&models.User{ID: userID}).Where("id = ?", continuationID).Related(&feed).RecordNotFound() {
+		if !c.db.db.Model(&models.User{
+			ID: userID,
+		}).Where("id = ?", page.ContinuationID).Related(&feed).RecordNotFound() {
 			query = query.Where("created_at >= ?", feed.CreatedAt)
 		}
 	}
 
-	query.Limit(count + 1).Association("Feeds").Find(&feeds)
+	query.Limit(page.Count + 1).Association("Feeds").Find(&feeds)
 
-	if len(feeds) > count {
+	if len(feeds) > page.Count {
 		next = feeds[len(feeds)-1].ID
 		feeds = feeds[:len(feeds)-1]
 	}
@@ -163,6 +169,7 @@ func (c Categories) Stats(userID, ctgID string) (models.Stats, error) {
 	}
 
 	var feeds []models.Feed
+
 	c.db.db.Model(&ctg).Association("Feeds").Find(&feeds)
 
 	feedIds := make([]string, len(feeds))
@@ -190,6 +197,7 @@ func (c Categories) Mark(userID, ctgID string, marker models.Marker) error {
 	}
 
 	var feeds []models.Feed
+
 	c.db.db.Model(&ctg).Association("Feeds").Find(&feeds)
 
 	feedIds := make([]models.ID, len(feeds))
@@ -199,5 +207,6 @@ func (c Categories) Mark(userID, ctgID string, marker models.Marker) error {
 
 	markedEntry := &models.Entry{Mark: marker}
 	c.db.db.Model(markedEntry).Where("user_id = ? AND feed_id in (?)", userID, feedIds).Update(markedEntry)
+
 	return nil
 }

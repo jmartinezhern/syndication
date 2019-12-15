@@ -31,37 +31,37 @@ type (
 	Categories interface {
 		// New creates a new category. If the category conflicts with an existing category,
 		// this errors
-		New(name string, userID string) (models.Category, error)
+		New(userID, name string) (models.Category, error)
 
 		// Category returns a category with ID that belongs to user
-		Category(id string, userID string) (models.Category, bool)
+		Category(userID, id string) (models.Category, bool)
 
-		// Categories returns a page of categories owned by user and a continuation ID
-		Categories(continuationID string, count int, userID string) ([]models.Category, string)
+		// Categories returns a page of categories owned by user
+		Categories(userID string, page models.Page) ([]models.Category, string)
 
 		// Feeds returns all feeds associated to a category
-		Feeds(id string, continuationID string, count int, userID string) ([]models.Feed, string)
+		Feeds(userID string, page models.Page) ([]models.Feed, string)
 
 		// Uncategorized returns all feeds associated to a category
-		Uncategorized(continuationID string, count int, userID string) ([]models.Feed, string)
+		Uncategorized(userID string, page models.Page) ([]models.Feed, string)
 
 		// Update a category with ID that belongs to user
-		Update(newName, ctgID string, userID string) (models.Category, error)
+		Update(userID, ctgID, newName string) (models.Category, error)
 
 		// AddFeeds to a category
-		AddFeeds(ctgID string, feeds []string, userID string)
+		AddFeeds(userID, ctgID string, feeds []string)
 
 		// Delete a category with ID that belongs to a user
-		Delete(id string, userID string) error
+		Delete(userID, id string) error
 
 		// Mark a category
-		Mark(id string, marker models.Marker, userID string) error
+		Mark(userID, id string, marker models.Marker) error
 
 		// Entries returns all entries associated to a category
-		Entries(id, userID string, page models.Page) ([]models.Entry, string, error)
+		Entries(userID string, page models.Page) ([]models.Entry, string, error)
 
 		// Stats returns statistics on a category items
-		Stats(id string, userID string) (models.Stats, error)
+		Stats(userID, id string) (models.Stats, error)
 	}
 
 	// CategoriesService implements the Categories interface
@@ -88,7 +88,7 @@ func NewCategoriesService(ctgsRepo repo.Categories, entriesRepo repo.Entries) Ca
 
 // New creates a new category. If the category conflicts with an existing category,
 // this errors
-func (c CategoriesService) New(name, userID string) (models.Category, error) {
+func (c CategoriesService) New(userID, name string) (models.Category, error) {
 	name = strings.ToLower(name)
 
 	if _, found := c.ctgsRepo.CategoryWithName(userID, name); found {
@@ -105,38 +105,40 @@ func (c CategoriesService) New(name, userID string) (models.Category, error) {
 }
 
 // Category returns a category with ID that belongs to user
-func (c CategoriesService) Category(id, userID string) (models.Category, bool) {
+func (c CategoriesService) Category(userID, id string) (models.Category, bool) {
 	return c.ctgsRepo.CategoryWithID(userID, id)
 }
 
 // Categories returns all categories owned by user
-func (c CategoriesService) Categories(continuationID string, count int, userID string) (categories []models.Category, next string) {
-	return c.ctgsRepo.List(userID, continuationID, count)
+func (c CategoriesService) Categories(userID string, page models.Page) (categories []models.Category, next string) {
+	return c.ctgsRepo.List(userID, page)
 }
 
 // Feeds returns all feeds associated to a category
-func (c CategoriesService) Feeds(id, continuationID string, count int, userID string) (feeds []models.Feed, next string) {
-	return c.ctgsRepo.Feeds(userID, id, continuationID, count)
+func (c CategoriesService) Feeds(userID string, page models.Page) (feeds []models.Feed, next string) {
+	return c.ctgsRepo.Feeds(userID, page)
 }
 
 // Uncategorized returns all feeds associated to a category
-func (c CategoriesService) Uncategorized(continuationID string, count int, userID string) (feeds []models.Feed, next string) {
-	feeds, next = c.ctgsRepo.Uncategorized(userID, continuationID, count)
+func (c CategoriesService) Uncategorized(userID string, page models.Page) (feeds []models.Feed, next string) {
+	feeds, next = c.ctgsRepo.Uncategorized(userID, page)
 	return
 }
 
 // Update a category with ID that belongs to user
-func (c CategoriesService) Update(newName, ctgID, userID string) (models.Category, error) {
+func (c CategoriesService) Update(userID, ctgID, newName string) (models.Category, error) {
 	ctg := models.Category{ID: ctgID, Name: newName}
+
 	err := c.ctgsRepo.Update(userID, &ctg)
 	if err == repo.ErrModelNotFound {
 		return models.Category{}, ErrCategoryNotFound
 	}
+
 	return ctg, err
 }
 
 // AddFeeds to a category with ctgID
-func (c CategoriesService) AddFeeds(ctgID string, feeds []string, userID string) {
+func (c CategoriesService) AddFeeds(userID, ctgID string, feeds []string) {
 	for _, id := range feeds {
 		err := c.ctgsRepo.AddFeed(userID, id, ctgID)
 		if err != nil {
@@ -146,34 +148,38 @@ func (c CategoriesService) AddFeeds(ctgID string, feeds []string, userID string)
 }
 
 // Delete a category with ID that belongs to a user
-func (c CategoriesService) Delete(id, userID string) error {
+func (c CategoriesService) Delete(userID, id string) error {
 	err := c.ctgsRepo.Delete(userID, id)
 	if err == repo.ErrModelNotFound {
 		return ErrCategoryNotFound
 	}
+
 	return err
 }
 
 // Mark a category
-func (c CategoriesService) Mark(id string, marker models.Marker, userID string) error {
+func (c CategoriesService) Mark(userID, id string, marker models.Marker) error {
 	err := c.ctgsRepo.Mark(userID, id, marker)
 	if err == repo.ErrModelNotFound {
 		return ErrCategoryNotFound
 	}
+
 	return err
 }
 
 // Entries returns all entries associated to a category
-func (c CategoriesService) Entries(id, userID string, page models.Page) ([]models.Entry, string, error) {
-	if _, found := c.ctgsRepo.CategoryWithID(userID, id); !found {
+func (c CategoriesService) Entries(userID string, page models.Page) ([]models.Entry, string, error) {
+	if _, found := c.ctgsRepo.CategoryWithID(userID, page.FilterID); !found {
 		return nil, "", ErrCategoryNotFound
 	}
-	entries, next := c.entriesRepo.ListFromCategory(userID, id, page)
+
+	entries, next := c.entriesRepo.ListFromCategory(userID, page)
+
 	return entries, next, nil
 }
 
 // Stats returns statistics on a category items
-func (c CategoriesService) Stats(id, userID string) (models.Stats, error) {
+func (c CategoriesService) Stats(userID, id string) (models.Stats, error) {
 	stats, err := c.ctgsRepo.Stats(userID, id)
 	if err == repo.ErrModelNotFound {
 		return models.Stats{}, ErrCategoryNotFound

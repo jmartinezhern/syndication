@@ -140,9 +140,11 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func RandStringRunes(n int) string {
 	b := make([]rune, n)
+
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
+
 	return string(b)
 }
 
@@ -197,13 +199,13 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 	serv := NewService(testSyncInterval, s.feedsRepo, s.usersRepo, s.entriesRepo)
 	serv.SyncUser(s.user.ID)
 
-	entries, _ = s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, models.Page{
+	entries, _ = s.entriesRepo.ListFromFeed(s.user.ID, models.Page{
+		FilterID:       feed.ID,
 		ContinuationID: "",
 		Count:          5,
 		Newest:         true,
 		Marker:         models.MarkerAny,
 	})
-	s.Require().NoError(err)
 	s.Len(entries, 0)
 }
 
@@ -218,7 +220,8 @@ func (s *SyncTestSuite) TestSyncUser() {
 	serv := NewService(testSyncInterval, s.feedsRepo, s.usersRepo, s.entriesRepo)
 	serv.SyncUser(s.user.ID)
 
-	entries, _ := s.entriesRepo.ListFromFeed(s.user.ID, feed.ID, models.Page{
+	entries, _ := s.entriesRepo.ListFromFeed(s.user.ID, models.Page{
+		FilterID:       feed.ID,
 		ContinuationID: "",
 		Count:          5,
 		Newest:         true,
@@ -251,7 +254,10 @@ func (s *SyncTestSuite) TestSyncService() {
 
 	serv.Stop()
 
-	users, _ := s.usersRepo.List(s.user.ID, 10)
+	users, _ := s.usersRepo.List(models.Page{
+		ContinuationID: s.user.ID,
+		Count:          10,
+	})
 	users = users[1:]
 
 	for idx := range users {
@@ -290,7 +296,6 @@ func TestSyncTestSuite(t *testing.T) {
 		if _, err := fmt.Fprint(w, resp); err != nil {
 			panic(err)
 		}
-
 	}))
 	defer syncSuite.ts.Close()
 

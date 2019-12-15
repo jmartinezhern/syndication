@@ -49,6 +49,7 @@ func (u Users) Update(user *models.User) error {
 	}
 
 	u.db.db.Model(&dbUser).Updates(user).RecordNotFound()
+
 	return nil
 }
 
@@ -66,22 +67,24 @@ func (u Users) Delete(id string) error {
 	}
 
 	u.db.db.Delete(user)
+
 	return nil
 }
 
 // List all users
-func (u Users) List(continuationID string, count int) (users []models.User, next string) {
-	query := u.db.db.Limit(count + 1)
+func (u Users) List(page models.Page) (users []models.User, next string) {
+	query := u.db.db.Limit(page.Count + 1)
 
-	if continuationID != "" {
-		user, found := u.UserWithID(continuationID)
+	if page.ContinuationID != "" {
+		user, found := u.UserWithID(page.ContinuationID)
 		if found {
 			query = query.Where("created_at >= ?", user.CreatedAt)
 		}
 	}
+
 	query.Find(&users)
 
-	if len(users) > count {
+	if len(users) > page.Count {
 		next = users[len(users)-1].ID
 		users = users[:len(users)-1]
 	}

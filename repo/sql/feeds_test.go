@@ -63,19 +63,24 @@ func (s *FeedsSuite) TestList() {
 		s.repo.Create(s.user.ID, &feed)
 	}
 
-	feeds, next := s.repo.List(s.user.ID, "", 2)
+	feeds, next := s.repo.List(s.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          2,
+	})
 	s.Require().Len(feeds, 2)
 	s.NotEmpty(next)
 	s.Equal("Test site 0", feeds[0].Title)
 	s.Equal("Test site 1", feeds[1].Title)
 
-	feeds, _ = s.repo.List(s.user.ID, next, 3)
+	feeds, _ = s.repo.List(s.user.ID, models.Page{
+		ContinuationID: next,
+		Count:          3,
+	})
 	s.Require().Len(feeds, 3)
 	s.Equal(feeds[0].ID, next)
 	s.Equal("Test site 2", feeds[0].Title)
 	s.Equal("Test site 3", feeds[1].Title)
 	s.Equal("Test site 4", feeds[2].Title)
-
 }
 
 func (s *FeedsSuite) TestUpdate() {
@@ -148,7 +153,8 @@ func (s *FeedsSuite) TestMark() {
 	err := s.repo.Mark(s.user.ID, feed.ID, models.MarkerRead)
 	s.NoError(err)
 
-	entries, _ := NewEntries(s.db).ListFromFeed(s.user.ID, feed.ID, models.Page{
+	entries, _ := NewEntries(s.db).ListFromFeed(s.user.ID, models.Page{
+		FilterID:       feed.ID,
 		ContinuationID: "",
 		Count:          5,
 		Newest:         false,
@@ -172,6 +178,7 @@ func (s *FeedsSuite) TestStats() {
 		} else {
 			marker = models.MarkerUnread
 		}
+
 		entry := models.Entry{
 			ID:        utils.CreateID(),
 			Title:     "Item",
