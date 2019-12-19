@@ -52,12 +52,14 @@ func (t *AuthSuite) TestRegisterConflicting() {
 		ID:       utils.CreateID(),
 		Username: "testUser",
 	})
+
 	err := t.service.Register("testUser", "testtesttest")
 	t.EqualError(err, ErrUserConflicts.Error())
 }
 
 func (t *AuthSuite) TestLogin() {
 	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
+
 	t.usersRepo.Create(&models.User{
 		ID:           utils.CreateID(),
 		Username:     "testUser",
@@ -73,6 +75,7 @@ func (t *AuthSuite) TestLogin() {
 
 func (t *AuthSuite) TestBadLogin() {
 	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
+
 	t.usersRepo.Create(&models.User{
 		ID:           utils.CreateID(),
 		Username:     "testUser",
@@ -86,6 +89,7 @@ func (t *AuthSuite) TestBadLogin() {
 
 func (t *AuthSuite) TestRenew() {
 	hash, salt := utils.CreatePasswordHashAndSalt("testtesttest")
+
 	t.usersRepo.Create(&models.User{
 		ID:           utils.CreateID(),
 		Username:     "testUser",

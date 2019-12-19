@@ -52,18 +52,18 @@ func (t Tags) TagWithID(userID, id string) (tag models.Tag, found bool) {
 }
 
 // List all Tags owned by user
-func (t Tags) List(userID, continuationID string, count int) (tags []models.Tag, next string) {
+func (t Tags) List(userID string, page models.Page) (tags []models.Tag, next string) {
 	query := t.db.db.Model(&models.User{ID: userID})
 
-	if continuationID != "" {
-		if tag, found := t.TagWithID(userID, continuationID); found {
+	if page.ContinuationID != "" {
+		if tag, found := t.TagWithID(userID, page.ContinuationID); found {
 			query = query.Where("created_at >= ?", tag.CreatedAt)
 		}
 	}
 
-	query.Limit(count + 1).Association("Tags").Find(&tags)
+	query.Limit(page.Count + 1).Association("Tags").Find(&tags)
 
-	if len(tags) > count {
+	if len(tags) > page.Count {
 		next = tags[len(tags)-1].ID
 		tags = tags[:len(tags)-1]
 	}
@@ -77,6 +77,7 @@ func (t Tags) Update(userID string, tag *models.Tag) error {
 		t.db.db.Model(&dbTag).Updates(tag)
 		return nil
 	}
+
 	return repo.ErrModelNotFound
 }
 
@@ -84,7 +85,9 @@ func (t Tags) Update(userID string, tag *models.Tag) error {
 func (t Tags) Delete(userID, id string) error {
 	if tag, found := t.TagWithID(userID, id); found {
 		t.db.db.Delete(&tag)
+
 		return nil
 	}
+
 	return repo.ErrModelNotFound
 }

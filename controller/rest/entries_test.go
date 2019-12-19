@@ -75,8 +75,8 @@ func (c *EntriesControllerSuite) TestGetEntry() {
 	c.Equal(http.StatusOK, rec.Code)
 
 	var sEntry models.Entry
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &sEntry))
 
+	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &sEntry))
 	c.Equal(entry.Title, sEntry.Title)
 }
 
@@ -127,8 +127,8 @@ func (c *EntriesControllerSuite) TestGetEntries() {
 	}
 
 	var entries Entries
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
 
+	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
 	c.Require().Len(entries.Entries, 1)
 	c.Equal(entry.Title, entries.Entries[0].Title)
 }
@@ -232,6 +232,7 @@ func (c *EntriesControllerSuite) TestGetEntryStats() {
 	c.NoError(c.controller.GetEntryStats(ctx))
 
 	var stats models.Stats
+
 	c.NoError(json.Unmarshal(rec.Body.Bytes(), &stats))
 }
 

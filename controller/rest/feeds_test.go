@@ -82,7 +82,8 @@ func (c *FeedsControllerSuite) TestUnreachableNewFeed() {
 
 	ctx.SetPath("/v1/feeds")
 
-	c.EqualError(c.controller.NewFeed(ctx), echo.NewHTTPError(http.StatusBadRequest, "subscription url is not reachable").Error())
+	c.EqualError(c.controller.NewFeed(ctx),
+		echo.NewHTTPError(http.StatusBadRequest, "subscription url is not reachable").Error())
 }
 
 func (c *FeedsControllerSuite) TestGetFeeds() {
@@ -109,8 +110,8 @@ func (c *FeedsControllerSuite) TestGetFeeds() {
 	}
 
 	var feeds Feeds
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &feeds))
 
+	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &feeds))
 	c.Len(feeds.Feeds, 1)
 	c.Equal(feed.Title, feeds.Feeds[0].Title)
 }
@@ -137,8 +138,8 @@ func (c *FeedsControllerSuite) TestGetFeed() {
 	c.Equal(http.StatusOK, rec.Code)
 
 	var sFeed models.Feed
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &sFeed))
 
+	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &sFeed))
 	c.Equal(feed.Title, sFeed.Title)
 }
 
@@ -183,8 +184,8 @@ func (c *FeedsControllerSuite) TestEditFeed() {
 	c.Equal(http.StatusOK, rec.Code)
 
 	var sFeed models.Feed
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &sFeed))
 
+	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &sFeed))
 	c.Equal("NewName", sFeed.Title)
 }
 
@@ -336,8 +337,8 @@ func (c *FeedsControllerSuite) TestGetFeedEntries() {
 	}
 
 	var entries Entries
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
 
+	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
 	c.Require().Len(entries.Entries, 1)
 	c.Equal(entry.Title, entries.Entries[0].Title)
 }
@@ -363,6 +364,7 @@ func (c *FeedsControllerSuite) TestGetFeedStats() {
 	c.NoError(c.controller.GetFeedStats(ctx))
 
 	var stats models.Stats
+
 	c.NoError(json.Unmarshal(rec.Body.Bytes(), &stats))
 }
 

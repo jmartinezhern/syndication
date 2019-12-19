@@ -40,6 +40,7 @@ func (f Feeds) Create(userID string, feed *models.Feed) {
 
 	if feed.Category.ID != "" {
 		var ctg models.Category
+
 		found := !f.db.db.Model(&models.User{ID: userID}).Where("id = ?", feed.Category.ID).Related(&ctg).RecordNotFound()
 		if found {
 			f.db.db.Model(&ctg).Association("Feeds").Append(feed)
@@ -55,6 +56,7 @@ func (f Feeds) Update(userID string, feed *models.Feed) error {
 	}
 
 	f.db.db.Model(&dbFeed).Updates(feed)
+
 	return nil
 }
 
@@ -66,6 +68,7 @@ func (f Feeds) Delete(userID, id string) error {
 	}
 
 	f.db.db.Delete(&feed)
+
 	return nil
 }
 
@@ -75,22 +78,23 @@ func (f Feeds) FeedWithID(userID, id string) (feed models.Feed, found bool) {
 	if found {
 		f.db.db.Model(&feed).Related(&feed.Category)
 	}
+
 	return
 }
 
 // List all Feeds owned by user
-func (f Feeds) List(userID, continuationID string, count int) (feeds []models.Feed, next string) {
+func (f Feeds) List(userID string, page models.Page) (feeds []models.Feed, next string) {
 	query := f.db.db.Model(&models.User{ID: userID})
 
-	if continuationID != "" {
-		if feed, found := f.FeedWithID(userID, continuationID); found {
+	if page.ContinuationID != "" {
+		if feed, found := f.FeedWithID(userID, page.ContinuationID); found {
 			query = query.Where("created_at >= ?", feed.CreatedAt)
 		}
 	}
 
-	query.Limit(count + 1).Association("Feeds").Find(&feeds)
+	query.Limit(page.Count + 1).Association("Feeds").Find(&feeds)
 
-	if len(feeds) > count {
+	if len(feeds) > page.Count {
 		next = feeds[len(feeds)-1].ID
 		feeds = feeds[:len(feeds)-1]
 	}
@@ -103,6 +107,7 @@ func (f Feeds) Mark(userID, id string, marker models.Marker) error {
 	if feed, found := f.FeedWithID(userID, id); found {
 		entry := models.Entry{Mark: marker}
 		f.db.db.Model(&entry).Where("user_id = ? AND feed_id = ?", userID, feed.ID).Update(&entry)
+
 		return nil
 	}
 

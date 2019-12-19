@@ -144,8 +144,8 @@ func CreatePasswordHashAndSalt(password string) (hash, salt []byte) {
 	var err error
 
 	salt = make([]byte, pwSaltBytes)
-	_, err = io.ReadFull(rand.Reader, salt)
-	if err != nil {
+
+	if _, err = io.ReadFull(rand.Reader, salt); err != nil {
 		panic(err) // We must be able to read from random
 	}
 
@@ -180,7 +180,7 @@ func VerifyPasswordHash(password string, pwHash, pwSalt []byte) bool {
 // CreateAPIID creates an API ID
 func CreateID() string {
 	currentTime := time.Now().Unix()
-	duplicateTime := (lastTimeIDWasCreated == currentTime)
+	duplicateTime := lastTimeIDWasCreated == currentTime
 	lastTimeIDWasCreated = currentTime
 
 	if !duplicateTime {
@@ -189,8 +189,7 @@ func CreateID() string {
 		random32Int++
 	}
 
-	idStr := strconv.FormatInt(currentTime+int64(random32Int), 10)
-	return base64.StdEncoding.EncodeToString([]byte(idStr))
+	return base64.StdEncoding.EncodeToString([]byte(strconv.FormatInt(currentTime+int64(random32Int), 10)))
 }
 
 func NewAPIKey(secret string, keyType models.APIKeyType, userID string) (models.APIKey, error) {

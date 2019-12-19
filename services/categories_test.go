@@ -37,7 +37,7 @@ type CategoriesSuite struct {
 }
 
 func (t *CategoriesSuite) TestNewCategory() {
-	_, err := t.service.New("test", t.user.ID)
+	_, err := t.service.New(t.user.ID, "test")
 	t.NoError(err)
 
 	_, found := t.service.ctgsRepo.CategoryWithName(t.user.ID, "test")
@@ -49,29 +49,34 @@ func (t *CategoriesSuite) TestNewConflictingCategory() {
 		Name: "test",
 	})
 
-	_, err := t.service.New("test", t.user.ID)
+	_, err := t.service.New(t.user.ID, "test")
 	t.EqualError(err, ErrCategoryConflicts.Error())
 }
 
 func (t *CategoriesSuite) TestCategory() {
 	ctgID := utils.CreateID()
+
 	t.service.ctgsRepo.Create(t.user.ID, &models.Category{
 		ID:   ctgID,
 		Name: "test",
 	})
 
-	_, found := t.service.Category(ctgID, t.user.ID)
+	_, found := t.service.Category(t.user.ID, ctgID)
 	t.True(found)
 }
 
 func (t *CategoriesSuite) TestCategories() {
 	ctgID := utils.CreateID()
+
 	t.service.ctgsRepo.Create(t.user.ID, &models.Category{
 		ID:   ctgID,
 		Name: "test",
 	})
 
-	ctgs, _ := t.service.Categories("", 2, t.user.ID)
+	ctgs, _ := t.service.Categories(t.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          2,
+	})
 	t.Require().Len(ctgs, 1)
 	t.Equal("test", ctgs[0].Name)
 	t.Equal(ctgID, ctgs[0].ID)
@@ -93,7 +98,11 @@ func (t *CategoriesSuite) TestCategoryFeeds() {
 
 	sql.NewFeeds(t.db).Create(t.user.ID, &feed)
 
-	feeds, _ := t.service.Feeds(ctg.ID, "", 1, t.user.ID)
+	feeds, _ := t.service.Feeds(t.user.ID, models.Page{
+		FilterID:       ctg.ID,
+		ContinuationID: "",
+		Count:          1,
+	})
 	t.Require().Len(feeds, 1)
 	t.Equal(feed.Title, feeds[0].Title)
 }
@@ -107,7 +116,10 @@ func (t *CategoriesSuite) TestUncategorized() {
 
 	sql.NewFeeds(t.db).Create(t.user.ID, &feed)
 
-	feeds, _ := t.service.Uncategorized("", 1, t.user.ID)
+	feeds, _ := t.service.Uncategorized(t.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          1,
+	})
 	t.Require().Len(feeds, 1)
 	t.Equal(feed.Title, feeds[0].Title)
 }
@@ -121,13 +133,13 @@ func (t *CategoriesSuite) TestEditCategory() {
 
 	ctg.Name = "newName"
 
-	newCtg, err := t.service.Update("newName", ctg.ID, t.user.ID)
+	newCtg, err := t.service.Update(t.user.ID, ctg.ID, "newName")
 	t.NoError(err)
 	t.Equal("newName", newCtg.Name)
 }
 
 func (t *CategoriesSuite) TestEditMissingCategory() {
-	_, err := t.service.Update("bogus", "bogus", t.user.ID)
+	_, err := t.service.Update(t.user.ID, "bogus", "bogus")
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
@@ -146,9 +158,13 @@ func (t *CategoriesSuite) TestAddFeedsToCategory() {
 	}
 	sql.NewFeeds(t.db).Create(t.user.ID, &feed)
 
-	t.service.AddFeeds(ctg.ID, []string{feed.ID}, t.user.ID)
+	t.service.AddFeeds(t.user.ID, ctg.ID, []string{feed.ID})
 
-	feeds, _ := t.service.ctgsRepo.Feeds(t.user.ID, ctg.ID, "", 1)
+	feeds, _ := t.service.ctgsRepo.Feeds(t.user.ID, models.Page{
+		FilterID:       ctg.ID,
+		ContinuationID: "",
+		Count:          1,
+	})
 	t.Require().Len(feeds, 1)
 	t.Equal(feed.Title, feeds[0].Title)
 }
@@ -160,7 +176,7 @@ func (t *CategoriesSuite) TestDeleteCategory() {
 	}
 	t.service.ctgsRepo.Create(t.user.ID, &ctg)
 
-	err := t.service.Delete(ctg.ID, t.user.ID)
+	err := t.service.Delete(t.user.ID, ctg.ID)
 	t.NoError(err)
 
 	_, found := t.service.ctgsRepo.CategoryWithID(t.user.ID, ctg.ID)
@@ -168,7 +184,7 @@ func (t *CategoriesSuite) TestDeleteCategory() {
 }
 
 func (t *CategoriesSuite) TestDeleteMissingCategory() {
-	err := t.service.Delete("bogus", t.user.ID)
+	err := t.service.Delete(t.user.ID, "bogus")
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
@@ -194,7 +210,7 @@ func (t *CategoriesSuite) TestMarkCategory() {
 		Feed:  feed,
 	})
 
-	err := t.service.Mark(ctg.ID, models.MarkerRead, t.user.ID)
+	err := t.service.Mark(t.user.ID, ctg.ID, models.MarkerRead)
 	t.NoError(err)
 
 	entries, _ := entriesRepo.List(t.user.ID, models.Page{
@@ -207,7 +223,7 @@ func (t *CategoriesSuite) TestMarkCategory() {
 }
 
 func (t *CategoriesSuite) TestMarkMissingCategory() {
-	err := t.service.Mark("bogus", models.MarkerRead, t.user.ID)
+	err := t.service.Mark(t.user.ID, "bogus", models.MarkerRead)
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 
@@ -234,7 +250,8 @@ func (t *CategoriesSuite) TestCategoryEntries() {
 		Feed:  feed,
 	})
 
-	entries, _, err := t.service.Entries(ctg.ID, t.user.ID, models.Page{
+	entries, _, err := t.service.Entries(t.user.ID, models.Page{
+		FilterID:       ctg.ID,
 		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
@@ -246,7 +263,7 @@ func (t *CategoriesSuite) TestCategoryEntries() {
 }
 
 func (t *CategoriesSuite) TestEntriesForMissingCategory() {
-	_, _, err := t.service.Entries("bogus", t.user.ID, models.Page{
+	_, _, err := t.service.Entries(t.user.ID, models.Page{
 		ContinuationID: "",
 		Count:          1,
 		Newest:         true,
@@ -262,12 +279,12 @@ func (t *CategoriesSuite) TestCategoryStats() {
 	}
 	t.service.ctgsRepo.Create(t.user.ID, &ctg)
 
-	_, err := t.service.Stats(ctg.ID, t.user.ID)
+	_, err := t.service.Stats(t.user.ID, ctg.ID)
 	t.NoError(err)
 }
 
 func (t *CategoriesSuite) TestMissingCategoryStats() {
-	_, err := t.service.Stats("bogus", t.user.ID)
+	_, err := t.service.Stats(t.user.ID, "bogus")
 	t.EqualError(err, ErrCategoryNotFound.Error())
 }
 

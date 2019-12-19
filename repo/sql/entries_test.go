@@ -124,7 +124,8 @@ func (s *EntriesSuite) TestListFromCategory() {
 		s.db.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
-	entries, next := s.repo.ListFromCategory(s.user.ID, ctg.ID, models.Page{
+	entries, next := s.repo.ListFromCategory(s.user.ID, models.Page{
+		FilterID:       ctg.ID,
 		ContinuationID: "",
 		Count:          2,
 		Newest:         false,
@@ -135,7 +136,8 @@ func (s *EntriesSuite) TestListFromCategory() {
 	s.Equal("Entry 0", entries[0].Title)
 	s.Equal("Entry 1", entries[1].Title)
 
-	entries, _ = s.repo.ListFromCategory(s.user.ID, ctg.ID, models.Page{
+	entries, _ = s.repo.ListFromCategory(s.user.ID, models.Page{
+		FilterID:       ctg.ID,
 		ContinuationID: next,
 		Count:          3,
 		Newest:         false,
@@ -171,7 +173,8 @@ func (s *EntriesSuite) TestListFromFeed() {
 		s.db.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
-	entries, next := s.repo.ListFromFeed(s.user.ID, feed.ID, models.Page{
+	entries, next := s.repo.ListFromFeed(s.user.ID, models.Page{
+		FilterID:       feed.ID,
 		ContinuationID: "",
 		Count:          2,
 		Newest:         false,
@@ -181,7 +184,8 @@ func (s *EntriesSuite) TestListFromFeed() {
 	s.Equal("Entry 0", entries[0].Title)
 	s.Equal("Entry 1", entries[1].Title)
 
-	entries, _ = s.repo.ListFromFeed(s.user.ID, feed.ID, models.Page{
+	entries, _ = s.repo.ListFromFeed(s.user.ID, models.Page{
+		FilterID:       feed.ID,
 		ContinuationID: next,
 		Count:          3,
 		Newest:         false,
@@ -195,7 +199,7 @@ func (s *EntriesSuite) TestListFromFeed() {
 }
 
 func (s *EntriesSuite) TestEntriesWithMissingCategory() {
-	entries, _ := s.repo.ListFromCategory(s.user.ID, "bogus", models.Page{
+	entries, _ := s.repo.ListFromCategory(s.user.ID, models.Page{
 		ContinuationID: "",
 		Count:          5,
 		Newest:         true,
@@ -288,12 +292,14 @@ func (s *EntriesSuite) TestListFromTags() {
 	}
 
 	firstTagID := utils.CreateID()
+
 	s.db.db.Model(s.user).Association("Tags").Append(&models.Tag{
 		ID:   firstTagID,
 		Name: "first",
 	})
 
 	secondTagID := utils.CreateID()
+
 	s.db.db.Model(s.user).Association("Tags").Append(&models.Tag{
 		ID:   secondTagID,
 		Name: "first",
@@ -319,6 +325,7 @@ func (s *EntriesSuite) TestStats() {
 		} else {
 			marker = models.MarkerUnread
 		}
+
 		entry := models.Entry{
 			ID:        utils.CreateID(),
 			Title:     "Item",

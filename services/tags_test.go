@@ -38,7 +38,7 @@ type TagsSuite struct {
 }
 
 func (t *TagsSuite) TestNewTag() {
-	tag, err := t.service.New("tech", t.user.ID)
+	tag, err := t.service.New(t.user.ID, "tech")
 	t.NoError(err)
 	t.Equal("tech", tag.Name)
 }
@@ -48,7 +48,8 @@ func (t *TagsSuite) TestNewConflictingTag() {
 		ID:   utils.CreateID(),
 		Name: "test",
 	})
-	_, err := t.service.New("test", t.user.ID)
+
+	_, err := t.service.New(t.user.ID, "test")
 	t.Equal(ErrTagConflicts, err)
 	t.EqualError(err, ErrTagConflicts.Error())
 }
@@ -60,7 +61,7 @@ func (t *TagsSuite) TestDeleteTag() {
 	}
 	t.tagsRepo.Create(t.user.ID, &tag)
 
-	err := t.service.Delete(tag.ID, t.user.ID)
+	err := t.service.Delete(t.user.ID, tag.ID)
 	t.NoError(err)
 
 	_, found := t.tagsRepo.TagWithID(t.user.ID, tag.ID)
@@ -68,7 +69,7 @@ func (t *TagsSuite) TestDeleteTag() {
 }
 
 func (t *TagsSuite) TestDeleteUnknownTag() {
-	err := t.service.Delete("bogus", t.user.ID)
+	err := t.service.Delete(t.user.ID, "bogus")
 	t.Equal(ErrTagNotFound, err)
 }
 
@@ -79,13 +80,13 @@ func (t *TagsSuite) TestUpdateTag() {
 	}
 	t.tagsRepo.Create(t.user.ID, &tag)
 
-	newTag, err := t.service.Update(tag.ID, "other", t.user.ID)
+	newTag, err := t.service.Update(t.user.ID, tag.ID, "other")
 	t.NoError(err)
 	t.Equal("other", newTag.Name)
 }
 
 func (t *TagsSuite) TestEditUnknownTag() {
-	_, err := t.service.Update("", "", t.user.ID)
+	_, err := t.service.Update(t.user.ID, "", "")
 	t.EqualError(err, ErrTagNotFound.Error())
 }
 

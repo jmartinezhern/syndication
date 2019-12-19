@@ -97,6 +97,7 @@ func (s *UsersSuite) TestGetUser() {
 	s.NoError(s.controller.GetUser(ctx))
 
 	var respUser models.User
+
 	s.NoError(json.Unmarshal(rec.Body.Bytes(), &respUser))
 	s.Equal(user.Username, respUser.Username)
 }

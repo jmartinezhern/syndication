@@ -59,7 +59,7 @@ func (s *EntriesController) GetEntry(c echo.Context) error {
 
 	entryID := c.Param("entryID")
 
-	entry, err := s.entries.Entry(entryID, userID)
+	entry, err := s.entries.Entry(userID, entryID)
 	if err == services.ErrEntryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -105,7 +105,7 @@ func (s *EntriesController) MarkEntry(c echo.Context) error {
 	marker := models.MarkerFromString(asParam)
 	entryID := c.Param("entryID")
 
-	err := s.entries.Mark(entryID, marker, userID)
+	err := s.entries.Mark(userID, entryID, marker)
 	if err == services.ErrEntryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
 	} else if err != nil {
@@ -126,7 +126,7 @@ func (s *EntriesController) MarkAllEntries(c echo.Context) error {
 
 	marker := models.MarkerFromString(asParam)
 
-	s.entries.MarkAll(marker, userID)
+	s.entries.MarkAll(userID, marker)
 
 	return c.NoContent(http.StatusNoContent)
 }

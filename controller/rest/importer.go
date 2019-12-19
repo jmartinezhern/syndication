@@ -63,6 +63,7 @@ func (s *ImporterController) Import(c echo.Context) error {
 
 	contType := c.Request().Header.Get("Content-Type")
 	data := make([]byte, contLength)
+
 	_, err := bufio.NewReader(c.Request().Body).Read(data)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not read request body")

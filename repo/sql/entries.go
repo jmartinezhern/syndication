@@ -44,7 +44,8 @@ func (e Entries) Create(userID string, entry *models.Entry) {
 
 	if entry.Feed.ID != "" {
 		var feed models.Feed
-		if !e.db.db.Model(&models.User{ID: userID}).Where("id = ?", entry.Feed.ID).Related(&feed).RecordNotFound() {
+		if !e.db.db.Model(&models.User{ID: userID}).Where("id = ?", entry.Feed.ID).Related(&feed).
+			RecordNotFound() {
 			e.db.db.Model(&feed).Association("Entries").Append(entry)
 		}
 	}
@@ -56,6 +57,7 @@ func (e Entries) EntryWithGUID(userID, guid string) (entry models.Entry, found b
 	if found {
 		e.db.db.Model(&entry).Related(&entry.Feed)
 	}
+
 	return
 }
 
@@ -91,9 +93,10 @@ func (e Entries) List(userID string, page models.Page) (entries []models.Entry, 
 }
 
 // ListFromFeed returns all Entries associated to a feed
-func (e Entries) ListFromFeed(userID, feedID string, page models.Page) (entries []models.Entry, next string) {
+func (e Entries) ListFromFeed(userID string, page models.Page) (entries []models.Entry, next string) {
 	var feed models.Feed
-	if notFound := e.db.db.Model(&models.User{ID: userID}).Where("id = ?", feedID).Related(&feed).RecordNotFound(); notFound {
+	if notFound := e.db.db.Model(&models.User{ID: userID}).Where("id = ?", page.FilterID).Related(&feed).
+		RecordNotFound(); notFound {
 		return nil, ""
 	}
 
@@ -103,16 +106,19 @@ func (e Entries) ListFromFeed(userID, feedID string, page models.Page) (entries 
 }
 
 // ListFromCategory all Entries that are associated to a Category
-func (e Entries) ListFromCategory(userID, ctgID string, page models.Page) (entries []models.Entry, next string) {
+func (e Entries) ListFromCategory(userID string, page models.Page) (entries []models.Entry, next string) {
 	var ctg models.Category
-	if notFound := e.db.db.Model(&models.User{ID: userID}).Where("id = ?", ctgID).Related(&ctg).RecordNotFound(); notFound {
+	if notFound := e.db.db.Model(&models.User{ID: userID}).Where("id = ?", page.FilterID).Related(&ctg).
+		RecordNotFound(); notFound {
 		return nil, ""
 	}
 
 	query := e.db.db.Model(&models.User{ID: userID})
 
 	var feeds []models.Feed
+
 	e.db.db.Model(&ctg).Related(&feeds)
+
 	feedIds := make([]models.ID, len(feeds))
 	for idx := range feeds {
 		feedIds[idx] = feeds[idx].ID
@@ -169,6 +175,7 @@ func (e Entries) TagEntries(userID, tagID string, entryIDs []string) error {
 	}
 
 	entries := make([]models.Entry, len(entryIDs))
+
 	for i, id := range entryIDs {
 		entry, found := e.EntryWithID(userID, id)
 		if found {
@@ -185,8 +192,10 @@ func (e Entries) TagEntries(userID, tagID string, entryIDs []string) error {
 func (e Entries) Mark(userID, id string, marker models.Marker) error {
 	if entry, found := e.EntryWithID(userID, id); found {
 		e.db.db.Model(&entry).Update(&models.Entry{Mark: marker})
+
 		return nil
 	}
+
 	return repo.ErrModelNotFound
 }
 
@@ -204,10 +213,12 @@ func (e Entries) ListFromTags(userID string, tagIDs []string, page models.Page) 
 		if e.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(tag).RecordNotFound() {
 			return ""
 		}
+
 		return tag.ID
 	}
 
 	var tagPrimaryKeys []models.ID
+
 	for _, tag := range tagIDs {
 		key := tagPrimaryKey(tag, userID)
 		if key != "" {
@@ -231,9 +242,12 @@ func (e Entries) DeleteOldEntries(userID string, timestamp time.Time) {
 func (e Entries) Stats(userID string) models.Stats {
 	stats := models.Stats{}
 
-	stats.Unread = e.db.db.Model(&models.User{ID: userID}).Where("mark = ?", models.MarkerUnread).Association("Entries").Count()
-	stats.Read = e.db.db.Model(&models.User{ID: userID}).Where("mark = ?", models.MarkerRead).Association("Entries").Count()
-	stats.Saved = e.db.db.Model(&models.User{ID: userID}).Where("saved = ?", true).Association("Entries").Count()
+	stats.Unread = e.db.db.Model(&models.User{ID: userID}).Where("mark = ?", models.MarkerUnread).
+		Association("Entries").Count()
+	stats.Read = e.db.db.Model(&models.User{ID: userID}).Where("mark = ?", models.MarkerRead).
+		Association("Entries").Count()
+	stats.Saved = e.db.db.Model(&models.User{ID: userID}).Where("saved = ?", true).
+		Association("Entries").Count()
 	stats.Total = e.db.db.Model(&models.User{ID: userID}).Association("Entries").Count()
 
 	return stats

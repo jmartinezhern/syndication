@@ -66,11 +66,18 @@ func (t *ImporterSuite) TestOPMLImporter() {
 	ctg, found := t.importer.ctgsRepo.CategoryWithName(t.user.ID, "Test")
 	t.Require().True(found)
 
-	ctgFeeds, _ := t.importer.ctgsRepo.Feeds(t.user.ID, ctg.ID, "", 10)
+	ctgFeeds, _ := t.importer.ctgsRepo.Feeds(t.user.ID, models.Page{
+		FilterID:       ctg.ID,
+		ContinuationID: "",
+		Count:          10,
+	})
 	t.Require().Len(ctgFeeds, 1)
 	t.Equal(ctgFeeds[0].Title, "Example")
 
-	feeds, _ := t.importer.feedsRepo.List(t.user.ID, "", 2)
+	feeds, _ := t.importer.feedsRepo.List(t.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          2,
+	})
 
 	t.NotZero(sort.Search(len(feeds), func(i int) bool {
 		return feeds[i].Title == "Empty"

@@ -83,17 +83,27 @@ func (c *ImporterControllerSuite) TestOPMLImport() {
 	c.Equal(http.StatusNoContent, rec.Code)
 
 	ctgsRepo := sql.NewCategories(c.db)
-	ctgs, _ := ctgsRepo.List(c.user.ID, "", 1)
+	ctgs, _ := ctgsRepo.List(c.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          1,
+	})
 	c.Require().Len(ctgs, 1)
 	c.Equal("Sports", ctgs[0].Name)
 	c.NotEmpty(ctgs[0].ID)
 
-	feeds, _ := ctgsRepo.Feeds(c.user.ID, ctgs[0].ID, "", 1)
+	feeds, _ := ctgsRepo.Feeds(c.user.ID, models.Page{
+		FilterID:       ctgs[0].ID,
+		ContinuationID: "",
+		Count:          1,
+	})
 	c.Require().Len(feeds, 1)
 	c.Equal("Basketball", feeds[0].Title)
 	c.Equal("http://example.com/basketball", feeds[0].Subscription)
 
-	unctgsFeeds, _ := ctgsRepo.Uncategorized(c.user.ID, "", 1)
+	unctgsFeeds, _ := ctgsRepo.Uncategorized(c.user.ID, models.Page{
+		ContinuationID: "",
+		Count:          1,
+	})
 	c.Require().Len(unctgsFeeds, 1)
 	c.Equal("Baseball", unctgsFeeds[0].Title)
 	c.Equal("http://example.com/baseball", unctgsFeeds[0].Subscription)

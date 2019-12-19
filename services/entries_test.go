@@ -48,13 +48,13 @@ func (t *EntriesSuite) TestEntry() {
 	}
 	t.entriesRepo.Create(t.user.ID, &entry)
 
-	uEntry, err := t.service.Entry(entry.ID, t.user.ID)
+	uEntry, err := t.service.Entry(t.user.ID, entry.ID)
 	t.NoError(err)
 	t.Equal(entry.Title, uEntry.Title)
 }
 
 func (t *EntriesSuite) TestMissingEntry() {
-	_, err := t.service.Entry("bogus", t.user.ID)
+	_, err := t.service.Entry(t.user.ID, "bogus")
 	t.EqualError(err, ErrEntryNotFound.Error())
 }
 
@@ -86,7 +86,7 @@ func (t *EntriesSuite) TestMarkEntry() {
 	}
 	t.entriesRepo.Create(t.user.ID, &entry)
 
-	err := t.service.Mark(entry.ID, models.MarkerRead, t.user.ID)
+	err := t.service.Mark(t.user.ID, entry.ID, models.MarkerRead)
 	t.NoError(err)
 
 	entries, _ := t.entriesRepo.List(t.user.ID, models.Page{
@@ -100,7 +100,7 @@ func (t *EntriesSuite) TestMarkEntry() {
 }
 
 func (t *EntriesSuite) TestMarkMissingEntry() {
-	err := t.service.Mark("bogus", models.MarkerRead, t.user.ID)
+	err := t.service.Mark(t.user.ID, "bogus", models.MarkerRead)
 	t.EqualError(err, ErrEntryNotFound.Error())
 }
 
@@ -113,7 +113,7 @@ func (t *EntriesSuite) TestMarkAll() {
 	}
 	t.entriesRepo.Create(t.user.ID, &entry)
 
-	t.service.MarkAll(models.MarkerRead, t.user.ID)
+	t.service.MarkAll(t.user.ID, models.MarkerRead)
 
 	entries, _ := t.entriesRepo.List(t.user.ID, models.Page{
 		ContinuationID: "",

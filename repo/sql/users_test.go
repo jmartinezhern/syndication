@@ -58,20 +58,26 @@ func (s *UsersSuite) TestList() {
 		Username: "test_two",
 	})
 
-	users, next := s.repo.List("", 1)
+	users, next := s.repo.List(models.Page{
+		ContinuationID: "",
+		Count:          1,
+	})
 	s.NotEmpty(next)
 	s.Require().Len(users, 1)
 	s.Equal("test_one", users[0].Username)
 
-	users, _ = s.repo.List(next, 1)
+	users, _ = s.repo.List(models.Page{
+		ContinuationID: next,
+		Count:          1,
+	})
 	s.Require().Len(users, 1)
 	s.Equal(users[0].ID, next)
 	s.Equal("test_two", users[0].Username)
-
 }
 
 func (s *UsersSuite) TestUserWithID() {
 	userID := utils.CreateID()
+
 	s.repo.Create(&models.User{
 		ID:       userID,
 		Username: "test",

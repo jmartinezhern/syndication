@@ -93,6 +93,7 @@ func main() {
 
 	syncService := sync.NewService(config.Sync.Interval, feedsRepo, usersRepo, entriesRepo)
 	syncService.Start()
+
 	defer syncService.Stop()
 
 	go func() {
