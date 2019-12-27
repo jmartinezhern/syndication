@@ -127,7 +127,6 @@ type (
 		suite.Suite
 
 		ts          *httptest.Server
-		user        *models.User
 		db          *sql.DB
 		ctgsRepo    repo.Categories
 		feedsRepo   repo.Feeds
@@ -152,13 +151,6 @@ func (s *SyncTestSuite) SetupTest() {
 	s.db = sql.NewDB("sqlite3", ":memory:")
 
 	s.usersRepo = sql.NewUsers(s.db)
-
-	randUserName := RandStringRunes(8)
-	s.user = &models.User{
-		ID:       utils.CreateID(),
-		Username: randUserName,
-	}
-	s.usersRepo.Create(s.user)
 
 	s.ctgsRepo = sql.NewCategories(s.db)
 	s.feedsRepo = sql.NewFeeds(s.db)
@@ -186,20 +178,26 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 		Subscription: s.ts.URL + "/rss.xml",
 	}
 
-	s.feedsRepo.Create(s.user.ID, &feed)
+	user := &models.User{
+		ID:       utils.CreateID(),
+		Username: RandStringRunes(8),
+	}
+	s.usersRepo.Create(user)
+
+	s.feedsRepo.Create(user.ID, &feed)
 
 	_, entries, err := utils.PullFeed(feed.Subscription, "")
 	s.Require().NoError(err)
 	s.Require().Len(entries, 5)
 
 	for idx := range entries {
-		s.entriesRepo.Create(s.user.ID, &entries[idx])
+		s.entriesRepo.Create(user.ID, &entries[idx])
 	}
 
 	serv := NewService(testSyncInterval, s.feedsRepo, s.usersRepo, s.entriesRepo)
-	serv.SyncUser(s.user.ID)
+	serv.syncUser(user.ID)
 
-	entries, _ = s.entriesRepo.ListFromFeed(s.user.ID, models.Page{
+	entries, _ = s.entriesRepo.ListFromFeed(user.ID, models.Page{
 		FilterID:       feed.ID,
 		ContinuationID: "",
 		Count:          5,
@@ -210,17 +208,23 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 }
 
 func (s *SyncTestSuite) TestSyncUser() {
+	user := &models.User{
+		ID:       utils.CreateID(),
+		Username: RandStringRunes(8),
+	}
+	s.usersRepo.Create(user)
+
 	feed := models.Feed{
 		ID:           utils.CreateID(),
 		Title:        "Sync Test",
 		Subscription: s.ts.URL + "/rss.xml",
 	}
-	s.feedsRepo.Create(s.user.ID, &feed)
+	s.feedsRepo.Create(user.ID, &feed)
 
 	serv := NewService(testSyncInterval, s.feedsRepo, s.usersRepo, s.entriesRepo)
-	serv.SyncUser(s.user.ID)
+	serv.syncUser(user.ID)
 
-	entries, _ := s.entriesRepo.ListFromFeed(s.user.ID, models.Page{
+	entries, _ := s.entriesRepo.ListFromFeed(user.ID, models.Page{
 		FilterID:       feed.ID,
 		ContinuationID: "",
 		Count:          5,
@@ -250,12 +254,12 @@ func (s *SyncTestSuite) TestSyncService() {
 
 	serv.Start()
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 5)
 
 	serv.Stop()
 
 	users, _ := s.usersRepo.List(models.Page{
-		ContinuationID: s.user.ID,
+		ContinuationID: "",
 		Count:          10,
 	})
 	users = users[1:]
@@ -267,7 +271,7 @@ func (s *SyncTestSuite) TestSyncService() {
 			Newest:         true,
 			Marker:         models.MarkerAny,
 		})
-		s.Len(entries, 5)
+		s.Len(entries, 5, "Entries are missing for user with id %s", users[idx].ID)
 	}
 }
 

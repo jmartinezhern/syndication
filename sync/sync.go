@@ -29,21 +29,20 @@ import (
 )
 
 const (
-	maxThreads = 100
-	stopping   = iota
-	stopped
+	maxThreads = 10
 )
-
-type syncStatus = int
 
 // Service defines properties for running a Feed Sync Service.
 // Service will update all feeds for all users periodically.
 type Service struct {
-	ticker        *time.Ticker
-	userWaitGroup sync.WaitGroup
-	status        chan syncStatus
-	userQueue     chan models.User
-	dbLock        sync.Mutex
+	ticker *time.Ticker
+
+	quit      chan bool
+	userQueue chan models.User
+
+	dbLock sync.Mutex
+
+	wg sync.WaitGroup
 
 	interval time.Duration
 
@@ -52,60 +51,65 @@ type Service struct {
 	entriesRepo repo.Entries
 }
 
-// SyncUsers sync's all user's feeds.
-func (s *Service) SyncUsers() {
-	s.userQueue = make(chan models.User)
+func (s *Service) syncUserHandler() {
+	defer s.wg.Done()
 
-	// List up to maxThreads of users per iteration
-	users, continuationID := s.usersRepo.List(models.Page{
-		ContinuationID: "",
-		Count:          maxThreads,
-	})
-	if len(users) == 0 {
+	for {
+		user, ok := <-s.userQueue
+		if !ok {
+			return
+		}
+
+		s.syncUser(user.ID)
+	}
+}
+
+func (s *Service) updateFeed(userID string, feed *models.Feed) {
+	if !time.Now().After(feed.LastUpdated.Add(s.interval)) {
 		return
 	}
 
-	s.userWaitGroup.Add(len(users))
-
-	// We may have less users than we do maxThreads.
-	// Start length of users of goroutines which cannot be more than maxThreads.
-	for range users {
-		go func() {
-			for {
-				user, more := <-s.userQueue
-				if !more {
-					return
-				}
-				s.SyncUser(user.ID)
-				s.userWaitGroup.Done()
-			}
-		}()
+	fetchedFeed, entries, err := utils.PullFeed(feed.Subscription, feed.Etag)
+	if err != nil {
+		log.Error(err)
+		return
 	}
 
+	fetchedFeed.ID = feed.ID
+
+	if err = s.feedsRepo.Update(userID, &fetchedFeed); err != nil {
+		log.Error(err)
+		return
+	}
+
+	for idx := range entries {
+		if _, found := s.entriesRepo.EntryWithGUID(userID, entries[idx].GUID); !found {
+			entries[idx].ID = utils.CreateID()
+			entries[idx].Feed = *feed
+			s.entriesRepo.Create(userID, &entries[idx])
+		}
+	}
+}
+
+func (s *Service) syncUsers() {
 	for {
-		for idx := range users {
-			s.userQueue <- users[idx]
-		}
-
-		s.userWaitGroup.Wait()
-
-		if continuationID == "" {
-			break
-		}
-
-		users, continuationID = s.usersRepo.List(models.Page{ContinuationID: continuationID, Count: maxThreads})
+		// List up to maxThreads of users per iteration
+		users, continuationID := s.usersRepo.List(models.Page{ContinuationID: "", Count: maxThreads})
 		if len(users) == 0 {
 			break
 		}
 
-		s.userWaitGroup.Add(len(users))
-	}
+		for idx := range users {
+			s.userQueue <- users[idx]
+		}
 
-	close(s.userQueue)
+		if continuationID == "" {
+			break
+		}
+	}
 }
 
-// SyncUser sync's all feeds owned by user
-func (s *Service) SyncUser(userID string) {
+func (s *Service) syncUser(userID string) {
 	s.dbLock.Lock()
 	defer s.dbLock.Unlock()
 
@@ -117,31 +121,8 @@ func (s *Service) SyncUser(userID string) {
 	for {
 		feeds, continuationID = s.feedsRepo.List(userID, models.Page{ContinuationID: continuationID, Count: 100})
 
-		for feedIdx := range feeds {
-			if !time.Now().After(feeds[feedIdx].LastUpdated.Add(s.interval)) {
-				continue
-			}
-
-			fetchedFeed, entries, err := utils.PullFeed(feeds[feedIdx].Subscription, feeds[feedIdx].Etag)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
-
-			fetchedFeed.ID = feeds[feedIdx].ID
-
-			if err = s.feedsRepo.Update(userID, &fetchedFeed); err != nil {
-				log.Error(err)
-				continue
-			}
-
-			for idx := range entries {
-				if _, found := s.entriesRepo.EntryWithGUID(userID, entries[idx].GUID); !found {
-					entries[idx].ID = utils.CreateID()
-					entries[idx].Feed = feeds[feedIdx]
-					s.entriesRepo.Create(userID, &entries[idx])
-				}
-			}
+		for idx := range feeds {
+			s.updateFeed(userID, &feeds[idx])
 		}
 
 		if continuationID == "" {
@@ -155,10 +136,8 @@ func (s *Service) scheduleTask() {
 		for {
 			select {
 			case <-s.ticker.C:
-				s.SyncUsers()
-			case <-s.status:
-				s.ticker.Stop()
-				s.status <- stopped
+				s.syncUsers()
+			case <-s.quit:
 				return
 			}
 		}
@@ -167,6 +146,14 @@ func (s *Service) scheduleTask() {
 
 // Start a SyncService
 func (s *Service) Start() {
+	s.userQueue = make(chan models.User, maxThreads)
+
+	s.wg.Add(maxThreads)
+
+	for i := 0; i < maxThreads; i++ {
+		go s.syncUserHandler()
+	}
+
 	s.ticker = time.NewTicker(s.interval)
 	s.scheduleTask()
 }
@@ -174,17 +161,20 @@ func (s *Service) Start() {
 // Stop a SyncService
 func (s *Service) Stop() {
 	s.ticker.Stop()
-	s.userWaitGroup.Wait()
-	s.status <- stopping
-	<-s.status
+
+	s.quit <- true
+
+	close(s.userQueue)
+
+	s.wg.Wait()
 }
 
 // NewService creates a new SyncService object
-func NewService(syncInterval time.Duration, feedsRepo repo.Feeds, usersRepo repo.Users,
-	entriesRepo repo.Entries) Service {
+func NewService(interval time.Duration, feedsRepo repo.Feeds, usersRepo repo.Users, entriesRepo repo.Entries) Service {
 	return Service{
-		status:      make(chan syncStatus),
-		interval:    syncInterval,
+		quit:        make(chan bool),
+		wg:          sync.WaitGroup{},
+		interval:    interval,
 		feedsRepo:   feedsRepo,
 		usersRepo:   usersRepo,
 		entriesRepo: entriesRepo,
