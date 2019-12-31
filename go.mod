@@ -1,6 +1,7 @@
 module github.com/jmartinezhern/syndication
 
 require (
+	github.com/Masterminds/squirrel v1.1.0
 	github.com/PuerkitoBio/goquery v1.5.0 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/jinzhu/gorm v1.9.11

@@ -18,6 +18,12 @@
 package sql
 
 import (
+	"database/sql"
+	log "github.com/sirupsen/logrus"
+	"time"
+
+	sq "github.com/Masterminds/squirrel"
+
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 )
@@ -36,42 +42,102 @@ func NewCategories(db *DB) Categories {
 
 // Create a new Category owned by user
 func (c Categories) Create(userID string, ctg *models.Category) {
-	c.db.db.Model(&models.User{ID: userID}).Association("Categories").Append(ctg)
+	ctg.CreatedAt = time.Now()
+	ctg.UpdatedAt = time.Now()
+
+	stmnt, args, err := sq.Insert("categories").
+		Columns("id", "name", "user_id", "created_at", "updated_at").
+		Values(ctg.ID, ctg.Name, userID, ctg.CreatedAt, ctg.UpdatedAt).
+		ToSql()
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = c.db.db.DB().Exec(stmnt, args...)
+	if err != nil {
+		// TODO - return
+		panic(err)
+	}
+
+	// TODO - remove
+	ctg.UserID = userID
 }
 
 // Update a category owned by user
 func (c Categories) Update(userID string, ctg *models.Category) error {
-	dbCtg, found := c.CategoryWithID(userID, ctg.ID)
-	if !found {
-		return repo.ErrModelNotFound
+	ctg.UpdatedAt = time.Now()
+
+	stmnt, args, err := sq.Update("categories").
+		Set("name", ctg.Name).
+		Set("updated_at", ctg.UpdatedAt).
+		Where("id = ? AND user_id = ?", ctg.ID, userID).
+		ToSql()
+	if err != nil {
+		panic(err)
 	}
 
-	c.db.db.Model(&dbCtg).Updates(ctg)
+	res, err := c.db.db.DB().Exec(stmnt, args...)
+	if err != nil {
+		return err
+	}
+
+	if count, _ := res.RowsAffected(); count == 0 {
+		return repo.ErrModelNotFound
+	}
 
 	return nil
 }
 
 // Delete a category with id owned by user
 func (c Categories) Delete(userID, id string) error {
-	ctg, found := c.CategoryWithID(userID, id)
-	if !found {
-		return repo.ErrModelNotFound
+	stmnt, args, err := sq.Delete("categories").
+		Where("id = ? AND user_id = ?", id, userID).
+		ToSql()
+	if err != nil {
+		panic(err)
 	}
 
-	c.db.db.Delete(ctg)
+	res, err := c.db.db.DB().Exec(stmnt, args...)
+	if err != nil {
+		return err
+	}
+
+	if count, _ := res.RowsAffected(); count == 0 {
+		return repo.ErrModelNotFound
+	}
 
 	return nil
 }
 
 // CategoryWithID returns a category with ID owned by user
-func (c Categories) CategoryWithID(userID, id string) (ctg models.Category, found bool) {
-	found = !c.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&ctg).RecordNotFound()
-	return
+func (c Categories) CategoryWithID(userID, id string) (models.Category, bool) {
+	stmnt, args, err := sq.Select("id", "created_at", "updated_at", "name").
+		From("categories").
+		Where("id = ? AND user_id = ?", id, userID).
+		ToSql()
+	if err != nil {
+		panic(err)
+	}
+
+	row := c.db.db.DB().QueryRow(stmnt, args...)
+
+	var ctg models.Category
+	if err = row.Scan(&ctg.ID, &ctg.CreatedAt, &ctg.UpdatedAt, &ctg.Name); err != nil {
+		if err != sql.ErrNoRows {
+			log.Error(err)
+		}
+
+		return models.Category{}, false
+	}
+
+	return ctg, true
 }
 
 // List all Categories owned by user
-func (c Categories) List(userID string, page models.Page) (categories []models.Category, next string) {
-	query := c.db.db.Model(&models.User{ID: userID})
+func (c Categories) List(userID string, page models.Page) ([]models.Category, string) {
+	query := sq.Select("id, name, created_at, updated_at").
+		From("categories").
+		Where("user_id = ?", userID)
 
 	if page.ContinuationID != "" {
 		if ctg, found := c.CategoryWithID(userID, page.ContinuationID); found {
@@ -79,14 +145,36 @@ func (c Categories) List(userID string, page models.Page) (categories []models.C
 		}
 	}
 
-	query.Limit(page.Count + 1).Association("Categories").Find(&categories)
-
-	if len(categories) > page.Count {
-		next = categories[len(categories)-1].ID
-		categories = categories[:len(categories)-1]
+	stmnt, args, err := query.Limit(uint64(page.Count + 1)).ToSql()
+	if err != nil {
+		panic(err)
 	}
 
-	return
+	rows, err := c.db.db.DB().Query(stmnt, args...)
+	if err != nil {
+		log.Error(err)
+		return nil, ""
+	}
+
+	var categories []models.Category
+
+	for rows.Next() {
+		var ctg models.Category
+		err := rows.Scan(&ctg.ID, &ctg.Name, &ctg.CreatedAt, &ctg.UpdatedAt)
+		if err == sql.ErrNoRows {
+			return nil, ""
+		} else if err != nil {
+			log.Error(err)
+			return nil, ""
+		}
+		categories = append(categories, ctg)
+	}
+
+	if categories != nil && len(categories) > page.Count {
+		return categories[:len(categories)-1], categories[len(categories)-1].ID
+	}
+
+	return categories, ""
 }
 
 // Feeds returns all Feeds in category with ctgID owned by user

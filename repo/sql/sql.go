@@ -39,6 +39,7 @@ func NewDB(dbType, connection string) *DB {
 		panic(err)
 	}
 
+	gormDB.LogMode(false)
 	gormDB.AutoMigrate(&models.Feed{})
 	gormDB.AutoMigrate(&models.Category{})
 	gormDB.AutoMigrate(&models.User{})
