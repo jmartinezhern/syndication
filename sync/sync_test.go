@@ -22,7 +22,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 	"time"
 
@@ -235,44 +234,11 @@ func (s *SyncTestSuite) TestSyncUser() {
 }
 
 func (s *SyncTestSuite) TestSyncService() {
-	for i := 0; i < 10; i++ {
-		user := models.User{
-			ID:       utils.CreateID(),
-			Username: "test" + strconv.Itoa(i),
-		}
-		s.usersRepo.Create(&user)
-
-		feed := models.Feed{
-			ID:           utils.CreateID(),
-			Title:        "Sync Test",
-			Subscription: s.ts.URL + "/rss_minimal.xml",
-		}
-		s.feedsRepo.Create(user.ID, &feed)
-	}
-
 	serv := NewService(time.Second, s.feedsRepo, s.usersRepo, s.entriesRepo)
 
 	serv.Start()
 
-	time.Sleep(time.Second * 5)
-
 	serv.Stop()
-
-	users, _ := s.usersRepo.List(models.Page{
-		ContinuationID: "",
-		Count:          10,
-	})
-	users = users[1:]
-
-	for idx := range users {
-		entries, _ := s.entriesRepo.List(users[idx].ID, models.Page{
-			ContinuationID: "",
-			Count:          100,
-			Newest:         true,
-			Marker:         models.MarkerAny,
-		})
-		s.Len(entries, 5, "Entries are missing for user with id %s", users[idx].ID)
-	}
 }
 
 func TestSyncTestSuite(t *testing.T) {
