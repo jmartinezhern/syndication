@@ -190,6 +190,8 @@ func (s *CategoriesController) MarkCategory(c echo.Context) error {
 	err := s.categories.Mark(userID, c.Param("categoryID"), marker)
 	if err == services.ErrCategoryNotFound {
 		return echo.NewHTTPError(http.StatusNotFound)
+	} else if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError)
 	}
 
 	return c.NoContent(http.StatusNoContent)

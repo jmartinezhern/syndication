@@ -15,11 +15,12 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rest
+package rest_test
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
+	"github.com/golang/mock/gomock"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -28,27 +29,37 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/jmartinezhern/syndication/controller/rest"
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
+)
+
+const (
+	userContextKey = "user"
 )
 
 type (
 	CategoriesControllerSuite struct {
 		suite.Suite
 
-		controller *CategoriesController
+		ctrl           *gomock.Controller
+		mockCategories *services.MockCategories
+
+		controller *rest.CategoriesController
 		e          *echo.Echo
-		db         *sql.DB
 		user       *models.User
 	}
 )
 
 func (c *CategoriesControllerSuite) TestNewCategory() {
-	ctg := `{ "name": "new" }`
+	ctg := models.Category{
+		ID: utils.CreateID(),
+	}
 
-	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(ctg))
+	c.mockCategories.EXPECT().New(gomock.Eq(c.user.ID), gomock.Eq("new")).Return(ctg, nil)
+
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(`{ "name": "new" }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
@@ -59,15 +70,20 @@ func (c *CategoriesControllerSuite) TestNewCategory() {
 
 	c.NoError(c.controller.NewCategory(ctx))
 	c.Equal(http.StatusCreated, rec.Code)
+
+	response := &models.Category{}
+
+	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), response))
+
+	c.Equal(ctg.ID, response.ID)
 }
 
 func (c *CategoriesControllerSuite) TestNewConflictingCategory() {
-	ctg := `{ "name": "test" }`
+	c.mockCategories.EXPECT().
+		New(gomock.Eq(c.user.ID), gomock.Eq("test")).
+		Return(models.Category{}, services.ErrCategoryConflicts)
 
-	_, err := c.controller.categories.New(c.user.ID, "test")
-	c.NoError(err)
-
-	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(ctg))
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(`{ "name": "test" }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
@@ -76,7 +92,7 @@ func (c *CategoriesControllerSuite) TestNewConflictingCategory() {
 
 	ctx.SetPath("/v1/categories")
 
-	err = c.controller.NewCategory(ctx)
+	err := c.controller.NewCategory(ctx)
 
 	c.EqualError(
 		err,
@@ -95,19 +111,48 @@ func (c *CategoriesControllerSuite) TestNewCategoryWithBadInput() {
 	ctx.SetPath("/v1/categories")
 
 	c.EqualError(
-		echo.NewHTTPError(http.StatusBadRequest),
-		c.controller.NewCategory(ctx).Error(),
+		c.controller.NewCategory(ctx),
+		echo.NewHTTPError(http.StatusBadRequest).Error(),
+	)
+}
+
+func (c *CategoriesControllerSuite) TestNewCategoryInternalError() {
+	c.mockCategories.EXPECT().
+		New(gomock.Eq(c.user.ID), gomock.Eq("test")).
+		Return(models.Category{}, errors.New("error"))
+
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(`{ "name": "test" }`))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetPath("/v1/categories")
+
+	err := c.controller.NewCategory(ctx)
+
+	c.EqualError(
+		err,
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
 	)
 }
 
 func (c *CategoriesControllerSuite) TestGetCategory() {
-	ctg, err := c.controller.categories.New(c.user.ID, "Test")
-	c.Require().NoError(err)
+	ctg := models.Category{
+		ID:   utils.CreateID(),
+		Name: "test",
+	}
+
+	c.mockCategories.EXPECT().
+		Category(gomock.Eq(c.user.ID), gomock.Eq(ctg.ID)).
+		Return(ctg, true)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
+
 	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetPath("/v1/categories/:categoryID")
@@ -117,13 +162,15 @@ func (c *CategoriesControllerSuite) TestGetCategory() {
 	c.NoError(c.controller.GetCategory(ctx))
 	c.Equal(http.StatusOK, rec.Code)
 
-	var sCtg models.Category
+	response := &models.Category{}
 
-	c.NoError(json.Unmarshal(rec.Body.Bytes(), &sCtg))
-	c.Equal(ctg.Name, sCtg.Name)
+	c.NoError(json.Unmarshal(rec.Body.Bytes(), response))
+	c.Equal(ctg.Name, response.Name)
 }
 
 func (c *CategoriesControllerSuite) TestGetMissingCategory() {
+	c.mockCategories.EXPECT().Category(gomock.Eq(c.user.ID), gomock.Any()).Return(models.Category{}, false)
+
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
@@ -141,8 +188,14 @@ func (c *CategoriesControllerSuite) TestGetMissingCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategories() {
-	ctg, err := c.controller.categories.New(c.user.ID, "Test")
-	c.Require().NoError(err)
+	ctg := models.Category{
+		ID:   utils.CreateID(),
+		Name: "test",
+	}
+
+	c.mockCategories.EXPECT().
+		Categories(gomock.Eq(c.user.ID), gomock.Eq(models.Page{ContinuationID: "", Count: 1})).
+		Return([]models.Category{ctg}, "")
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
@@ -167,9 +220,23 @@ func (c *CategoriesControllerSuite) TestGetCategories() {
 	c.Equal(ctg.Name, categories.Categories[0].Name)
 }
 
+func (c *CategoriesControllerSuite) TestGetCategoriesBadRequest() {
+	req := httptest.NewRequest(echo.GET, "/?count=true", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetPath("/v1/categories")
+
+	c.EqualError(
+		c.controller.GetCategories(ctx),
+		echo.NewHTTPError(http.StatusBadRequest).Error(),
+	)
+}
+
 func (c *CategoriesControllerSuite) TestGetCategoryFeeds() {
-	ctg, err := c.controller.categories.New(c.user.ID, "test")
-	c.Require().NoError(err)
+	ctg := models.Category{ID: utils.CreateID()}
 
 	feed := models.Feed{
 		ID:           utils.CreateID(),
@@ -177,7 +244,8 @@ func (c *CategoriesControllerSuite) TestGetCategoryFeeds() {
 		Title:        "example",
 		Category:     ctg,
 	}
-	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
+
+	c.mockCategories.EXPECT().Feeds(gomock.Eq(c.user.ID), gomock.Any()).Return([]models.Feed{feed}, "")
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
@@ -203,9 +271,30 @@ func (c *CategoriesControllerSuite) TestGetCategoryFeeds() {
 	c.Len(ctgFeeds.Feeds, 1)
 }
 
+func (c *CategoriesControllerSuite) TestGetCategoryFeedsBadRequest() {
+	req := httptest.NewRequest(echo.GET, "/?count=true", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("id")
+
+	ctx.SetPath("/v1/categories/:categoryID/feeds")
+
+	c.EqualError(
+		c.controller.GetCategoryFeeds(ctx),
+		echo.NewHTTPError(http.StatusBadRequest).Error(),
+	)
+}
+
 func (c *CategoriesControllerSuite) TestEditCategory() {
-	ctg, err := c.controller.categories.New(c.user.ID, "test")
-	c.Require().NoError(err)
+	ctg := models.Category{
+		ID:   utils.CreateID(),
+		Name: "gopher",
+	}
+
+	c.mockCategories.EXPECT().Update(gomock.Eq(c.user.ID), gomock.Eq(ctg.ID), gomock.Eq(ctg.Name)).Return(ctg, nil)
 
 	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{"name": "gopher"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -222,28 +311,82 @@ func (c *CategoriesControllerSuite) TestEditCategory() {
 	c.Equal(http.StatusOK, rec.Code)
 }
 
-func (c *CategoriesControllerSuite) TestAppendFeeds() {
-	ctg, err := c.controller.categories.New(c.user.ID, "test")
-	c.Require().NoError(err)
-
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Subscription: "http://localhost:9090",
-		Title:        "example",
-		Category:     ctg,
-	}
-	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
-
-	feeds := fmt.Sprintf(`{ "feeds": ["%s"] }`, feed.ID)
+func (c *CategoriesControllerSuite) TestEditCategoryBadRequest() {
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{`))
+	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(feeds))
+
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("id")
+
+	ctx.SetPath("/v1/categories/:categoryID")
+
+	c.EqualError(
+		c.controller.EditCategory(ctx),
+		echo.NewHTTPError(http.StatusBadRequest).Error(),
+	)
+}
+
+func (c *CategoriesControllerSuite) TestEditCategoryNotFound() {
+	c.mockCategories.EXPECT().
+		Update(gomock.Eq(c.user.ID), gomock.Any(), gomock.Any()).
+		Return(models.Category{}, services.ErrCategoryNotFound)
+
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{"name": "gopher"}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("id")
+
+	ctx.SetPath("/v1/categories/:categoryID")
+
+	c.EqualError(
+		c.controller.EditCategory(ctx),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
+}
+
+func (c *CategoriesControllerSuite) TestEditCategoryInternalError() {
+	c.mockCategories.EXPECT().
+		Update(gomock.Eq(c.user.ID), gomock.Any(), gomock.Any()).
+		Return(models.Category{}, errors.New("error"))
+
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{"name": "gopher"}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("id")
+
+	ctx.SetPath("/v1/categories/:categoryID")
+
+	c.EqualError(
+		c.controller.EditCategory(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
+}
+
+func (c *CategoriesControllerSuite) TestAppendFeeds() {
+	ctgID := utils.CreateID()
+
+	c.mockCategories.EXPECT().AddFeeds(gomock.Eq(c.user.ID), gomock.Eq(ctgID), gomock.Any())
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{ "feeds": ["id"] }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.ID)
+	ctx.SetParamValues(ctgID)
 
 	ctx.SetPath("/v1/categories/:categoryID/feeds")
 
@@ -251,9 +394,29 @@ func (c *CategoriesControllerSuite) TestAppendFeeds() {
 	c.Equal(http.StatusNoContent, rec.Code)
 }
 
+func (c *CategoriesControllerSuite) TestAppendFeedsBadRequest() {
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{`))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("id")
+
+	ctx.SetPath("/v1/categories/:categoryID/feeds")
+
+	c.EqualError(
+		c.controller.AppendCategoryFeeds(ctx),
+		echo.NewHTTPError(http.StatusBadRequest).Error(),
+	)
+}
+
 func (c *CategoriesControllerSuite) TestDeleteCategory() {
-	ctg, err := c.controller.categories.New(c.user.ID, "test")
-	c.Require().NoError(err)
+	ctgID := utils.CreateID()
+
+	c.mockCategories.EXPECT().Delete(gomock.Eq(c.user.ID), gomock.Eq(ctgID)).Return(nil)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
@@ -261,7 +424,7 @@ func (c *CategoriesControllerSuite) TestDeleteCategory() {
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.ID)
+	ctx.SetParamValues(ctgID)
 
 	ctx.SetPath("/v1/categories/:categoryID")
 
@@ -269,26 +432,48 @@ func (c *CategoriesControllerSuite) TestDeleteCategory() {
 	c.Equal(http.StatusNoContent, rec.Code)
 }
 
+func (c *CategoriesControllerSuite) TestDeleteCategoryNotFound() {
+	c.mockCategories.EXPECT().Delete(gomock.Eq(c.user.ID), gomock.Any()).Return(services.ErrCategoryNotFound)
+
+	req := httptest.NewRequest(echo.DELETE, "/", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("id")
+
+	ctx.SetPath("/v1/categories/:categoryID")
+
+	c.EqualError(
+		c.controller.DeleteCategory(ctx),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
+	)
+}
+
+func (c *CategoriesControllerSuite) TestDeleteCategoryInternalError() {
+	c.mockCategories.EXPECT().Delete(gomock.Eq(c.user.ID), gomock.Any()).Return(errors.New("error"))
+
+	req := httptest.NewRequest(echo.DELETE, "/", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("id")
+
+	ctx.SetPath("/v1/categories/:categoryID")
+
+	c.EqualError(
+		c.controller.DeleteCategory(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
+}
+
 func (c *CategoriesControllerSuite) TestMarkCategory() {
-	ctg, err := c.controller.categories.New(c.user.ID, "test")
-	c.Require().NoError(err)
+	ctgID := utils.CreateID()
 
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Subscription: "http://localhost:9090",
-		Title:        "example",
-		Category:     ctg,
-	}
-	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
-
-	entry := models.Entry{
-		Title: "Test Entry",
-		Mark:  models.MarkerUnread,
-		Feed:  feed,
-	}
-
-	entriesRepo := sql.NewEntries(c.db)
-	entriesRepo.Create(c.user.ID, &entry)
+	c.mockCategories.EXPECT().Mark(gomock.Eq(c.user.ID), gomock.Eq(ctgID), gomock.Eq(models.MarkerRead)).Return(nil)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
@@ -296,23 +481,36 @@ func (c *CategoriesControllerSuite) TestMarkCategory() {
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.ID)
+	ctx.SetParamValues(ctgID)
 
 	ctx.SetPath("/v1/categories/:categoryID/mark")
 
 	c.NoError(c.controller.MarkCategory(ctx))
 	c.Equal(http.StatusNoContent, rec.Code)
+}
 
-	entries, _ := entriesRepo.List(c.user.ID, models.Page{
-		ContinuationID: "",
-		Count:          1,
-		Newest:         true,
-		Marker:         models.MarkerRead,
-	})
-	c.Require().Len(entries, 1)
+func (c *CategoriesControllerSuite) TestMarkCategoryInternalError() {
+	c.mockCategories.EXPECT().Mark(gomock.Eq(c.user.ID), gomock.Any(), gomock.Any()).Return(errors.New("error"))
+
+	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("bogus")
+
+	ctx.SetPath("/v1/categories/:categoryID/mark")
+
+	c.EqualError(
+		c.controller.MarkCategory(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
 }
 
 func (c *CategoriesControllerSuite) TestMarkUnknownCategory() {
+	c.mockCategories.EXPECT().Mark(gomock.Eq(c.user.ID), gomock.Any(), gomock.Any()).Return(services.ErrCategoryNotFound)
+
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	rec := httptest.NewRecorder()
@@ -330,26 +528,21 @@ func (c *CategoriesControllerSuite) TestMarkUnknownCategory() {
 }
 
 func (c *CategoriesControllerSuite) TestGetCategoryEntries() {
-	ctg, err := c.controller.categories.New(c.user.ID, "test")
-	c.Require().NoError(err)
+	ctgID := utils.CreateID()
 
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Subscription: "http://localhost:9090",
-		Title:        "example",
-		Category:     ctg,
-	}
-	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
-
-	entry := models.Entry{
-		ID:    utils.CreateID(),
-		Title: "Test Entry",
-		Mark:  models.MarkerUnread,
-		Feed:  feed,
+	page := models.Page{
+		FilterID:       ctgID,
+		ContinuationID: "",
+		Count:          1,
+		Newest:         true,
+		Marker:         models.MarkerAny,
 	}
 
-	entriesRepo := sql.NewEntries(c.db)
-	entriesRepo.Create(c.user.ID, &entry)
+	c.mockCategories.EXPECT().Entries(gomock.Eq(c.user.ID), gomock.Eq(page)).Return([]models.Entry{
+		{
+			ID: utils.CreateID(),
+		},
+	}, "", nil)
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
@@ -357,25 +550,35 @@ func (c *CategoriesControllerSuite) TestGetCategoryEntries() {
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.ID)
+	ctx.SetParamValues(ctgID)
 
 	ctx.SetPath("/v1/categories/:categoryID/entries")
 
 	c.NoError(c.controller.GetCategoryEntries(ctx))
+}
 
-	type Entries struct {
-		Entries []models.Entry `json:"entries"`
-	}
+func (c *CategoriesControllerSuite) TestGetCategoryEntriesBadRequest() {
+	req := httptest.NewRequest(echo.GET, "/?count=true", nil)
 
-	var entries Entries
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("bogus")
 
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
+	ctx.SetPath("/v1/categories/:categoryID/entries")
 
-	c.Require().Len(entries.Entries, 1)
-	c.Equal(entry.Title, entries.Entries[0].Title)
+	c.EqualError(
+		c.controller.GetCategoryEntries(ctx),
+		echo.NewHTTPError(http.StatusBadRequest).Error(),
+	)
 }
 
 func (c *CategoriesControllerSuite) TestGetUnknownCategoryEntries() {
+	c.mockCategories.EXPECT().
+		Entries(gomock.Eq(c.user.ID), gomock.Any()).
+		Return([]models.Entry{}, "", services.ErrCategoryNotFound)
+
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
@@ -387,14 +590,15 @@ func (c *CategoriesControllerSuite) TestGetUnknownCategoryEntries() {
 	ctx.SetPath("/v1/categories/:categoryID/entries")
 
 	c.EqualError(
-		echo.NewHTTPError(http.StatusNotFound),
-		c.controller.GetCategoryEntries(ctx).Error(),
+		c.controller.GetCategoryEntries(ctx),
+		echo.NewHTTPError(http.StatusNotFound).Error(),
 	)
 }
 
-func (c *CategoriesControllerSuite) TestGetCategoryStats() {
-	ctg, err := c.controller.categories.New(c.user.ID, "test")
-	c.Require().NoError(err)
+func (c *CategoriesControllerSuite) TestGetCategoryEntriesInternalError() {
+	c.mockCategories.EXPECT().
+		Entries(gomock.Eq(c.user.ID), gomock.Any()).
+		Return([]models.Entry{}, "", errors.New("error"))
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
@@ -402,18 +606,37 @@ func (c *CategoriesControllerSuite) TestGetCategoryStats() {
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("categoryID")
-	ctx.SetParamValues(ctg.ID)
+	ctx.SetParamValues("bogus")
+
+	ctx.SetPath("/v1/categories/:categoryID/entries")
+
+	c.EqualError(
+		c.controller.GetCategoryEntries(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
+}
+
+func (c *CategoriesControllerSuite) TestGetCategoryStats() {
+	ctgID := utils.CreateID()
+
+	c.mockCategories.EXPECT().Stats(gomock.Eq(c.user.ID), gomock.Eq(ctgID)).Return(models.Stats{}, nil)
+
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues(ctgID)
 
 	ctx.SetPath("/v1/categories/:categoryID/stats")
 
 	c.NoError(c.controller.GetCategoryStats(ctx))
-
-	var stats models.Stats
-
-	c.NoError(json.Unmarshal(rec.Body.Bytes(), &stats))
 }
 
 func (c *CategoriesControllerSuite) TestGetUnknownCategoryStats() {
+	c.mockCategories.EXPECT().Stats(gomock.Eq(c.user.ID), gomock.Any()).Return(models.Stats{}, services.ErrCategoryNotFound)
+
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
@@ -430,7 +653,28 @@ func (c *CategoriesControllerSuite) TestGetUnknownCategoryStats() {
 	)
 }
 
+func (c *CategoriesControllerSuite) TestGetCategoryStatsInternalError() {
+	c.mockCategories.EXPECT().Stats(gomock.Eq(c.user.ID), gomock.Any()).Return(models.Stats{}, errors.New("error"))
+
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("categoryID")
+	ctx.SetParamValues("bogus")
+
+	ctx.SetPath("/v1/categories/:categoryID/stats")
+
+	c.EqualError(
+		c.controller.GetCategoryStats(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
+}
+
 func (c *CategoriesControllerSuite) SetupTest() {
+	c.ctrl = gomock.NewController(c.T())
+
 	c.e = echo.New()
 	c.e.HideBanner = true
 
@@ -438,18 +682,15 @@ func (c *CategoriesControllerSuite) SetupTest() {
 		ID: utils.CreateID(),
 	}
 
-	c.db = sql.NewDB("sqlite3", ":memory:")
-	ctgsRepo := sql.NewCategories(c.db)
-	entriesRepo := sql.NewEntries(c.db)
-	sql.NewUsers(c.db).Create(c.user)
+	c.mockCategories = services.NewMockCategories(c.ctrl)
 
-	c.controller = NewCategoriesController(services.NewCategoriesService(ctgsRepo, entriesRepo), c.e)
+	c.controller = rest.NewCategoriesController(c.mockCategories, c.e)
 }
 
 func (c *CategoriesControllerSuite) TearDownTest() {
-	err := c.db.Close()
-	c.NoError(err)
+	c.ctrl.Finish()
 }
+
 func TestCategoriesControllerSuite(t *testing.T) {
 	suite.Run(t, new(CategoriesControllerSuite))
 }

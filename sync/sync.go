@@ -29,7 +29,8 @@ import (
 )
 
 const (
-	maxThreads = 10
+	maxThreads           = 10
+	maxPageSizePerThread = 100
 )
 
 // Service defines properties for running a Feed Sync Service.
@@ -119,7 +120,10 @@ func (s *Service) syncUser(userID string) {
 	)
 
 	for {
-		feeds, continuationID = s.feedsRepo.List(userID, models.Page{ContinuationID: continuationID, Count: 100})
+		feeds, continuationID = s.feedsRepo.List(userID, models.Page{
+			ContinuationID: continuationID,
+			Count:          maxPageSizePerThread,
+		})
 
 		for idx := range feeds {
 			s.updateFeed(userID, &feeds[idx])

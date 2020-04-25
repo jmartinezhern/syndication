@@ -29,8 +29,11 @@ import (
 )
 
 const (
-	generatedSecretLength = 128
-	configFileName        = "config"
+	generatedSecretLength      = 128
+	configFileName             = "config"
+	defaultSyncInterval        = time.Minute * 15
+	defaultDeleteAfterInterval = 30
+	defaultHTTPPort            = 8080
 )
 
 type (
@@ -78,13 +81,13 @@ var rootCmd = &cobra.Command{
 // EffectiveConfig read by viper
 var EffectiveConfig Config
 
-// Execute the root command
+// Execute the root command.
 func Execute() error {
 	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file")
 
-	viper.SetDefault("sync.interval", time.Minute*15)
-	viper.SetDefault("sync.delete_after", 30)
-	viper.SetDefault("host.port", 8080)
+	viper.SetDefault("sync.interval", defaultSyncInterval)
+	viper.SetDefault("sync.delete_after", defaultDeleteAfterInterval)
+	viper.SetDefault("host.port", defaultHTTPPort)
 	viper.SetDefault("host.address", "localhost")
 	viper.SetDefault("database.type", "sqlite3")
 	viper.SetDefault("database.connection", "/var/lib/syndication.db")

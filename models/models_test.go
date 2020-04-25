@@ -15,12 +15,14 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package models
+package models_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/jmartinezhern/syndication/models"
 )
 
 type (
@@ -30,9 +32,9 @@ type (
 )
 
 func (s *ModelsTestSuite) TestMarkerFromString() {
-	s.EqualValues(MarkerUnread, MarkerFromString("unread"))
-	s.EqualValues(MarkerRead, MarkerFromString("read"))
-	s.EqualValues(MarkerAny, MarkerFromString("bogus"))
+	s.EqualValues(models.MarkerUnread, models.MarkerFromString("unread"))
+	s.EqualValues(models.MarkerRead, models.MarkerFromString("read"))
+	s.EqualValues(models.MarkerAny, models.MarkerFromString("bogus"))
 }
 
 func TestImporterTestSuite(t *testing.T) {

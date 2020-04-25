@@ -24,6 +24,10 @@ import (
 	"github.com/jmartinezhern/syndication/repo"
 )
 
+const (
+	maxPageSize = 100
+)
+
 type (
 	// Exporter is an interface that wraps the basic
 	// export functions.
@@ -73,14 +77,14 @@ func (e OPMLExporter) Export(userID string) ([]byte, error) {
 	}
 
 	for {
-		ctgs, continuationID = e.repo.List(userID, models.Page{ContinuationID: continuationID, Count: 100})
+		ctgs, continuationID = e.repo.List(userID, models.Page{ContinuationID: continuationID, Count: maxPageSize})
 
 		for idx := range ctgs {
 			ctg := ctgs[idx]
 			feeds, _ := e.repo.Feeds(userID, models.Page{
 				FilterID:       ctg.ID,
 				ContinuationID: "",
-				Count:          100,
+				Count:          maxPageSize,
 			})
 			items := marshal(feeds)
 			ctgOutline := models.OPMLOutline{
@@ -98,7 +102,7 @@ func (e OPMLExporter) Export(userID string) ([]byte, error) {
 
 	for {
 		var feeds []models.Feed
-		feeds, continuationID = e.repo.Uncategorized(userID, models.Page{ContinuationID: continuationID, Count: 100})
+		feeds, continuationID = e.repo.Uncategorized(userID, models.Page{ContinuationID: continuationID, Count: maxPageSize})
 
 		items := marshal(feeds)
 		b.Body.Items = append(b.Body.Items, items...)

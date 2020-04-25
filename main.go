@@ -35,6 +35,12 @@ import (
 	"github.com/jmartinezhern/syndication/sync"
 )
 
+const (
+	oneKilobyte         = 1 << 10
+	defaultHSTSMaxAge   = 3600
+	cancellationTimeout = time.Second * 5
+)
+
 func config() cmd.Config {
 	if err := cmd.Execute(); err != nil {
 		log.Error(err)
@@ -42,6 +48,25 @@ func config() cmd.Config {
 	}
 
 	return cmd.EffectiveConfig
+}
+
+func configureMiddleware(e *echo.Echo) {
+	e.Use(middleware.CORS())
+
+	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+		XSSProtection:         "",
+		XFrameOptions:         "",
+		ContentTypeNosniff:    "nosniff",
+		HSTSMaxAge:            defaultHSTSMaxAge,
+		ContentSecurityPolicy: "default-src 'self'",
+	}))
+
+	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
+		StackSize:         oneKilobyte, // 1 KB
+		DisablePrintStack: false,
+	}))
+
+	e.Use(middleware.Logger())
 }
 
 func main() {
@@ -63,22 +88,8 @@ func main() {
 
 	e := echo.New()
 	e.HideBanner = true
-	e.Use(middleware.CORS())
 
-	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
-		XSSProtection:         "",
-		XFrameOptions:         "",
-		ContentTypeNosniff:    "nosniff",
-		HSTSMaxAge:            3600,
-		ContentSecurityPolicy: "default-src 'self'",
-	}))
-
-	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
-		StackSize:         1 << 10, // 1 KB
-		DisablePrintStack: false,
-	}))
-
-	e.Use(middleware.Logger())
+	configureMiddleware(e)
 
 	rest.NewAuthController(authService, config.AuthSecret, config.AllowRegistrations, e)
 	rest.NewUsersController(usersService, e)
@@ -106,7 +117,7 @@ func main() {
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), cancellationTimeout)
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {

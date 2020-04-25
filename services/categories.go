@@ -26,6 +26,8 @@ import (
 	"github.com/jmartinezhern/syndication/utils"
 )
 
+//go:generate mockgen -source=categories.go -destination=categories_mock.go -package=services
+
 type (
 	// Categories interface defines the Categories service
 	Categories interface {

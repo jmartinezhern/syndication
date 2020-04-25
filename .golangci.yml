@@ -23,6 +23,7 @@
   linters:
     enable-all: true
     disable:
+      - godot # re-enable on issue #134
       - maligned
       - prealloc
       - gochecknoglobals

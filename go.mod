@@ -3,6 +3,8 @@ module github.com/jmartinezhern/syndication
 require (
 	github.com/PuerkitoBio/goquery v1.5.0 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/golang/mock v1.4.3
+	github.com/google/uuid v1.1.1
 	github.com/jinzhu/gorm v1.9.12
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/labstack/echo/v4 v4.1.16

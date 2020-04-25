@@ -21,15 +21,13 @@ package utils
 import (
 	"crypto/md5"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"io"
-	mathRand "math/rand"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/google/uuid"
 	"github.com/mmcdole/gofeed"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/scrypt"
@@ -42,14 +40,12 @@ const (
 	pwHashBytes = 64
 )
 
-var (
-	lastTimeIDWasCreated int64
-	random32Int          uint32
-)
-
 const (
 	refreshKeyExpirationInterval = time.Hour * 24 * 7
 	accessKeyExpirationInterval  = time.Hour * 24 * 3
+	cpuCost                      = 1 << 14
+	keyRValue                    = 8
+	keyPValue                    = 1
 )
 
 var (
@@ -149,7 +145,7 @@ func CreatePasswordHashAndSalt(password string) (hash, salt []byte) {
 		panic(err) // We must be able to read from random
 	}
 
-	hash, err = scrypt.Key([]byte(password), salt, 1<<14, 8, 1, pwHashBytes)
+	hash, err = scrypt.Key([]byte(password), salt, cpuCost, keyRValue, keyPValue, pwHashBytes)
 	if err != nil {
 		panic(err) // We must never get an error
 	}
@@ -159,7 +155,7 @@ func CreatePasswordHashAndSalt(password string) (hash, salt []byte) {
 
 // VerifyPasswordHash with a given salt
 func VerifyPasswordHash(password string, pwHash, pwSalt []byte) bool {
-	hash, err := scrypt.Key([]byte(password), pwSalt, 1<<14, 8, 1, pwHashBytes)
+	hash, err := scrypt.Key([]byte(password), pwSalt, cpuCost, keyRValue, keyPValue, pwHashBytes)
 	if err != nil {
 		return false
 	}
@@ -177,19 +173,9 @@ func VerifyPasswordHash(password string, pwHash, pwSalt []byte) bool {
 	return true
 }
 
-// CreateAPIID creates an API ID
+// CreateID creates a random ID
 func CreateID() string {
-	currentTime := time.Now().Unix()
-	duplicateTime := lastTimeIDWasCreated == currentTime
-	lastTimeIDWasCreated = currentTime
-
-	if !duplicateTime {
-		random32Int = mathRand.Uint32() % 16
-	} else {
-		random32Int++
-	}
-
-	return base64.StdEncoding.EncodeToString([]byte(strconv.FormatInt(currentTime+int64(random32Int), 10)))
+	return uuid.New().String()
 }
 
 func NewAPIKey(secret string, keyType models.APIKeyType, userID string) (models.APIKey, error) {
