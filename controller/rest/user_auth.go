@@ -42,7 +42,6 @@ type (
 		e                  *echo.Echo
 		auth               services.Auth
 		secret             string
-		allowRegistrations bool
 	}
 )
 
@@ -67,7 +66,6 @@ func NewAuthController(service services.Auth, secret string, allowRegistration b
 		e,
 		service,
 		secret,
-		allowRegistration,
 	}
 
 	controller.e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -90,8 +88,11 @@ func NewAuthController(service services.Auth, secret string, allowRegistration b
 		}
 	})
 
+	if allowRegistration {
+		v1.POST("/auth/register", controller.Register)
+	}
+
 	v1.POST("/auth/login", controller.Login)
-	v1.POST("/auth/register", controller.Register)
 	v1.POST("/auth/renew", controller.Renew)
 
 	return &controller
@@ -111,10 +112,6 @@ func (s *AuthController) Login(c echo.Context) error {
 
 // Register a user
 func (s *AuthController) Register(c echo.Context) error {
-	if !s.allowRegistrations {
-		return echo.NewHTTPError(http.StatusNotFound)
-	}
-
 	err := s.auth.Register(c.FormValue("username"), c.FormValue("password"))
 	if err == services.ErrUserConflicts {
 		return echo.NewHTTPError(http.StatusConflict)

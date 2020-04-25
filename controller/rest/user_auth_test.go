@@ -15,19 +15,21 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rest
+package rest_test
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/jmartinezhern/syndication/controller/rest"
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/services"
@@ -37,50 +39,20 @@ type (
 	AuthControllerSuite struct {
 		suite.Suite
 
-		controller *AuthController
+		ctrl     *gomock.Controller
+		mockAuth *services.MockAuth
+
+		controller *rest.AuthController
 		e          *echo.Echo
 		db         *sql.DB
 	}
 )
 
-func (c *AuthControllerSuite) TestRegister() {
-	req := httptest.NewRequest(
-		echo.POST,
-		fmt.Sprintf("/?username=%s&password=%s", "test", "testtesttest"),
-		nil,
-	)
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	rec := httptest.NewRecorder()
-	ctx := c.e.NewContext(req, rec)
-	ctx.SetPath("/v1/auth/register")
-
-	c.NoError(c.controller.Register(ctx))
-	c.Equal(http.StatusCreated, rec.Code)
-}
-
-func (c *AuthControllerSuite) TestDisallowedRegistrations() {
-	c.controller.allowRegistrations = false
-
-	req := httptest.NewRequest(
-		echo.POST,
-		fmt.Sprintf("/"),
-		nil,
-	)
-
-	rec := httptest.NewRecorder()
-	ctx := c.e.NewContext(req, rec)
-	ctx.SetPath("/v1/auth/register")
-
-	c.EqualError(c.controller.Register(ctx), echo.NewHTTPError(http.StatusNotFound).Error())
-}
-
 func (c *AuthControllerSuite) TestLogin() {
 	username := "test"
 	password := "testtesttest"
 
-	err := c.controller.auth.Register(username, password)
-	c.Require().NoError(err)
+	c.mockAuth.EXPECT().Login(gomock.Eq(username), gomock.Eq(password)).Return(models.APIKeyPair{}, nil)
 
 	req := httptest.NewRequest(
 		echo.POST,
@@ -96,25 +68,121 @@ func (c *AuthControllerSuite) TestLogin() {
 
 	c.NoError(c.controller.Login(ctx))
 	c.Equal(http.StatusOK, rec.Code)
+}
 
-	keys := new(models.APIKeyPair)
-	c.NoError(json.Unmarshal(rec.Body.Bytes(), keys))
-	c.NotEmpty(keys.AccessKey)
-	c.NotEmpty(keys.RefreshKey)
+func (c *AuthControllerSuite) TestLoginUnauthorized() {
+	c.mockAuth.EXPECT().Login(gomock.Any(), gomock.Any()).Return(models.APIKeyPair{}, services.ErrUserUnauthorized)
+
+	req := httptest.NewRequest(
+		echo.POST,
+		fmt.Sprintf("/?username=%s&password=%s", "test", "test"),
+		nil,
+	)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+
+	ctx.SetPath("/v1/auth/login")
+
+	c.EqualError(
+		c.controller.Login(ctx),
+		echo.NewHTTPError(http.StatusUnauthorized).Error(),
+	)
+}
+
+func (c *AuthControllerSuite) TestLoginInternalError() {
+	c.mockAuth.EXPECT().Login(gomock.Any(), gomock.Any()).Return(models.APIKeyPair{}, errors.New("errors"))
+
+	req := httptest.NewRequest(
+		echo.POST,
+		fmt.Sprintf("/?username=%s&password=%s", "test", "test"),
+		nil,
+	)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+
+	ctx.SetPath("/v1/auth/login")
+
+	c.EqualError(
+		c.controller.Login(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
+}
+
+func (c *AuthControllerSuite) TestRegister() {
+	username := "test"
+	password := "testtesttest"
+
+	c.mockAuth.EXPECT().Register(gomock.Eq(username), gomock.Eq(password)).Return(nil)
+
+	req := httptest.NewRequest(
+		echo.POST,
+		fmt.Sprintf("/?username=%s&password=%s", username, password),
+		nil,
+	)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.SetPath("/v1/auth/register")
+
+	c.NoError(c.controller.Register(ctx))
+	c.Equal(http.StatusCreated, rec.Code)
+}
+
+func (c *AuthControllerSuite) TestRegisterConflict() {
+	c.mockAuth.EXPECT().Register(gomock.Any(), gomock.Any()).Return(services.ErrUserConflicts)
+
+	req := httptest.NewRequest(
+		echo.POST,
+		fmt.Sprintf("/?username=%s&password=%s", "test", "testtesttest"),
+		nil,
+	)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.SetPath("/v1/auth/register")
+
+	c.EqualError(
+		c.controller.Register(ctx),
+		echo.NewHTTPError(http.StatusConflict).Error(),
+	)
+}
+
+func (c *AuthControllerSuite) TestRegisterInternalServer() {
+	c.mockAuth.EXPECT().Register(gomock.Any(), gomock.Any()).Return(errors.New("error"))
+
+	req := httptest.NewRequest(
+		echo.POST,
+		fmt.Sprintf("/?username=%s&password=%s", "test", "testtesttest"),
+		nil,
+	)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.SetPath("/v1/auth/register")
+
+	c.EqualError(
+		c.controller.Register(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
 }
 
 func (c *AuthControllerSuite) TestRenew() {
-	err := c.controller.auth.Register("gopher", "testtesttest")
-	c.Require().NoError(err)
+	refreshKey := "key"
 
-	keyPair, err := c.controller.auth.Login("gopher", "testtesttest")
-	c.Require().NoError(err)
+	c.mockAuth.EXPECT().Renew(refreshKey).Return(models.APIKey{}, nil)
 
 	req := httptest.NewRequest(
 		echo.POST,
 		"/",
 		strings.NewReader(
-			fmt.Sprintf(`{ "refreshToken": "%s" }`, keyPair.RefreshKey),
+			fmt.Sprintf(`{ "refreshToken": "%s" }`, refreshKey),
 		),
 	)
 	req.Header.Add("Content-Type", "application/json")
@@ -125,25 +193,23 @@ func (c *AuthControllerSuite) TestRenew() {
 	ctx.SetPath("/v1/auth/renew")
 
 	c.NoError(c.controller.Renew(ctx))
-
-	key := new(models.APIKey)
-	c.NoError(json.Unmarshal(rec.Body.Bytes(), key))
-	c.NotEmpty(key.Key)
-	c.Equal(http.StatusOK, rec.Code)
 }
 
 func (c *AuthControllerSuite) SetupTest() {
+	c.ctrl = gomock.NewController(c.T())
+
 	c.e = echo.New()
 	c.e.HideBanner = true
-	c.db = sql.NewDB("sqlite3", ":memory:")
-	repo := sql.NewUsers(c.db)
-	c.controller = NewAuthController(services.NewAuthService("secret", repo), "secret", true, c.e)
+
+	c.mockAuth = services.NewMockAuth(c.ctrl)
+
+	c.controller = rest.NewAuthController(c.mockAuth, "secret", true, c.e)
 }
 
 func (c *AuthControllerSuite) TearDownTest() {
-	err := c.db.Close()
-	c.NoError(err)
+	c.ctrl.Finish()
 }
+
 func TestAuthControllerSuite(t *testing.T) {
 	suite.Run(t, new(AuthControllerSuite))
 }

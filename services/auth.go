@@ -25,9 +25,7 @@ import (
 	"github.com/jmartinezhern/syndication/utils"
 )
 
-const (
-	refreshType = "refresh"
-)
+//go:generate mockgen -source=auth.go -destination=auth_mock.go -package=services
 
 type (
 	// Auth service interface
@@ -51,6 +49,7 @@ type (
 
 const (
 	signingMethod = "HS256"
+	refreshType = "refresh"
 )
 
 var (
