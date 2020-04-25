@@ -1,5 +1,6 @@
 ![](https://github.com/jmartinezhern/syndication/workflows/Go/badge.svg)
 [![codecov](https://codecov.io/gh/jmartinezhern/syndication/branch/master/graph/badge.svg)](https://codecov.io/gh/jmartinezhern/syndication)
+[![BCH compliance](https://bettercodehub.com/edge/badge/jmartinezhern/syndication?branch=master)](https://bettercodehub.com/)
 
 # Syndication - A simple news aggregation server
 
