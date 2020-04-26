@@ -15,20 +15,20 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rest
+package rest_test
 
 import (
-	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/jmartinezhern/syndication/controller/rest"
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/jmartinezhern/syndication/repo"
-	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
@@ -37,29 +37,19 @@ type (
 	EntriesControllerSuite struct {
 		suite.Suite
 
-		e           *echo.Echo
-		db          *sql.DB
-		feedsRepo   repo.Feeds
-		entriesRepo repo.Entries
-		user        *models.User
-		controller  *EntriesController
+		ctrl        *gomock.Controller
+		mockEntries *services.MockEntries
+
+		controller *rest.EntriesController
+		e          *echo.Echo
+		user       *models.User
 	}
 )
 
 func (c *EntriesControllerSuite) TestGetEntry() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "example",
-		Subscription: "http://example.com",
-	}
-	c.feedsRepo.Create(c.user.ID, &feed)
+	entryID := utils.CreateID()
 
-	entry := models.Entry{
-		ID:    utils.CreateID(),
-		Title: "example",
-		Feed:  feed,
-	}
-	c.entriesRepo.Create(c.user.ID, &entry)
+	c.mockEntries.EXPECT().Entry(gomock.Eq(c.user.ID), gomock.Eq(entryID)).Return(models.Entry{ID: entryID}, nil)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
@@ -68,19 +58,16 @@ func (c *EntriesControllerSuite) TestGetEntry() {
 	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetParamNames("entryID")
-	ctx.SetParamValues(entry.ID)
+	ctx.SetParamValues(entryID)
 	ctx.SetPath("/v1/entries/:entryID")
 
 	c.NoError(c.controller.GetEntry(ctx))
 	c.Equal(http.StatusOK, rec.Code)
-
-	var sEntry models.Entry
-
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &sEntry))
-	c.Equal(entry.Title, sEntry.Title)
 }
 
 func (c *EntriesControllerSuite) TestGetUnknownEntry() {
+	c.mockEntries.EXPECT().Entry(gomock.Any(), gomock.Any()).Return(models.Entry{}, services.ErrEntryNotFound)
+
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
@@ -97,21 +84,37 @@ func (c *EntriesControllerSuite) TestGetUnknownEntry() {
 	)
 }
 
+func (c *EntriesControllerSuite) TestGetEntryInternalError() {
+	c.mockEntries.EXPECT().Entry(gomock.Any(), gomock.Any()).Return(models.Entry{}, errors.New("error"))
+
+	req := httptest.NewRequest(echo.GET, "/", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetParamNames("entryID")
+	ctx.SetParamValues("bogus")
+	ctx.SetPath("/v1/entries/:entryID")
+
+	c.EqualError(
+		c.controller.GetEntry(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
+}
+
 func (c *EntriesControllerSuite) TestGetEntries() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "example",
-		Subscription: "http://example.com",
+	page := models.Page{
+		Count:  1,
+		Newest: true,
+		Marker: models.MarkerAny,
 	}
-	c.feedsRepo.Create(c.user.ID, &feed)
 
-	entry := models.Entry{
-		ID:    utils.CreateID(),
-		Title: "example",
-		Feed:  feed,
-	}
-	c.entriesRepo.Create(c.user.ID, &entry)
-
+	c.mockEntries.EXPECT().Entries(gomock.Eq(c.user.ID), gomock.Eq(page)).Return([]models.Entry{
+		{
+			ID: utils.CreateID(),
+		},
+	}, "")
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
@@ -121,40 +124,27 @@ func (c *EntriesControllerSuite) TestGetEntries() {
 	ctx.SetPath("/v1/entries")
 
 	c.NoError(c.controller.GetEntries(ctx))
+}
 
-	type Entries struct {
-		Entries []models.Entry `json:"entries"`
-	}
+func (c *EntriesControllerSuite) TestGetEntriesBadRequest() {
+	req := httptest.NewRequest(echo.GET, "/?count=true", nil)
 
-	var entries Entries
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
 
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
-	c.Require().Len(entries.Entries, 1)
-	c.Equal(entry.Title, entries.Entries[0].Title)
+	ctx.SetPath("/v1/entries")
+
+	c.EqualError(
+		c.controller.GetEntries(ctx),
+		echo.NewHTTPError(http.StatusBadRequest).Error(),
+	)
 }
 
 func (c *EntriesControllerSuite) TestMarkEntry() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "example",
-		Subscription: "http://example.com",
-	}
-	c.feedsRepo.Create(c.user.ID, &feed)
+	entryID := utils.CreateID()
 
-	entry := models.Entry{
-		ID:    utils.CreateID(),
-		Title: "example",
-		Feed:  feed,
-	}
-	c.entriesRepo.Create(c.user.ID, &entry)
-
-	entries, _ := c.entriesRepo.List(c.user.ID, models.Page{
-		ContinuationID: "",
-		Count:          2,
-		Newest:         true,
-		Marker:         models.MarkerRead,
-	})
-	c.Empty(entries)
+	c.mockEntries.EXPECT().Mark(gomock.Eq(c.user.ID), gomock.Eq(entryID), gomock.Eq(models.MarkerRead)).Return(nil)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
@@ -163,13 +153,15 @@ func (c *EntriesControllerSuite) TestMarkEntry() {
 	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetParamNames("entryID")
-	ctx.SetParamValues(entry.ID)
+	ctx.SetParamValues(entryID)
 	ctx.SetPath("/v1/entries/:entryID/mark")
 
 	c.NoError(c.controller.MarkEntry(ctx))
 }
 
 func (c *EntriesControllerSuite) TestMarkUnknownEntry() {
+	c.mockEntries.EXPECT().Mark(gomock.Any(), gomock.Any(), gomock.Any()).Return(services.ErrEntryNotFound)
+
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	rec := httptest.NewRecorder()
@@ -186,28 +178,44 @@ func (c *EntriesControllerSuite) TestMarkUnknownEntry() {
 	)
 }
 
+func (c *EntriesControllerSuite) TestMarkEntryBadRequest() {
+	req := httptest.NewRequest(echo.PUT, "/?as=", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetParamNames("entryID")
+	ctx.SetParamValues("id")
+	ctx.SetPath("/v1/entries/:entryID/mark")
+
+	c.EqualError(
+		c.controller.MarkEntry(ctx),
+		echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required").Error(),
+	)
+}
+
+func (c *EntriesControllerSuite) TestMarkEntryInternalError() {
+	c.mockEntries.EXPECT().Mark(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("error"))
+
+	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetParamNames("entryID")
+	ctx.SetParamValues("id")
+	ctx.SetPath("/v1/entries/:entryID/mark")
+
+	c.EqualError(
+		c.controller.MarkEntry(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
+}
+
 func (c *EntriesControllerSuite) TestMarkAllEntries() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "example",
-		Subscription: "http://example.com",
-	}
-	c.feedsRepo.Create(c.user.ID, &feed)
-
-	entry := models.Entry{
-		ID:    utils.CreateID(),
-		Title: "example",
-		Feed:  feed,
-	}
-	c.entriesRepo.Create(c.user.ID, &entry)
-
-	entries, _ := c.entriesRepo.List(c.user.ID, models.Page{
-		ContinuationID: "",
-		Count:          2,
-		Newest:         true,
-		Marker:         models.MarkerRead,
-	})
-	c.Empty(entries)
+	c.mockEntries.EXPECT().MarkAll(gomock.Eq(c.user.ID), models.MarkerRead)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
@@ -220,7 +228,26 @@ func (c *EntriesControllerSuite) TestMarkAllEntries() {
 	c.NoError(c.controller.MarkAllEntries(ctx))
 }
 
+func (c *EntriesControllerSuite) TestMarkAllEntriesBadRequest() {
+	req := httptest.NewRequest(echo.PUT, "/?as=", nil)
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetParamNames("entryID")
+	ctx.SetParamValues("id")
+	ctx.SetPath("/v1/entries/mark")
+
+	c.EqualError(
+		c.controller.MarkAllEntries(ctx),
+		echo.NewHTTPError(http.StatusBadRequest, "'as' parameter is required").Error(),
+	)
+}
+
 func (c *EntriesControllerSuite) TestGetEntryStats() {
+	c.mockEntries.EXPECT().Stats(gomock.Eq(c.user.ID)).Return(models.Stats{})
+
 	req := httptest.NewRequest(echo.PUT, "/", nil)
 
 	rec := httptest.NewRecorder()
@@ -230,13 +257,11 @@ func (c *EntriesControllerSuite) TestGetEntryStats() {
 	ctx.SetPath("/v1/entries/stats")
 
 	c.NoError(c.controller.GetEntryStats(ctx))
-
-	var stats models.Stats
-
-	c.NoError(json.Unmarshal(rec.Body.Bytes(), &stats))
 }
 
 func (c *EntriesControllerSuite) SetupTest() {
+	c.ctrl = gomock.NewController(c.T())
+
 	c.e = echo.New()
 	c.e.HideBanner = true
 
@@ -244,17 +269,13 @@ func (c *EntriesControllerSuite) SetupTest() {
 		ID: utils.CreateID(),
 	}
 
-	c.db = sql.NewDB("sqlite3", ":memory:")
-	sql.NewUsers(c.db).Create(c.user)
+	c.mockEntries = services.NewMockEntries(c.ctrl)
 
-	c.feedsRepo = sql.NewFeeds(c.db)
-	c.entriesRepo = sql.NewEntries(c.db)
-	c.controller = NewEntriesController(services.NewEntriesService(c.entriesRepo), c.e)
+	c.controller = rest.NewEntriesController(c.mockEntries, c.e)
 }
 
 func (c *EntriesControllerSuite) TearDownTest() {
-	err := c.db.Close()
-	c.NoError(err)
+	c.ctrl.Finish()
 }
 
 func TestEntriesControllerSuite(t *testing.T) {

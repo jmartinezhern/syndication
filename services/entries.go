@@ -24,6 +24,8 @@ import (
 	"github.com/jmartinezhern/syndication/repo"
 )
 
+//go:generate mockgen -source=entries.go -destination=entries_mock.go -package=services
+
 type (
 	// Entries interface defines the Entries service
 	Entries interface {
