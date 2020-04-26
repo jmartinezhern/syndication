@@ -18,10 +18,8 @@
 package rest
 
 import (
-	"net/http"
-	"strconv"
-
 	"github.com/labstack/echo/v4"
+	"net/http"
 
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/services"
@@ -31,11 +29,11 @@ type (
 	FeedsController struct {
 		Controller
 
-		feeds services.Feed
+		feeds services.Feeds
 	}
 )
 
-func NewFeedsController(service services.Feed, e *echo.Echo) *FeedsController {
+func NewFeedsController(service services.Feeds, e *echo.Echo) *FeedsController {
 	v1 := e.Group("v1")
 
 	controller := FeedsController{
@@ -83,23 +81,14 @@ func (s *FeedsController) NewFeed(c echo.Context) error {
 func (s *FeedsController) GetFeeds(c echo.Context) error {
 	userID := c.Get(userContextKey).(string)
 
-	continuationID := c.QueryParam("continuationID")
-
-	count := 100
-
-	countParam := c.QueryParam("count")
-	if countParam != "" {
-		var err error
-
-		count, err = strconv.Atoi(countParam)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "count must be an integer")
-		}
+	params := paginationParams{}
+	if err := c.Bind(&params); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest)
 	}
 
 	feeds, next := s.feeds.Feeds(userID, models.Page{
-		ContinuationID: continuationID,
-		Count:          count,
+		ContinuationID: params.ContinuationID,
+		Count:          params.Count,
 	})
 
 	return c.JSON(http.StatusOK, map[string]interface{}{

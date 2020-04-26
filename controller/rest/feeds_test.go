@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rest
+package rest_test
 
 import (
 	"encoding/json"
@@ -25,12 +25,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/jmartinezhern/syndication/controller/rest"
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/jmartinezhern/syndication/repo"
-	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
@@ -39,25 +39,30 @@ type (
 	FeedsControllerSuite struct {
 		suite.Suite
 
-		e           *echo.Echo
-		db          *sql.DB
-		feedsRepo   repo.Feeds
-		ctgsRepo    repo.Categories
-		entriesRepo repo.Entries
-		user        *models.User
-		controller  *FeedsController
+		ctrl      *gomock.Controller
+		mockFeeds *services.MockFeeds
+
+		controller *rest.FeedsController
+		e          *echo.Echo
+		user       *models.User
 	}
 )
 
 func (c *FeedsControllerSuite) TestNewFeed() {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "<rss></rss>")
-	}))
-	defer ts.Close()
+	feed := models.Feed{
+		ID:           utils.CreateID(),
+		Title:        "Example",
+		Subscription: "https://example.com",
+	}
 
-	feed := fmt.Sprintf(`{ "title": "Example", "subscription": "%s" }`, ts.URL)
+	c.mockFeeds.EXPECT().
+		New(gomock.Eq(feed.Title), gomock.Eq(feed.Subscription), gomock.Eq(""), gomock.Eq(c.user.ID)).
+		Return(feed, nil)
 
-	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(feed))
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(
+		fmt.Sprintf(`{ "title": "%s", "subscription": "%s" }`, feed.Title, feed.Subscription),
+	))
+
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
@@ -71,6 +76,10 @@ func (c *FeedsControllerSuite) TestNewFeed() {
 }
 
 func (c *FeedsControllerSuite) TestUnreachableNewFeed() {
+	c.mockFeeds.EXPECT().
+		New(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(models.Feed{}, services.ErrFetchingFeed)
+
 	feed := `{ "title": "Example", "subscription": "bogus" }`
 
 	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(feed))
@@ -82,19 +91,20 @@ func (c *FeedsControllerSuite) TestUnreachableNewFeed() {
 
 	ctx.SetPath("/v1/feeds")
 
-	c.EqualError(c.controller.NewFeed(ctx),
-		echo.NewHTTPError(http.StatusBadRequest, "subscription url is not reachable").Error())
+	c.EqualError(
+		c.controller.NewFeed(ctx),
+		echo.NewHTTPError(http.StatusBadRequest, "subscription url is not reachable").Error(),
+	)
 }
 
 func (c *FeedsControllerSuite) TestGetFeeds() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "Example",
-		Subscription: "http://example.com",
+	page := models.Page{
+		Count: 1,
 	}
-	c.feedsRepo.Create(c.user.ID, &feed)
 
-	req := httptest.NewRequest(echo.GET, "/", nil)
+	c.mockFeeds.EXPECT().Feeds(gomock.Eq(c.user.ID), gomock.Eq(page)).Return([]models.Feed{{ID: utils.CreateID()}}, "")
+
+	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
@@ -104,25 +114,12 @@ func (c *FeedsControllerSuite) TestGetFeeds() {
 
 	c.NoError(c.controller.GetFeeds(ctx))
 	c.Equal(http.StatusOK, rec.Code)
-
-	type Feeds struct {
-		Feeds []models.Feed `json:"feeds"`
-	}
-
-	var feeds Feeds
-
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &feeds))
-	c.Len(feeds.Feeds, 1)
-	c.Equal(feed.Title, feeds.Feeds[0].Title)
 }
 
 func (c *FeedsControllerSuite) TestGetFeed() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "Example",
-		Subscription: "http://example.com",
-	}
-	c.feedsRepo.Create(c.user.ID, &feed)
+	feedID := utils.CreateID()
+
+	c.mockFeeds.EXPECT().Feed(gomock.Eq(c.user.ID), gomock.Eq(feedID)).Return(models.Feed{ID: feedID}, true)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
@@ -130,20 +127,17 @@ func (c *FeedsControllerSuite) TestGetFeed() {
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.ID)
+	ctx.SetParamValues(feedID)
 
 	ctx.SetPath("/v1/feeds/:feedID")
 
 	c.NoError(c.controller.GetFeed(ctx))
 	c.Equal(http.StatusOK, rec.Code)
-
-	var sFeed models.Feed
-
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &sFeed))
-	c.Equal(feed.Title, sFeed.Title)
 }
 
 func (c *FeedsControllerSuite) TestGetUnknownFeed() {
+	c.mockFeeds.EXPECT().Feed(gomock.Any(), gomock.Any()).Return(models.Feed{}, false)
+
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
@@ -161,38 +155,31 @@ func (c *FeedsControllerSuite) TestGetUnknownFeed() {
 }
 
 func (c *FeedsControllerSuite) TestEditFeed() {
-	newFeed := `{ "title": "NewName" }`
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "Example",
-		Subscription: "http://example.com",
-	}
-	c.feedsRepo.Create(c.user.ID, &feed)
+	feedID := utils.CreateID()
 
-	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(newFeed))
+	c.mockFeeds.EXPECT().
+		Update(gomock.Eq(c.user.ID), gomock.Eq(&models.Feed{ID: feedID, Title: "NewName"})).
+		Return(nil)
+
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{ "title": "NewName" }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.ID)
+	ctx.SetParamValues(feedID)
 
 	ctx.SetPath("/v1/feeds/:feedID")
 
 	c.NoError(c.controller.EditFeed(ctx))
 	c.Equal(http.StatusOK, rec.Code)
-
-	var sFeed models.Feed
-
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &sFeed))
-	c.Equal("NewName", sFeed.Title)
 }
 
 func (c *FeedsControllerSuite) TestEditUnknownFeed() {
-	newFeed := `{ "title": "title" }`
+	c.mockFeeds.EXPECT().Update(gomock.Any(), gomock.Any()).Return(services.ErrFeedNotFound)
 
-	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(newFeed))
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{ "title": "title" }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
@@ -210,12 +197,9 @@ func (c *FeedsControllerSuite) TestEditUnknownFeed() {
 }
 
 func (c *FeedsControllerSuite) TestDeleteFeed() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "Example",
-		Subscription: "http://example.com",
-	}
-	c.feedsRepo.Create(c.user.ID, &feed)
+	feedID := utils.CreateID()
+
+	c.mockFeeds.EXPECT().Delete(gomock.Eq(c.user.ID), gomock.Eq(feedID)).Return(nil)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
@@ -223,17 +207,17 @@ func (c *FeedsControllerSuite) TestDeleteFeed() {
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.ID)
+	ctx.SetParamValues(feedID)
 
 	ctx.SetPath("/v1/feeds/:feedID")
 
 	c.NoError(c.controller.DeleteFeed(ctx))
-
-	_, found := c.feedsRepo.FeedWithID(c.user.ID, feed.ID)
-	c.False(found)
+	c.Equal(http.StatusNoContent, rec.Code)
 }
 
 func (c *FeedsControllerSuite) TestDeleteUnknownFeed() {
+	c.mockFeeds.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(services.ErrFeedNotFound)
+
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	rec := httptest.NewRecorder()
@@ -251,20 +235,11 @@ func (c *FeedsControllerSuite) TestDeleteUnknownFeed() {
 }
 
 func (c *FeedsControllerSuite) TestMarkFeed() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "Example",
-		Subscription: "http://example.com",
-	}
-	c.feedsRepo.Create(c.user.ID, &feed)
+	feedID := utils.CreateID()
 
-	entry := models.Entry{
-		ID:    utils.CreateID(),
-		Title: "Test Entry",
-		Mark:  models.MarkerUnread,
-		Feed:  feed,
-	}
-	c.entriesRepo.Create(c.user.ID, &entry)
+	c.mockFeeds.EXPECT().
+		Mark(gomock.Eq(c.user.ID), gomock.Eq(feedID), gomock.Eq(models.MarkerRead)).
+		Return(nil)
 
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
@@ -272,23 +247,17 @@ func (c *FeedsControllerSuite) TestMarkFeed() {
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.ID)
+	ctx.SetParamValues(feedID)
 
 	ctx.SetPath("/v1/feeds/:feedID/mark")
 
 	c.NoError(c.controller.MarkFeed(ctx))
 	c.Equal(http.StatusNoContent, rec.Code)
-
-	entries, _ := c.entriesRepo.List(c.user.ID, models.Page{
-		ContinuationID: "",
-		Count:          1,
-		Newest:         false,
-		Marker:         models.MarkerRead,
-	})
-	c.Len(entries, 1)
 }
 
 func (c *FeedsControllerSuite) TestMarkUnknownFeeed() {
+	c.mockFeeds.EXPECT().Mark(gomock.Any(), gomock.Any(), gomock.Any()).Return(services.ErrFeedNotFound)
+
 	req := httptest.NewRequest(echo.PUT, "/?as=read", nil)
 
 	rec := httptest.NewRecorder()
@@ -306,19 +275,18 @@ func (c *FeedsControllerSuite) TestMarkUnknownFeeed() {
 }
 
 func (c *FeedsControllerSuite) TestGetFeedEntries() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "Example",
-		Subscription: "http://example.com",
-	}
-	c.feedsRepo.Create(c.user.ID, &feed)
+	feedID := utils.CreateID()
 
-	entry := models.Entry{
-		Title: "Test Entry",
-		Mark:  models.MarkerUnread,
-		Feed:  feed,
+	page := models.Page{
+		Count:    1,
+		FilterID: feedID,
+		Newest:   true,
+		Marker:   models.MarkerAny,
 	}
-	c.entriesRepo.Create(c.user.ID, &entry)
+
+	c.mockFeeds.EXPECT().
+		Entries(gomock.Eq(c.user.ID), gomock.Eq(page)).
+		Return([]models.Entry{{ID: utils.CreateID()}}, "")
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
@@ -327,29 +295,17 @@ func (c *FeedsControllerSuite) TestGetFeedEntries() {
 	ctx.Set(userContextKey, c.user.ID)
 
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.ID)
+	ctx.SetParamValues(feedID)
 	ctx.SetPath("/v1/feeds/:feedID/entries")
 
 	c.NoError(c.controller.GetFeedEntries(ctx))
-
-	type Entries struct {
-		Entries []models.Entry `json:"entries"`
-	}
-
-	var entries Entries
-
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
-	c.Require().Len(entries.Entries, 1)
-	c.Equal(entry.Title, entries.Entries[0].Title)
+	c.Equal(http.StatusOK, rec.Code)
 }
 
 func (c *FeedsControllerSuite) TestGetFeedStats() {
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "Example",
-		Subscription: "http://example.com",
-	}
-	c.feedsRepo.Create(c.user.ID, &feed)
+	feedID := utils.CreateID()
+
+	c.mockFeeds.EXPECT().Stats(gomock.Eq(c.user.ID), gomock.Eq(feedID)).Return(models.Stats{}, nil)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
@@ -357,7 +313,7 @@ func (c *FeedsControllerSuite) TestGetFeedStats() {
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("feedID")
-	ctx.SetParamValues(feed.ID)
+	ctx.SetParamValues(feedID)
 
 	ctx.SetPath("/v1/feeds/:feedID/stats")
 
@@ -369,6 +325,8 @@ func (c *FeedsControllerSuite) TestGetFeedStats() {
 }
 
 func (c *FeedsControllerSuite) TestGetUnknownFeedStats() {
+	c.mockFeeds.EXPECT().Stats(gomock.Any(), gomock.Any()).Return(models.Stats{}, services.ErrFeedNotFound)
+
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
@@ -386,6 +344,8 @@ func (c *FeedsControllerSuite) TestGetUnknownFeedStats() {
 }
 
 func (c *FeedsControllerSuite) SetupTest() {
+	c.ctrl = gomock.NewController(c.T())
+
 	c.e = echo.New()
 	c.e.HideBanner = true
 
@@ -393,18 +353,13 @@ func (c *FeedsControllerSuite) SetupTest() {
 		ID: utils.CreateID(),
 	}
 
-	c.db = sql.NewDB("sqlite3", ":memory:")
-	sql.NewUsers(c.db).Create(c.user)
+	c.mockFeeds = services.NewMockFeeds(c.ctrl)
 
-	c.feedsRepo = sql.NewFeeds(c.db)
-	c.ctgsRepo = sql.NewCategories(c.db)
-	c.entriesRepo = sql.NewEntries(c.db)
-	c.controller = NewFeedsController(services.NewFeedsService(c.feedsRepo, c.ctgsRepo, c.entriesRepo), c.e)
+	c.controller = rest.NewFeedsController(c.mockFeeds, c.e)
 }
 
 func (c *FeedsControllerSuite) TearDownTest() {
-	err := c.db.Close()
-	c.NoError(err)
+	c.ctrl.Finish()
 }
 
 func TestFeedsControllerSuite(t *testing.T) {

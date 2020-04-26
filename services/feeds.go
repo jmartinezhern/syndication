@@ -25,9 +25,11 @@ import (
 	"github.com/jmartinezhern/syndication/utils"
 )
 
+//go:generate mockgen -source=feeds.go -destination=feeds_mock.go -package=services
+
 type (
-	// Feed defines the Feed service interface
-	Feed interface {
+	// Feeds defines the Feeds service interface
+	Feeds interface {
 		// New creates a new Feed
 		New(title, subscription string, ctgID string, userID string) (models.Feed, error)
 

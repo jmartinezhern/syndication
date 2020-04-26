@@ -34,7 +34,7 @@ import (
 type FeedsSuite struct {
 	suite.Suite
 
-	service Feed
+	service Feeds
 
 	db          *sql.DB
 	feedsRepo   repo.Feeds
