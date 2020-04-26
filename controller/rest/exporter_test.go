@@ -50,7 +50,7 @@ func (c *ExporterControllerSuite) TestExport() {
 	c.mockExporter.EXPECT().Export(gomock.Eq(c.user.ID)).Return([]byte{}, nil)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
-	req.Header.Set("Accept", "application/xml")
+	req.Header.Set("Accept", "text/xml")
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
@@ -66,7 +66,7 @@ func (c *ExporterControllerSuite) TestExportInternalError() {
 	c.mockExporter.EXPECT().Export(gomock.Any()).Return([]byte{}, errors.New("error"))
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
-	req.Header.Set("Accept", "application/xml")
+	req.Header.Set("Accept", "text/xml")
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
@@ -111,7 +111,7 @@ func (c *ExporterControllerSuite) SetupTest() {
 	c.mockExporter = services.NewMockExporter(c.ctrl)
 
 	exporters := rest.Exporters{
-		"application/xml": c.mockExporter,
+		"text/xml": c.mockExporter,
 	}
 	c.controller = rest.NewExporterController(exporters, c.e)
 }

@@ -15,19 +15,21 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rest
+package rest_test
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/jmartinezhern/syndication/controller/rest"
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
@@ -36,42 +38,20 @@ type (
 	ImporterControllerSuite struct {
 		suite.Suite
 
+		ctrl         *gomock.Controller
+		mockImporter *services.MockImporter
+
+		controller *rest.ImporterController
 		e          *echo.Echo
-		db         *sql.DB
 		user       *models.User
-		controller *ImporterController
 	}
 )
 
-const (
-	data = `
-<?xml version="1.0" encoding="UTF-8"?>
-<opml version="1.0">
-		<body>
-			<outline text="Sports" title="Sports">
-				<outline
-					type="rss"
-					text="Basketball"
-					title="Basketball"
-					xmlUrl="http://example.com/basketball"
-					htmlUrl="http://example.com/basketball"
-					/>
-			</outline>
-			<outline
-				type="rss"
-				text="Baseball"
-				title="Baseball"
-				xmlUrl="http://example.com/baseball"
-				htmlUrl="http://example.com/baseball"
-				/>
-		</body>
-	</opml>
-	`
-)
+func (c *ImporterControllerSuite) TestImport() {
+	c.mockImporter.EXPECT().Import(gomock.Any(), gomock.Eq(c.user.ID)).Return(nil)
 
-func (c *ImporterControllerSuite) TestOPMLImport() {
-	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(data))
-	req.Header.Set("Content-Type", "application/xml")
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(`<xml></xml>`))
+	req.Header.Set("Content-Type", "text/xml")
 
 	rec := httptest.NewRecorder()
 	ctx := c.e.NewContext(req, rec)
@@ -81,35 +61,77 @@ func (c *ImporterControllerSuite) TestOPMLImport() {
 
 	c.NoError(c.controller.Import(ctx))
 	c.Equal(http.StatusNoContent, rec.Code)
+}
 
-	ctgsRepo := sql.NewCategories(c.db)
-	ctgs, _ := ctgsRepo.List(c.user.ID, models.Page{
-		ContinuationID: "",
-		Count:          1,
-	})
-	c.Require().Len(ctgs, 1)
-	c.Equal("Sports", ctgs[0].Name)
-	c.NotEmpty(ctgs[0].ID)
+func (c *ImporterControllerSuite) TestImportEmptyRequest() {
+	req := httptest.NewRequest(echo.POST, "/", nil)
+	req.Header.Set("Content-Type", "text/xml")
 
-	feeds, _ := ctgsRepo.Feeds(c.user.ID, models.Page{
-		FilterID:       ctgs[0].ID,
-		ContinuationID: "",
-		Count:          1,
-	})
-	c.Require().Len(feeds, 1)
-	c.Equal("Basketball", feeds[0].Title)
-	c.Equal("http://example.com/basketball", feeds[0].Subscription)
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
 
-	unctgsFeeds, _ := ctgsRepo.Uncategorized(c.user.ID, models.Page{
-		ContinuationID: "",
-		Count:          1,
-	})
-	c.Require().Len(unctgsFeeds, 1)
-	c.Equal("Baseball", unctgsFeeds[0].Title)
-	c.Equal("http://example.com/baseball", unctgsFeeds[0].Subscription)
+	ctx.SetPath("/v1/import")
+
+	c.NoError(c.controller.Import(ctx))
+	c.Equal(http.StatusNoContent, rec.Code)
+}
+
+func (c *ImporterControllerSuite) TestImportDetectContentType() {
+	c.mockImporter.EXPECT().Import(gomock.Any(), gomock.Eq(c.user.ID)).Return(nil)
+
+	req := httptest.NewRequest(echo.POST, "/",
+		strings.NewReader(`<?xml version="1.0"?><opml></opml>`))
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetPath("/v1/import")
+
+	c.NoError(c.controller.Import(ctx))
+	c.Equal(http.StatusNoContent, rec.Code)
+}
+
+func (c *ImporterControllerSuite) TestImportInternalError() {
+	c.mockImporter.EXPECT().Import(gomock.Any(), gomock.Any()).Return(errors.New("error"))
+
+	req := httptest.NewRequest(echo.POST, "/",
+		strings.NewReader(`<?xml version="1.0"?><opml></opml>`))
+	req.Header.Set("Content-Type", "text/xml")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetPath("/v1/import")
+
+	c.EqualError(
+		c.controller.Import(ctx),
+		echo.NewHTTPError(http.StatusBadRequest, "could not parse input").Error(),
+	)
+}
+
+func (c *ImporterControllerSuite) TestImportUnsupportedContentType() {
+	req := httptest.NewRequest(echo.POST, "/",
+		strings.NewReader(`<?xml version="1.0"?><opml></opml>`))
+	req.Header.Set("Content-Type", "text/bogus")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetPath("/v1/import")
+
+	c.EqualError(
+		c.controller.Import(ctx),
+		echo.NewHTTPError(http.StatusUnsupportedMediaType).Error(),
+	)
 }
 
 func (c *ImporterControllerSuite) SetupTest() {
+	c.ctrl = gomock.NewController(c.T())
+
 	c.e = echo.New()
 	c.e.HideBanner = true
 
@@ -117,20 +139,19 @@ func (c *ImporterControllerSuite) SetupTest() {
 		ID: utils.CreateID(),
 	}
 
-	c.db = sql.NewDB("sqlite3", ":memory:")
-	ctgsRepo := sql.NewCategories(c.db)
-	sql.NewUsers(c.db).Create(c.user)
+	c.mockImporter = services.NewMockImporter(c.ctrl)
 
-	importers := Importers{
-		"application/xml": services.NewOPMLImporter(ctgsRepo, sql.NewFeeds(c.db)),
+	importers := rest.Importers{
+		"text/xml": c.mockImporter,
 	}
-	c.controller = NewImporterController(importers, c.e)
+
+	c.controller = rest.NewImporterController(importers, c.e)
 }
 
 func (c *ImporterControllerSuite) TearDownTest() {
-	err := c.db.Close()
-	c.NoError(err)
+	c.ctrl.Finish()
 }
+
 func TestImporterControllerSuite(t *testing.T) {
 	suite.Run(t, new(ImporterControllerSuite))
 }

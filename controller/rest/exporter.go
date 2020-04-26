@@ -53,7 +53,7 @@ func NewExporterController(exporters Exporters, e *echo.Echo) *ExporterControlle
 // Export feeds and categories out of Syndication.
 // Accept header must be set to a supported MIME type.
 // The current supported formats are:
-//    - OPML (application/xml)
+//    - OPML (text/xml)
 func (s *ExporterController) Export(c echo.Context) error {
 	userID := c.Get(userContextKey).(string)
 
@@ -65,7 +65,7 @@ func (s *ExporterController) Export(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
 
-		if contType == "application/xml" {
+		if contType == "text/xml" {
 			return c.XMLBlob(http.StatusOK, data)
 		}
 	}

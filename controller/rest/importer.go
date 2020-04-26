@@ -20,6 +20,7 @@ package rest
 import (
 	"bufio"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -52,13 +53,13 @@ func NewImporterController(importers Importers, e *echo.Echo) *ImporterControlle
 // Import feeds and categories into Syndication.
 // Content-Type header must be set to a supported MIME type.
 // The current supported formats are:
-//    - OPML (application/xml)
+//    - OPML (text/xml)
 func (s *ImporterController) Import(c echo.Context) error {
 	userID := c.Get(userContextKey).(string)
 
 	contLength := c.Request().ContentLength
 	if contLength <= 0 {
-		return echo.NewHTTPError(http.StatusNoContent)
+		return c.NoContent(http.StatusNoContent)
 	}
 
 	contType := c.Request().Header.Get("Content-Type")
@@ -70,18 +71,16 @@ func (s *ImporterController) Import(c echo.Context) error {
 	}
 
 	if contType == "" && contLength > 0 {
-		contType = http.DetectContentType(data)
+		contType = strings.Split(http.DetectContentType(data), ";")[0]
 	}
 
-	if val, ok := s.importers[contType]; ok {
-		err = val.Import(data, userID)
-	} else {
-		return echo.NewHTTPError(http.StatusUnsupportedMediaType)
+	if importer, ok := s.importers[contType]; ok {
+		if err = importer.Import(data, userID); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "could not parse input")
+		}
+
+		return c.NoContent(http.StatusNoContent)
 	}
 
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "could not parse input")
-	}
-
-	return c.NoContent(http.StatusNoContent)
+	return echo.NewHTTPError(http.StatusUnsupportedMediaType)
 }

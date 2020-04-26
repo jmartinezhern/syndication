@@ -98,9 +98,9 @@ func main() {
 	rest.NewEntriesController(entriesService, e)
 	rest.NewTagsController(tagsService, e)
 	rest.NewImporterController(rest.Importers{
-		"application/xml": services.NewOPMLImporter(ctgsRepo, feedsRepo)}, e)
+		"text/xml": services.NewOPMLImporter(ctgsRepo, feedsRepo)}, e)
 	rest.NewExporterController(rest.Exporters{
-		"application/xml": services.NewOPMLExporter(ctgsRepo)}, e)
+		"text/xml": services.NewOPMLExporter(ctgsRepo)}, e)
 
 	syncService := sync.NewService(config.Sync.Interval, feedsRepo, usersRepo, entriesRepo)
 	syncService.Start()

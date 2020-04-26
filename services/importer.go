@@ -25,6 +25,8 @@ import (
 	"github.com/jmartinezhern/syndication/utils"
 )
 
+//go:generate mockgen -source=importer.go -destination=importer_mock.go -package=services
+
 type (
 	// Importer is an interface that wraps the basic
 	// import functions.
