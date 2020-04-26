@@ -65,8 +65,7 @@ func (s *ExporterController) Export(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
 
-		switch contType {
-		case "application/xml":
+		if contType == "application/xml" {
 			return c.XMLBlob(http.StatusOK, data)
 		}
 	}

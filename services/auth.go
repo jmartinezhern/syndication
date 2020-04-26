@@ -49,7 +49,7 @@ type (
 
 const (
 	signingMethod = "HS256"
-	refreshType = "refresh"
+	refreshType   = "refresh"
 )
 
 var (

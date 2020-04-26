@@ -115,6 +115,7 @@ func (c *EntriesControllerSuite) TestGetEntries() {
 			ID: utils.CreateID(),
 		},
 	}, "")
+
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()

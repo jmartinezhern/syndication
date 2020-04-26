@@ -19,11 +19,11 @@ package rest_test
 
 import (
 	"errors"
-	"github.com/golang/mock/gomock"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
@@ -46,7 +46,7 @@ type (
 	}
 )
 
-func (c *ExporterControllerSuite) TestOPMLExport() {
+func (c *ExporterControllerSuite) TestExport() {
 	c.mockExporter.EXPECT().Export(gomock.Eq(c.user.ID)).Return([]byte{}, nil)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
@@ -62,7 +62,7 @@ func (c *ExporterControllerSuite) TestOPMLExport() {
 	c.Equal(http.StatusOK, rec.Code)
 }
 
-func (c *ExporterControllerSuite) TestOPMLExportInternalError() {
+func (c *ExporterControllerSuite) TestExportInternalError() {
 	c.mockExporter.EXPECT().Export(gomock.Any()).Return([]byte{}, errors.New("error"))
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
@@ -80,7 +80,7 @@ func (c *ExporterControllerSuite) TestOPMLExportInternalError() {
 	)
 }
 
-func (c *ExporterControllerSuite) TestOPMLExportBadAcceptHeader() {
+func (c *ExporterControllerSuite) TestExportBadAcceptHeader() {
 	c.mockExporter.EXPECT().Export(gomock.Any()).Return([]byte{}, nil)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)

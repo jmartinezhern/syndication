@@ -31,7 +31,6 @@ import (
 
 	"github.com/jmartinezhern/syndication/controller/rest"
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/services"
 )
 
@@ -44,13 +43,12 @@ type (
 
 		controller *rest.AuthController
 		e          *echo.Echo
-		db         *sql.DB
 	}
 )
 
 func (c *AuthControllerSuite) TestLogin() {
-	username := "test"
-	password := "testtesttest"
+	username := "username"
+	password := "password"
 
 	c.mockAuth.EXPECT().Login(gomock.Eq(username), gomock.Eq(password)).Return(models.APIKeyPair{}, nil)
 

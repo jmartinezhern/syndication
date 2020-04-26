@@ -39,9 +39,9 @@ var (
 
 type (
 	AuthController struct {
-		e                  *echo.Echo
-		auth               services.Auth
-		secret             string
+		e      *echo.Echo
+		auth   services.Auth
+		secret string
 	}
 )
 

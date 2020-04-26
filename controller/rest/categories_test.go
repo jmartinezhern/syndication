@@ -20,12 +20,12 @@ package rest_test
 import (
 	"encoding/json"
 	"errors"
-	"github.com/golang/mock/gomock"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
@@ -635,7 +635,9 @@ func (c *CategoriesControllerSuite) TestGetCategoryStats() {
 }
 
 func (c *CategoriesControllerSuite) TestGetUnknownCategoryStats() {
-	c.mockCategories.EXPECT().Stats(gomock.Eq(c.user.ID), gomock.Any()).Return(models.Stats{}, services.ErrCategoryNotFound)
+	c.mockCategories.EXPECT().
+		Stats(gomock.Eq(c.user.ID), gomock.Any()).
+		Return(models.Stats{}, services.ErrCategoryNotFound)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
