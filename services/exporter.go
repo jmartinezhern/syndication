@@ -24,9 +24,7 @@ import (
 	"github.com/jmartinezhern/syndication/repo"
 )
 
-const (
-	maxPageSize = 100
-)
+//go:generate mockgen -source=exporter.go -destination=exporter_mock.go -package=services
 
 type (
 	// Exporter is an interface that wraps the basic
@@ -40,6 +38,10 @@ type (
 	OPMLExporter struct {
 		repo repo.Categories
 	}
+)
+
+const (
+	maxPageSize = 100
 )
 
 func NewOPMLExporter(ctgsRepo repo.Categories) OPMLExporter {

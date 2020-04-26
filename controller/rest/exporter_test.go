@@ -15,20 +15,20 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rest
+package rest_test
 
 import (
-	"encoding/xml"
+	"errors"
+	"github.com/golang/mock/gomock"
 	"net/http"
 	"net/http/httptest"
-	"sort"
 	"testing"
 
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/jmartinezhern/syndication/controller/rest"
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
@@ -37,27 +37,17 @@ type (
 	ExporterControllerSuite struct {
 		suite.Suite
 
+		ctrl         *gomock.Controller
+		mockExporter *services.MockExporter
+
+		controller *rest.ExporterController
 		e          *echo.Echo
-		db         *sql.DB
 		user       *models.User
-		controller *ExporterController
 	}
 )
 
 func (c *ExporterControllerSuite) TestOPMLExport() {
-	ctg := models.Category{
-		ID:   utils.CreateID(),
-		Name: "Test",
-	}
-	sql.NewCategories(c.db).Create(c.user.ID, &ctg)
-
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "example.com",
-		Subscription: "https://example.com",
-		Category:     ctg,
-	}
-	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
+	c.mockExporter.EXPECT().Export(gomock.Eq(c.user.ID)).Return([]byte{}, nil)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 	req.Header.Set("Accept", "application/xml")
@@ -70,17 +60,47 @@ func (c *ExporterControllerSuite) TestOPMLExport() {
 
 	c.NoError(c.controller.Export(ctx))
 	c.Equal(http.StatusOK, rec.Code)
+}
 
-	var exp models.OPML
+func (c *ExporterControllerSuite) TestOPMLExportInternalError() {
+	c.mockExporter.EXPECT().Export(gomock.Any()).Return([]byte{}, errors.New("error"))
 
-	c.NoError(xml.Unmarshal(rec.Body.Bytes(), &exp))
-	c.NotEqual(sort.Search(len(exp.Body.Items), func(i int) bool {
-		item := exp.Body.Items[i]
-		return item.Title == ctg.Name && item.Items[0].Title == feed.Title
-	}), len(exp.Body.Items))
+	req := httptest.NewRequest(echo.GET, "/", nil)
+	req.Header.Set("Accept", "application/xml")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetPath("/v1/export")
+
+	c.EqualError(
+		c.controller.Export(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
+}
+
+func (c *ExporterControllerSuite) TestOPMLExportBadAcceptHeader() {
+	c.mockExporter.EXPECT().Export(gomock.Any()).Return([]byte{}, nil)
+
+	req := httptest.NewRequest(echo.GET, "/", nil)
+	req.Header.Set("Accept", "application/bogus")
+
+	rec := httptest.NewRecorder()
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+
+	ctx.SetPath("/v1/export")
+
+	c.EqualError(
+		c.controller.Export(ctx),
+		echo.NewHTTPError(http.StatusNotAcceptable).Error(),
+	)
 }
 
 func (c *ExporterControllerSuite) SetupTest() {
+	c.ctrl = gomock.NewController(c.T())
+
 	c.e = echo.New()
 	c.e.HideBanner = true
 
@@ -88,19 +108,15 @@ func (c *ExporterControllerSuite) SetupTest() {
 		ID: utils.CreateID(),
 	}
 
-	c.db = sql.NewDB("sqlite3", ":memory:")
-	ctgsRepo := sql.NewCategories(c.db)
-	sql.NewUsers(c.db).Create(c.user)
+	c.mockExporter = services.NewMockExporter(c.ctrl)
 
-	exporters := Exporters{
-		"application/xml": services.NewOPMLExporter(ctgsRepo),
+	exporters := rest.Exporters{
+		"application/xml": c.mockExporter,
 	}
-	c.controller = NewExporterController(exporters, c.e)
+	c.controller = rest.NewExporterController(exporters, c.e)
 }
 
 func (c *ExporterControllerSuite) TearDownTest() {
-	err := c.db.Close()
-	c.NoError(err)
 }
 func TestExporterControllerSuite(t *testing.T) {
 	suite.Run(t, new(ExporterControllerSuite))

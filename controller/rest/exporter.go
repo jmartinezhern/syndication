@@ -68,8 +68,6 @@ func (s *ExporterController) Export(c echo.Context) error {
 		switch contType {
 		case "application/xml":
 			return c.XMLBlob(http.StatusOK, data)
-		case "application/json":
-			return c.JSONBlob(http.StatusOK, data)
 		}
 	}
 
