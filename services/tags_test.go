@@ -31,7 +31,7 @@ import (
 type TagsSuite struct {
 	suite.Suite
 
-	service  Tag
+	service  Tags
 	tagsRepo repo.Tags
 	db       *sql.DB
 	user     *models.User

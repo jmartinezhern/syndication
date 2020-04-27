@@ -15,22 +15,21 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rest
+package rest_test
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/jmartinezhern/syndication/controller/rest"
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/jmartinezhern/syndication/repo"
-	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
@@ -39,22 +38,23 @@ type (
 	TagsControllerSuite struct {
 		suite.Suite
 
-		e           *echo.Echo
-		db          *sql.DB
-		tagsRepo    repo.Tags
-		entriesRepo repo.Entries
-		user        *models.User
-		controller  *TagsController
+		ctrl     *gomock.Controller
+		mockTags *services.MockTags
+
+		controller *rest.TagsController
+		e          *echo.Echo
+		user       *models.User
 	}
 )
 
 func (c *TagsControllerSuite) TestNewTag() {
-	tag := `{ "name": "Test" }`
+	c.mockTags.EXPECT().New(gomock.Eq(c.user.ID), gomock.Eq("Test")).Return(models.Tag{ID: utils.CreateID()}, nil)
 
-	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(tag))
+	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(`{ "name": "Test" }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 
@@ -65,16 +65,13 @@ func (c *TagsControllerSuite) TestNewTag() {
 }
 
 func (c *TagsControllerSuite) TestNewConflictingTag() {
-	tag := models.Tag{
-		ID:   utils.CreateID(),
-		Name: "Test",
-	}
-	c.tagsRepo.Create(c.user.ID, &tag)
+	c.mockTags.EXPECT().New(gomock.Any(), gomock.Any()).Return(models.Tag{}, services.ErrTagConflicts)
 
 	req := httptest.NewRequest(echo.POST, "/", strings.NewReader(`{ "name": "Test" }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 
@@ -82,20 +79,21 @@ func (c *TagsControllerSuite) TestNewConflictingTag() {
 
 	c.EqualError(
 		c.controller.NewTag(ctx),
-		echo.NewHTTPError(http.StatusConflict, "tag with name "+tag.Name+" already exists").Error(),
+		echo.NewHTTPError(http.StatusConflict, "tag with name Test already exists").Error(),
 	)
 }
 
 func (c *TagsControllerSuite) TestGetTags() {
-	tag := models.Tag{
-		ID:   utils.CreateID(),
-		Name: "Test",
+	page := models.Page{
+		Count: 1,
 	}
-	c.tagsRepo.Create(c.user.ID, &tag)
+
+	c.mockTags.EXPECT().List(gomock.Eq(c.user.ID), gomock.Eq(page)).Return([]models.Tag{}, "")
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 
@@ -103,33 +101,21 @@ func (c *TagsControllerSuite) TestGetTags() {
 
 	c.NoError(c.controller.GetTags(ctx))
 	c.Equal(http.StatusOK, rec.Code)
-
-	type Tags struct {
-		Tags []models.Tag `json:"tags"`
-	}
-
-	var tags Tags
-
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &tags))
-	c.Require().Len(tags.Tags, 1)
-	c.Equal(tag.Name, tags.Tags[0].Name)
 }
 
 func (c *TagsControllerSuite) TestDeleteTag() {
-	tag := models.Tag{
-		ID:   utils.CreateID(),
-		Name: "Test",
-	}
-	c.tagsRepo.Create(c.user.ID, &tag)
+	tagID := utils.CreateID()
+
+	c.mockTags.EXPECT().Delete(gomock.Eq(c.user.ID), gomock.Eq(tagID)).Return(nil)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.ID)
-
+	ctx.SetParamValues(tagID)
 	ctx.SetPath("/v1/tags/:tagID")
 
 	c.NoError(c.controller.DeleteTag(ctx))
@@ -137,14 +123,16 @@ func (c *TagsControllerSuite) TestDeleteTag() {
 }
 
 func (c *TagsControllerSuite) TestDeleteUnknownTag() {
+	c.mockTags.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(services.ErrTagNotFound)
+
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
 	ctx.SetParamValues("bogus")
-
 	ctx.SetPath("/v1/tags/:tagID")
 
 	c.EqualError(
@@ -154,23 +142,21 @@ func (c *TagsControllerSuite) TestDeleteUnknownTag() {
 }
 
 func (c *TagsControllerSuite) TestEditTag() {
-	tag := models.Tag{
-		ID:   utils.CreateID(),
-		Name: "Test",
-	}
-	c.tagsRepo.Create(c.user.ID, &tag)
+	tagID := utils.CreateID()
 
-	mdfTagJSON := `{"name": "gopher"}`
+	c.mockTags.EXPECT().
+		Update(gomock.Eq(c.user.ID), gomock.Eq(tagID), gomock.Eq("gopher")).
+		Return(models.Tag{ID: tagID, Name: "gopher"}, nil)
 
-	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(mdfTagJSON))
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{"name": "gopher"}`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.ID)
-
+	ctx.SetParamValues(tagID)
 	ctx.SetPath("/v1/tags/:tagID")
 
 	c.NoError(c.controller.UpdateTag(ctx))
@@ -178,14 +164,13 @@ func (c *TagsControllerSuite) TestEditTag() {
 }
 
 func (c *TagsControllerSuite) TestEditUnknownTag() {
-	req := httptest.NewRequest(
-		echo.PUT,
-		"/",
-		strings.NewReader(`{"name" : "bogus" }`),
-	)
+	c.mockTags.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).Return(models.Tag{}, services.ErrTagNotFound)
+
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{"name" : "bogus" }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
@@ -199,41 +184,43 @@ func (c *TagsControllerSuite) TestEditUnknownTag() {
 	)
 }
 
-func (c *TagsControllerSuite) TestTagEntries() {
-	tag := models.Tag{
-		ID:   utils.CreateID(),
-		Name: "Test",
-	}
-	c.tagsRepo.Create(c.user.ID, &tag)
+func (c *TagsControllerSuite) TestEditTagConflicts() {
+	c.mockTags.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).Return(models.Tag{}, services.ErrTagConflicts)
 
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "example",
-		Subscription: "http://example.com",
-	}
-	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
-
-	entry := models.Entry{
-		ID:    utils.CreateID(),
-		Title: "Test",
-		Feed:  feed,
-	}
-	c.entriesRepo.Create(c.user.ID, &entry)
-
-	req := httptest.NewRequest(
-		echo.PUT,
-		"/",
-		strings.NewReader(fmt.Sprintf(`{
-			"entries" :  ["%s"]
-		}`, entry.ID)),
-	)
+	req := httptest.NewRequest(echo.PUT, "/", strings.NewReader(`{"name" : "bogus" }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.ID)
+	ctx.SetParamValues("bogus")
+
+	ctx.SetPath("/v1/tags/:tagID")
+
+	c.EqualError(
+		c.controller.UpdateTag(ctx),
+		echo.NewHTTPError(http.StatusConflict, "tag with name bogus already exists").Error(),
+	)
+}
+
+func (c *TagsControllerSuite) TestTagEntries() {
+	entryID := utils.CreateID()
+	tagID := utils.CreateID()
+
+	c.mockTags.EXPECT().Apply(gomock.Eq(c.user.ID), gomock.Eq(tagID), gomock.Eq([]string{entryID})).Return(nil)
+
+	req := httptest.NewRequest(echo.PUT, "/",
+		strings.NewReader(fmt.Sprintf(`{ "entries" : ["%s"] }`, entryID)))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+
+	ctx := c.e.NewContext(req, rec)
+	ctx.Set(userContextKey, c.user.ID)
+	ctx.SetParamNames("tagID")
+	ctx.SetParamValues(tagID)
 
 	ctx.SetPath("/v1/tags/:tagID")
 
@@ -242,16 +229,14 @@ func (c *TagsControllerSuite) TestTagEntries() {
 }
 
 func (c *TagsControllerSuite) TestTagEntriesWithUnknownTag() {
-	req := httptest.NewRequest(
-		echo.PUT,
-		"/",
-		strings.NewReader(`{
-			"entries" :  ["foo"]
-		}`),
-	)
+	c.mockTags.EXPECT().Apply(gomock.Any(), gomock.Any(), gomock.Any()).Return(services.ErrTagNotFound)
+
+	req := httptest.NewRequest(echo.PUT, "/",
+		strings.NewReader(`{ "entries" :  ["foo"] }`))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
@@ -266,39 +251,36 @@ func (c *TagsControllerSuite) TestTagEntriesWithUnknownTag() {
 }
 
 func (c *TagsControllerSuite) TestGetTag() {
-	tag := models.Tag{
-		ID:   utils.CreateID(),
-		Name: "Test",
-	}
-	c.tagsRepo.Create(c.user.ID, &tag)
+	tagID := utils.CreateID()
+
+	c.mockTags.EXPECT().Tag(gomock.Eq(c.user.ID), gomock.Eq(tagID)).Return(models.Tag{ID: tagID}, true)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.ID)
+	ctx.SetParamValues(tagID)
 
 	ctx.SetPath("/v1/tags/:tagID")
 
 	c.NoError(c.controller.GetTag(ctx))
-
-	var sTag models.Tag
-
-	c.NoError(json.Unmarshal(rec.Body.Bytes(), &sTag))
-	c.Equal(tag.Name, sTag.Name)
+	c.Equal(http.StatusOK, rec.Code)
 }
 
 func (c *TagsControllerSuite) TestGetUnknownTag() {
+	c.mockTags.EXPECT().Tag(gomock.Any(), gomock.Any()).Return(models.Tag{}, false)
+
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
 	ctx.SetParamValues("bogus")
-
 	ctx.SetPath("/v1/tags/:tagID")
 
 	c.EqualError(
@@ -308,55 +290,39 @@ func (c *TagsControllerSuite) TestGetUnknownTag() {
 }
 
 func (c *TagsControllerSuite) TestGetEntriesFromTag() {
-	tag := models.Tag{
-		ID:   utils.CreateID(),
-		Name: "Test",
-	}
-	c.tagsRepo.Create(c.user.ID, &tag)
+	tagID := utils.CreateID()
 
-	feed := models.Feed{
-		ID:           utils.CreateID(),
-		Title:        "example",
-		Subscription: "http://example.com",
+	page := models.Page{
+		Count:  1,
+		Newest: true,
+		Marker: models.MarkerAny,
 	}
-	sql.NewFeeds(c.db).Create(c.user.ID, &feed)
 
-	entry := models.Entry{
-		ID:    utils.CreateID(),
-		Title: "Test",
-		Feed:  feed,
-	}
-	c.entriesRepo.Create(c.user.ID, &entry)
-
-	err := c.entriesRepo.TagEntries(c.user.ID, tag.ID, []string{entry.ID})
-	c.NoError(err)
+	c.mockTags.EXPECT().
+		Entries(gomock.Eq(c.user.ID), gomock.Eq(page)).
+		Return([]models.Entry{
+			{
+				ID: utils.CreateID(),
+			},
+		}, "")
 
 	req := httptest.NewRequest(echo.GET, "/?count=1", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := c.e.NewContext(req, rec)
 	ctx.Set(userContextKey, c.user.ID)
 	ctx.SetParamNames("tagID")
-	ctx.SetParamValues(tag.ID)
-
+	ctx.SetParamValues(tagID)
 	ctx.SetPath("/v1/tags/:tagID/entries")
 
 	c.NoError(c.controller.GetEntriesFromTag(ctx))
 	c.Equal(http.StatusOK, rec.Code)
-
-	type Entries struct {
-		Entries []models.Entry `json:"entries"`
-	}
-
-	var entries Entries
-
-	c.Require().NoError(json.Unmarshal(rec.Body.Bytes(), &entries))
-	c.Require().Len(entries.Entries, 1)
-	c.Equal(entry.Title, entries.Entries[0].Title)
-	c.Equal(entry.ID, entries.Entries[0].ID)
 }
 
 func (c *TagsControllerSuite) SetupTest() {
+	c.ctrl = gomock.NewController(c.T())
+
 	c.e = echo.New()
 	c.e.HideBanner = true
 
@@ -364,18 +330,15 @@ func (c *TagsControllerSuite) SetupTest() {
 		ID: utils.CreateID(),
 	}
 
-	c.db = sql.NewDB("sqlite3", ":memory:")
-	sql.NewUsers(c.db).Create(c.user)
+	c.mockTags = services.NewMockTags(c.ctrl)
 
-	c.tagsRepo = sql.NewTags(c.db)
-	c.entriesRepo = sql.NewEntries(c.db)
-	c.controller = NewTagsController(services.NewTagsService(c.tagsRepo, c.entriesRepo), c.e)
+	c.controller = rest.NewTagsController(c.mockTags, c.e)
 }
 
 func (c *TagsControllerSuite) TearDownTest() {
-	err := c.db.Close()
-	c.NoError(err)
+	c.ctrl.Finish()
 }
+
 func TestTagsControllerSuite(t *testing.T) {
 	suite.Run(t, new(TagsControllerSuite))
 }

@@ -30,11 +30,11 @@ type (
 	TagsController struct {
 		Controller
 
-		tags services.Tag
+		tags services.Tags
 	}
 )
 
-func NewTagsController(service services.Tag, e *echo.Echo) *TagsController {
+func NewTagsController(service services.Tags, e *echo.Echo) *TagsController {
 	v1 := e.Group("v1")
 
 	controller := TagsController{

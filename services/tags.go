@@ -25,9 +25,11 @@ import (
 	"github.com/jmartinezhern/syndication/utils"
 )
 
+//go:generate mockgen -source=tags.go -destination=tags_mock.go -package=services
+
 type (
-	// Tag defines the Tag service interface
-	Tag interface {
+	// Tags defines the Tags service interface
+	Tags interface {
 		// New creates a new tag
 		New(userID, name string) (models.Tag, error)
 
