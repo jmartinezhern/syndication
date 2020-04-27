@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package services
+package services_test
 
 import (
 	"testing"
@@ -25,13 +25,14 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
 type TagsSuite struct {
 	suite.Suite
 
-	service  Tags
+	service  services.Tags
 	tagsRepo repo.Tags
 	db       *sql.DB
 	user     *models.User
@@ -50,8 +51,7 @@ func (t *TagsSuite) TestNewConflictingTag() {
 	})
 
 	_, err := t.service.New(t.user.ID, "test")
-	t.Equal(ErrTagConflicts, err)
-	t.EqualError(err, ErrTagConflicts.Error())
+	t.EqualError(err, services.ErrTagConflicts.Error())
 }
 
 func (t *TagsSuite) TestDeleteTag() {
@@ -70,7 +70,7 @@ func (t *TagsSuite) TestDeleteTag() {
 
 func (t *TagsSuite) TestDeleteUnknownTag() {
 	err := t.service.Delete(t.user.ID, "bogus")
-	t.Equal(ErrTagNotFound, err)
+	t.Equal(services.ErrTagNotFound, err)
 }
 
 func (t *TagsSuite) TestUpdateTag() {
@@ -87,7 +87,7 @@ func (t *TagsSuite) TestUpdateTag() {
 
 func (t *TagsSuite) TestEditUnknownTag() {
 	_, err := t.service.Update(t.user.ID, "", "")
-	t.EqualError(err, ErrTagNotFound.Error())
+	t.EqualError(err, services.ErrTagNotFound.Error())
 }
 
 func (t *TagsSuite) SetupTest() {
@@ -101,7 +101,7 @@ func (t *TagsSuite) SetupTest() {
 
 	t.tagsRepo = sql.NewTags(t.db)
 
-	t.service = NewTagsService(t.tagsRepo, sql.NewEntries(t.db))
+	t.service = services.NewTagsService(t.tagsRepo, sql.NewEntries(t.db))
 }
 
 func (t *TagsSuite) TearDownTest() {

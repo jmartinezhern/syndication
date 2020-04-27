@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package services
+package services_test
 
 import (
 	"testing"
@@ -26,13 +26,14 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
 type AuthSuite struct {
 	suite.Suite
 
-	service   Auth
+	service   services.Auth
 	db        *sql.DB
 	usersRepo repo.Users
 }
@@ -54,7 +55,7 @@ func (t *AuthSuite) TestRegisterConflicting() {
 	})
 
 	err := t.service.Register("testUser", "testtesttest")
-	t.EqualError(err, ErrUserConflicts.Error())
+	t.EqualError(err, services.ErrUserConflicts.Error())
 }
 
 func (t *AuthSuite) TestLogin() {
@@ -84,7 +85,7 @@ func (t *AuthSuite) TestBadLogin() {
 	})
 
 	_, err := t.service.Login("testUser", "bogus")
-	t.Equal(ErrUserUnauthorized, err)
+	t.Equal(services.ErrUserUnauthorized, err)
 }
 
 func (t *AuthSuite) TestRenew() {
@@ -121,13 +122,13 @@ func (t *AuthSuite) TestRenewWithInvalidKey() {
 	t.Require().NoError(err)
 
 	_, err = t.service.Renew(key.Key)
-	t.EqualError(err, ErrUserUnauthorized.Error())
+	t.EqualError(err, services.ErrUserUnauthorized.Error())
 }
 
 func (t *AuthSuite) SetupTest() {
 	t.db = sql.NewDB("sqlite3", ":memory:")
 	t.usersRepo = sql.NewUsers(t.db)
-	t.service = NewAuthService("secret", t.usersRepo)
+	t.service = services.NewAuthService("secret", t.usersRepo)
 }
 
 func (t *AuthSuite) TearDownTest() {
@@ -135,6 +136,6 @@ func (t *AuthSuite) TearDownTest() {
 	t.NoError(err)
 }
 
-func TestAuth(t *testing.T) {
+func TestAuthSuite(t *testing.T) {
 	suite.Run(t, new(AuthSuite))
 }

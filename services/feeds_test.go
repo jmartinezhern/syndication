@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package services
+package services_test
 
 import (
 	"fmt"
@@ -28,13 +28,14 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
 type FeedsSuite struct {
 	suite.Suite
 
-	service Feeds
+	service services.Feeds
 
 	db          *sql.DB
 	feedsRepo   repo.Feeds
@@ -60,7 +61,7 @@ func (t *FeedsSuite) TestNewFeed() {
 
 func (t *FeedsSuite) TestUnreachableNewFeed() {
 	_, err := t.service.New("Example", "bogus", "", t.user.ID)
-	t.EqualError(err, ErrFetchingFeed.Error())
+	t.EqualError(err, services.ErrFetchingFeed.Error())
 }
 
 func (t *FeedsSuite) TestFeeds() {
@@ -88,7 +89,7 @@ func (t *FeedsSuite) TestEditFeed() {
 
 func (t *FeedsSuite) TestEditMissingFeed() {
 	err := t.service.Update(t.user.ID, &models.Feed{})
-	t.EqualError(err, ErrFeedNotFound.Error())
+	t.EqualError(err, services.ErrFeedNotFound.Error())
 }
 
 func (t *FeedsSuite) TestDeleteFeed() {
@@ -101,7 +102,7 @@ func (t *FeedsSuite) TestDeleteFeed() {
 
 func (t *FeedsSuite) TestDeleteMissingFeed() {
 	err := t.service.Delete(t.user.ID, "bogus")
-	t.EqualError(err, ErrFeedNotFound.Error())
+	t.EqualError(err, services.ErrFeedNotFound.Error())
 }
 
 func (t *FeedsSuite) TestMarkFeed() {
@@ -130,7 +131,7 @@ func (t *FeedsSuite) TestMarkFeed() {
 
 func (t *FeedsSuite) TestMarkMissingFeed() {
 	err := t.service.Mark(t.user.ID, "bogus", models.MarkerRead)
-	t.EqualError(err, ErrFeedNotFound.Error())
+	t.EqualError(err, services.ErrFeedNotFound.Error())
 }
 
 func (t *FeedsSuite) TestFeedEntries() {
@@ -171,7 +172,7 @@ func (t *FeedsSuite) TestFeedStats() {
 
 func (t *FeedsSuite) TestMissingFeedStats() {
 	_, err := t.service.Stats(t.user.ID, "bogus")
-	t.EqualError(err, ErrFeedNotFound.Error())
+	t.EqualError(err, services.ErrFeedNotFound.Error())
 }
 
 func (t *FeedsSuite) SetupTest() {
@@ -180,7 +181,7 @@ func (t *FeedsSuite) SetupTest() {
 	t.entriesRepo = sql.NewEntries(t.db)
 	t.ctgsRepo = sql.NewCategories(t.db)
 
-	t.service = NewFeedsService(t.feedsRepo, t.ctgsRepo, t.entriesRepo)
+	t.service = services.NewFeedsService(t.feedsRepo, t.ctgsRepo, t.entriesRepo)
 
 	t.user = &models.User{
 		ID:       utils.CreateID(),

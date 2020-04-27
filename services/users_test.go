@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package services
+package services_test
 
 import (
 	"testing"
@@ -25,6 +25,7 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
@@ -33,7 +34,7 @@ type (
 		suite.Suite
 
 		db      *sql.DB
-		service Users
+		service services.Users
 		repo    repo.Users
 	}
 )
@@ -54,7 +55,7 @@ func (s *UsersSuite) TestNewConflictingUser() {
 	})
 
 	_, err := s.service.NewUser("gopher", "password")
-	s.EqualError(err, ErrUsernameConflicts.Error())
+	s.EqualError(err, services.ErrUsernameConflicts.Error())
 }
 
 func (s *UsersSuite) TestDeleteUser() {
@@ -69,7 +70,7 @@ func (s *UsersSuite) TestDeleteUser() {
 }
 
 func (s *UsersSuite) TestDeleteMissingUser() {
-	s.EqualError(s.service.DeleteUser("bogus"), ErrUserNotFound.Error())
+	s.EqualError(s.service.DeleteUser("bogus"), services.ErrUserNotFound.Error())
 }
 
 func (s *UsersSuite) TestUser() {
@@ -90,7 +91,7 @@ func (s *UsersSuite) SetupTest() {
 	s.db = sql.NewDB("sqlite3", ":memory:")
 	s.repo = sql.NewUsers(s.db)
 
-	s.service = NewUsersService(s.repo)
+	s.service = services.NewUsersService(s.repo)
 }
 
 func (s *UsersSuite) TearDownTest() {

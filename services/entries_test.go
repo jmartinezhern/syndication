@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package services
+package services_test
 
 import (
 	"testing"
@@ -25,13 +25,14 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
 type EntriesSuite struct {
 	suite.Suite
 
-	service     Entries
+	service     services.Entries
 	db          *sql.DB
 	entriesRepo repo.Entries
 	feedsRepo   repo.Feeds
@@ -55,7 +56,7 @@ func (t *EntriesSuite) TestEntry() {
 
 func (t *EntriesSuite) TestMissingEntry() {
 	_, err := t.service.Entry(t.user.ID, "bogus")
-	t.EqualError(err, ErrEntryNotFound.Error())
+	t.EqualError(err, services.ErrEntryNotFound.Error())
 }
 
 func (t *EntriesSuite) TestEntries() {
@@ -101,7 +102,7 @@ func (t *EntriesSuite) TestMarkEntry() {
 
 func (t *EntriesSuite) TestMarkMissingEntry() {
 	err := t.service.Mark(t.user.ID, "bogus", models.MarkerRead)
-	t.EqualError(err, ErrEntryNotFound.Error())
+	t.EqualError(err, services.ErrEntryNotFound.Error())
 }
 
 func (t *EntriesSuite) TestMarkAll() {
@@ -128,7 +129,7 @@ func (t *EntriesSuite) TestMarkAll() {
 func (t *EntriesSuite) SetupTest() {
 	t.db = sql.NewDB("sqlite3", ":memory:")
 	t.entriesRepo = sql.NewEntries(t.db)
-	t.service = NewEntriesService(t.entriesRepo)
+	t.service = services.NewEntriesService(t.entriesRepo)
 
 	t.user = &models.User{
 		ID:       utils.CreateID(),

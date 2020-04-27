@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package services
+package services_test
 
 import (
 	"encoding/xml"
@@ -27,13 +27,14 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
 type ExporterSuite struct {
 	suite.Suite
 
-	service OPMLExporter
+	service services.OPMLExporter
 	user    *models.User
 	repo    repo.Categories
 	db      *sql.DB
@@ -81,7 +82,7 @@ func (t *ExporterSuite) SetupTest() {
 	t.db = sql.NewDB("sqlite3", ":memory:")
 	t.repo = sql.NewCategories(t.db)
 
-	t.service = NewOPMLExporter(t.repo)
+	t.service = services.NewOPMLExporter(t.repo)
 
 	t.user = &models.User{
 		ID:       utils.CreateID(),

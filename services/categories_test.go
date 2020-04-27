@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package services
+package services_test
 
 import (
 	"testing"
@@ -23,40 +23,43 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
 type CategoriesSuite struct {
 	suite.Suite
 
-	service CategoriesService
+	service services.CategoriesService
 
-	db   *sql.DB
-	user *models.User
+	db       *sql.DB
+	ctgsRepo repo.Categories
+	user     *models.User
 }
 
 func (t *CategoriesSuite) TestNewCategory() {
 	_, err := t.service.New(t.user.ID, "test")
 	t.NoError(err)
 
-	_, found := t.service.ctgsRepo.CategoryWithName(t.user.ID, "test")
+	_, found := t.ctgsRepo.CategoryWithName(t.user.ID, "test")
 	t.True(found)
 }
 
 func (t *CategoriesSuite) TestNewConflictingCategory() {
-	t.service.ctgsRepo.Create(t.user.ID, &models.Category{
+	t.ctgsRepo.Create(t.user.ID, &models.Category{
 		Name: "test",
 	})
 
 	_, err := t.service.New(t.user.ID, "test")
-	t.EqualError(err, ErrCategoryConflicts.Error())
+	t.EqualError(err, services.ErrCategoryConflicts.Error())
 }
 
 func (t *CategoriesSuite) TestCategory() {
 	ctgID := utils.CreateID()
 
-	t.service.ctgsRepo.Create(t.user.ID, &models.Category{
+	t.ctgsRepo.Create(t.user.ID, &models.Category{
 		ID:   ctgID,
 		Name: "test",
 	})
@@ -68,7 +71,7 @@ func (t *CategoriesSuite) TestCategory() {
 func (t *CategoriesSuite) TestCategories() {
 	ctgID := utils.CreateID()
 
-	t.service.ctgsRepo.Create(t.user.ID, &models.Category{
+	t.ctgsRepo.Create(t.user.ID, &models.Category{
 		ID:   ctgID,
 		Name: "test",
 	})
@@ -87,7 +90,7 @@ func (t *CategoriesSuite) TestCategoryFeeds() {
 		ID:   utils.CreateID(),
 		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user.ID, &ctg)
+	t.ctgsRepo.Create(t.user.ID, &ctg)
 
 	feed := models.Feed{
 		ID:           utils.CreateID(),
@@ -129,7 +132,7 @@ func (t *CategoriesSuite) TestEditCategory() {
 		ID:   utils.CreateID(),
 		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user.ID, &ctg)
+	t.ctgsRepo.Create(t.user.ID, &ctg)
 
 	ctg.Name = "newName"
 
@@ -140,7 +143,7 @@ func (t *CategoriesSuite) TestEditCategory() {
 
 func (t *CategoriesSuite) TestEditMissingCategory() {
 	_, err := t.service.Update(t.user.ID, "bogus", "bogus")
-	t.EqualError(err, ErrCategoryNotFound.Error())
+	t.EqualError(err, services.ErrCategoryNotFound.Error())
 }
 
 func (t *CategoriesSuite) TestAddFeedsToCategory() {
@@ -148,7 +151,7 @@ func (t *CategoriesSuite) TestAddFeedsToCategory() {
 		ID:   utils.CreateID(),
 		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user.ID, &ctg)
+	t.ctgsRepo.Create(t.user.ID, &ctg)
 
 	feed := models.Feed{
 		ID:           utils.CreateID(),
@@ -160,7 +163,7 @@ func (t *CategoriesSuite) TestAddFeedsToCategory() {
 
 	t.service.AddFeeds(t.user.ID, ctg.ID, []string{feed.ID})
 
-	feeds, _ := t.service.ctgsRepo.Feeds(t.user.ID, models.Page{
+	feeds, _ := t.ctgsRepo.Feeds(t.user.ID, models.Page{
 		FilterID:       ctg.ID,
 		ContinuationID: "",
 		Count:          1,
@@ -174,18 +177,18 @@ func (t *CategoriesSuite) TestDeleteCategory() {
 		ID:   utils.CreateID(),
 		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user.ID, &ctg)
+	t.ctgsRepo.Create(t.user.ID, &ctg)
 
 	err := t.service.Delete(t.user.ID, ctg.ID)
 	t.NoError(err)
 
-	_, found := t.service.ctgsRepo.CategoryWithID(t.user.ID, ctg.ID)
+	_, found := t.ctgsRepo.CategoryWithID(t.user.ID, ctg.ID)
 	t.False(found)
 }
 
 func (t *CategoriesSuite) TestDeleteMissingCategory() {
 	err := t.service.Delete(t.user.ID, "bogus")
-	t.EqualError(err, ErrCategoryNotFound.Error())
+	t.EqualError(err, services.ErrCategoryNotFound.Error())
 }
 
 func (t *CategoriesSuite) TestMarkCategory() {
@@ -193,7 +196,7 @@ func (t *CategoriesSuite) TestMarkCategory() {
 		ID:   utils.CreateID(),
 		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user.ID, &ctg)
+	t.ctgsRepo.Create(t.user.ID, &ctg)
 
 	feed := models.Feed{
 		ID:       utils.CreateID(),
@@ -224,7 +227,7 @@ func (t *CategoriesSuite) TestMarkCategory() {
 
 func (t *CategoriesSuite) TestMarkMissingCategory() {
 	err := t.service.Mark(t.user.ID, "bogus", models.MarkerRead)
-	t.EqualError(err, ErrCategoryNotFound.Error())
+	t.EqualError(err, services.ErrCategoryNotFound.Error())
 }
 
 func (t *CategoriesSuite) TestCategoryEntries() {
@@ -232,7 +235,7 @@ func (t *CategoriesSuite) TestCategoryEntries() {
 		ID:   utils.CreateID(),
 		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user.ID, &ctg)
+	t.ctgsRepo.Create(t.user.ID, &ctg)
 
 	feed := models.Feed{
 		ID:           utils.CreateID(),
@@ -269,7 +272,7 @@ func (t *CategoriesSuite) TestEntriesForMissingCategory() {
 		Newest:         true,
 		Marker:         models.MarkerAny,
 	})
-	t.EqualError(err, ErrCategoryNotFound.Error())
+	t.EqualError(err, services.ErrCategoryNotFound.Error())
 }
 
 func (t *CategoriesSuite) TestCategoryStats() {
@@ -277,7 +280,7 @@ func (t *CategoriesSuite) TestCategoryStats() {
 		ID:   utils.CreateID(),
 		Name: "test",
 	}
-	t.service.ctgsRepo.Create(t.user.ID, &ctg)
+	t.ctgsRepo.Create(t.user.ID, &ctg)
 
 	_, err := t.service.Stats(t.user.ID, ctg.ID)
 	t.NoError(err)
@@ -285,12 +288,15 @@ func (t *CategoriesSuite) TestCategoryStats() {
 
 func (t *CategoriesSuite) TestMissingCategoryStats() {
 	_, err := t.service.Stats(t.user.ID, "bogus")
-	t.EqualError(err, ErrCategoryNotFound.Error())
+	t.EqualError(err, services.ErrCategoryNotFound.Error())
 }
 
 func (t *CategoriesSuite) SetupTest() {
 	t.db = sql.NewDB("sqlite3", ":memory:")
-	t.service = NewCategoriesService(sql.NewCategories(t.db), sql.NewEntries(t.db))
+
+	t.ctgsRepo = sql.NewCategories(t.db)
+
+	t.service = services.NewCategoriesService(t.ctgsRepo, sql.NewEntries(t.db))
 
 	t.user = &models.User{
 		ID:       utils.CreateID(),
@@ -304,6 +310,6 @@ func (t *CategoriesSuite) TearDownTest() {
 	t.NoError(err)
 }
 
-func TestCategories(t *testing.T) {
+func TestCategoriesSuite(t *testing.T) {
 	suite.Run(t, new(CategoriesSuite))
 }

@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package services
+package services_test
 
 import (
 	"sort"
@@ -24,7 +24,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
+	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
@@ -54,19 +56,21 @@ const opml = `
 type ImporterSuite struct {
 	suite.Suite
 
-	importer OPMLImporter
-	db       *sql.DB
-	user     *models.User
+	importer  services.OPMLImporter
+	ctgsRepo  repo.Categories
+	feedsRepo repo.Feeds
+	db        *sql.DB
+	user      *models.User
 }
 
 func (t *ImporterSuite) TestOPMLImporter() {
 	err := t.importer.Import([]byte(opml), t.user.ID)
 	t.NoError(err)
 
-	ctg, found := t.importer.ctgsRepo.CategoryWithName(t.user.ID, "Test")
+	ctg, found := t.ctgsRepo.CategoryWithName(t.user.ID, "Test")
 	t.Require().True(found)
 
-	ctgFeeds, _ := t.importer.ctgsRepo.Feeds(t.user.ID, models.Page{
+	ctgFeeds, _ := t.ctgsRepo.Feeds(t.user.ID, models.Page{
 		FilterID:       ctg.ID,
 		ContinuationID: "",
 		Count:          10,
@@ -74,7 +78,7 @@ func (t *ImporterSuite) TestOPMLImporter() {
 	t.Require().Len(ctgFeeds, 1)
 	t.Equal(ctgFeeds[0].Title, "Example")
 
-	feeds, _ := t.importer.feedsRepo.List(t.user.ID, models.Page{
+	feeds, _ := t.feedsRepo.List(t.user.ID, models.Page{
 		ContinuationID: "",
 		Count:          2,
 	})
@@ -94,7 +98,10 @@ func (t *ImporterSuite) SetupTest() {
 
 	sql.NewUsers(t.db).Create(t.user)
 
-	t.importer = NewOPMLImporter(sql.NewCategories(t.db), sql.NewFeeds(t.db))
+	t.ctgsRepo = sql.NewCategories(t.db)
+	t.feedsRepo = sql.NewFeeds(t.db)
+
+	t.importer = services.NewOPMLImporter(t.ctgsRepo, t.feedsRepo)
 }
 
 func (t *ImporterSuite) TearDownTest() {
