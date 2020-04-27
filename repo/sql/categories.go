@@ -18,17 +18,19 @@
 package sql
 
 import (
+	"github.com/jinzhu/gorm"
+
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 )
 
 type (
 	Categories struct {
-		db *DB
+		db *gorm.DB
 	}
 )
 
-func NewCategories(db *DB) Categories {
+func NewCategories(db *gorm.DB) Categories {
 	return Categories{
 		db,
 	}
@@ -36,7 +38,7 @@ func NewCategories(db *DB) Categories {
 
 // Create a new Category owned by user
 func (c Categories) Create(userID string, ctg *models.Category) {
-	c.db.db.Model(&models.User{ID: userID}).Association("Categories").Append(ctg)
+	c.db.Model(&models.User{ID: userID}).Association("Categories").Append(ctg)
 }
 
 // Update a category owned by user
@@ -46,7 +48,7 @@ func (c Categories) Update(userID string, ctg *models.Category) error {
 		return repo.ErrModelNotFound
 	}
 
-	c.db.db.Model(&dbCtg).Updates(ctg)
+	c.db.Model(&dbCtg).Updates(ctg)
 
 	return nil
 }
@@ -58,20 +60,20 @@ func (c Categories) Delete(userID, id string) error {
 		return repo.ErrModelNotFound
 	}
 
-	c.db.db.Delete(ctg)
+	c.db.Delete(ctg)
 
 	return nil
 }
 
 // CategoryWithID returns a category with ID owned by user
 func (c Categories) CategoryWithID(userID, id string) (ctg models.Category, found bool) {
-	found = !c.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&ctg).RecordNotFound()
+	found = !c.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&ctg).RecordNotFound()
 	return
 }
 
 // List all Categories owned by user
 func (c Categories) List(userID string, page models.Page) (categories []models.Category, next string) {
-	query := c.db.db.Model(&models.User{ID: userID})
+	query := c.db.Model(&models.User{ID: userID})
 
 	if page.ContinuationID != "" {
 		if ctg, found := c.CategoryWithID(userID, page.ContinuationID); found {
@@ -96,11 +98,11 @@ func (c Categories) Feeds(userID string, page models.Page) (feeds []models.Feed,
 		return nil, ""
 	}
 
-	query := c.db.db.Model(&ctg)
+	query := c.db.Model(&ctg)
 
 	if page.ContinuationID != "" {
 		feed := models.Feed{}
-		if !c.db.db.Model(&models.User{
+		if !c.db.Model(&models.User{
 			ID: userID,
 		}).Where("id = ?", page.ContinuationID).Related(&feed).RecordNotFound() {
 			query = query.Where("created_at >= ?", feed.CreatedAt)
@@ -119,11 +121,11 @@ func (c Categories) Feeds(userID string, page models.Page) (feeds []models.Feed,
 
 // Uncategorized returns all Feeds that belong to a category with categoryID
 func (c Categories) Uncategorized(userID string, page models.Page) (feeds []models.Feed, next string) {
-	query := c.db.db.Model(&models.User{ID: userID}).Where("category_id = ?", "")
+	query := c.db.Model(&models.User{ID: userID}).Where("category_id = ?", "")
 
 	if page.ContinuationID != "" {
 		feed := models.Feed{}
-		if !c.db.db.Model(&models.User{
+		if !c.db.Model(&models.User{
 			ID: userID,
 		}).Where("id = ?", page.ContinuationID).Related(&feed).RecordNotFound() {
 			query = query.Where("created_at >= ?", feed.CreatedAt)
@@ -142,14 +144,14 @@ func (c Categories) Uncategorized(userID string, page models.Page) (feeds []mode
 
 // CategoryWithName returns a Category that has a matching name and belongs to the given user
 func (c Categories) CategoryWithName(userID, name string) (ctg models.Category, found bool) {
-	found = !c.db.db.Model(&models.User{ID: userID}).Where("name = ?", name).Related(&ctg).RecordNotFound()
+	found = !c.db.Model(&models.User{ID: userID}).Where("name = ?", name).Related(&ctg).RecordNotFound()
 	return
 }
 
 // AddFeed associates a feed to a category with ctgID
 func (c Categories) AddFeed(userID, feedID, ctgID string) error {
 	var feed models.Feed
-	if c.db.db.Model(&models.User{ID: userID}).Where("id = ?", feedID).Related(&feed).RecordNotFound() {
+	if c.db.Model(&models.User{ID: userID}).Where("id = ?", feedID).Related(&feed).RecordNotFound() {
 		return repo.ErrModelNotFound
 	}
 
@@ -158,7 +160,7 @@ func (c Categories) AddFeed(userID, feedID, ctgID string) error {
 		return repo.ErrModelNotFound
 	}
 
-	return c.db.db.Model(&ctg).Association("Feeds").Replace(&feed).Error
+	return c.db.Model(&ctg).Association("Feeds").Replace(&feed).Error
 }
 
 // Stats returns all Stats for a Category with the given id and that is owned by user
@@ -170,14 +172,14 @@ func (c Categories) Stats(userID, ctgID string) (models.Stats, error) {
 
 	var feeds []models.Feed
 
-	c.db.db.Model(&ctg).Association("Feeds").Find(&feeds)
+	c.db.Model(&ctg).Association("Feeds").Find(&feeds)
 
 	feedIds := make([]string, len(feeds))
 	for idx := range feeds {
 		feedIds[idx] = feeds[idx].ID
 	}
 
-	query := c.db.db.Model(&models.User{ID: userID}).Where("feed_id in (?)", feedIds)
+	query := c.db.Model(&models.User{ID: userID}).Where("feed_id in (?)", feedIds)
 
 	stats := models.Stats{}
 
@@ -198,7 +200,7 @@ func (c Categories) Mark(userID, ctgID string, marker models.Marker) error {
 
 	var feeds []models.Feed
 
-	c.db.db.Model(&ctg).Association("Feeds").Find(&feeds)
+	c.db.Model(&ctg).Association("Feeds").Find(&feeds)
 
 	feedIds := make([]models.ID, len(feeds))
 	for idx := range feeds {
@@ -206,7 +208,7 @@ func (c Categories) Mark(userID, ctgID string, marker models.Marker) error {
 	}
 
 	markedEntry := &models.Entry{Mark: marker}
-	c.db.db.Model(markedEntry).Where("user_id = ? AND feed_id in (?)", userID, feedIds).Update(markedEntry)
+	c.db.Model(markedEntry).Where("user_id = ? AND feed_id in (?)", userID, feedIds).Update(markedEntry)
 
 	return nil
 }

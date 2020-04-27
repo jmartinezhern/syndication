@@ -15,17 +15,19 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package sql
+package sql_test
 
 import (
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
+	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
@@ -33,7 +35,7 @@ type CategoriesSuite struct {
 	suite.Suite
 
 	repo repo.Categories
-	db   *DB
+	db   *gorm.DB
 	user *models.User
 }
 
@@ -96,7 +98,7 @@ func (s *CategoriesSuite) TestFeeds() {
 			Subscription: "https://example.com",
 			Category:     ctg,
 		}
-		s.db.db.Model(s.user).Association("Feeds").Append(&feed)
+		s.db.Model(s.user).Association("Feeds").Append(&feed)
 	}
 
 	feeds, next := s.repo.Feeds(s.user.ID, models.Page{
@@ -128,7 +130,7 @@ func (s *CategoriesSuite) TestUncategorized() {
 			Title:        "Feed " + strconv.Itoa(i),
 			Subscription: "https://example.com",
 		}
-		s.db.db.Model(s.user).Association("Feeds").Append(&feed)
+		s.db.Model(s.user).Association("Feeds").Append(&feed)
 	}
 
 	feeds, next := s.repo.Uncategorized(s.user.ID, models.Page{
@@ -217,8 +219,8 @@ func (s *CategoriesSuite) TestMark() {
 		Subscription: "http://example.com",
 	}
 
-	s.db.db.Model(s.user).Association("Feeds").Append(&feed)
-	s.db.db.Model(&ctg).Association("Feeds").Append(&feed)
+	s.db.Model(s.user).Association("Feeds").Append(&feed)
+	s.db.Model(&ctg).Association("Feeds").Append(&feed)
 
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
@@ -230,14 +232,14 @@ func (s *CategoriesSuite) TestMark() {
 			Published: time.Now(),
 		}
 
-		s.db.db.Model(s.user).Association("Entries").Append(&entry)
-		s.db.db.Model(&feed).Association("Entries").Append(&entry)
+		s.db.Model(s.user).Association("Entries").Append(&entry)
+		s.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
 	err := s.repo.Mark(s.user.ID, ctg.ID, models.MarkerRead)
 	s.NoError(err)
 
-	entries, _ := NewEntries(s.db).ListFromCategory(s.user.ID, models.Page{
+	entries, _ := sql.NewEntries(s.db).ListFromCategory(s.user.ID, models.Page{
 		FilterID:       ctg.ID,
 		ContinuationID: "",
 		Count:          5,
@@ -265,7 +267,7 @@ func (s *CategoriesSuite) TestAddFeed() {
 		Subscription: "http://example.com",
 		Category:     ctg,
 	}
-	s.db.db.Model(s.user).Association("Feeds").Append(&feed)
+	s.db.Model(s.user).Association("Feeds").Append(&feed)
 
 	s.NoError(s.repo.AddFeed(s.user.ID, feed.ID, ctg.ID))
 
@@ -293,8 +295,8 @@ func (s *CategoriesSuite) TestCategoryStats() {
 		Subscription: "http://example.com",
 	}
 
-	s.db.db.Model(s.user).Association("Feeds").Append(&feed)
-	s.db.db.Model(&ctg).Association("Feeds").Append(&feed)
+	s.db.Model(s.user).Association("Feeds").Append(&feed)
+	s.db.Model(&ctg).Association("Feeds").Append(&feed)
 
 	for i := 0; i < 10; i++ {
 		var marker models.Marker
@@ -314,8 +316,8 @@ func (s *CategoriesSuite) TestCategoryStats() {
 			Published: time.Now(),
 		}
 
-		s.db.db.Model(s.user).Association("Entries").Append(&entry)
-		s.db.db.Model(&feed).Association("Entries").Append(&entry)
+		s.db.Model(s.user).Association("Entries").Append(&entry)
+		s.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
 	stats, err := s.repo.Stats(s.user.ID, ctg.ID)
@@ -327,16 +329,21 @@ func (s *CategoriesSuite) TestCategoryStats() {
 }
 
 func (s *CategoriesSuite) SetupTest() {
-	s.db = NewDB("sqlite3", ":memory:")
+	var err error
+
+	s.db, err = gorm.Open("sqlite3", ":memory:")
+	s.Require().NoError(err)
+
+	sql.AutoMigrateTables(s.db)
 
 	s.user = &models.User{
 		ID:       utils.CreateID(),
 		Username: "test_ctgs",
 	}
 
-	s.db.db.Create(s.user.ID)
+	s.db.Create(s.user.ID)
 
-	s.repo = NewCategories(s.db)
+	s.repo = sql.NewCategories(s.db)
 }
 
 func (s *CategoriesSuite) TearDownTest() {

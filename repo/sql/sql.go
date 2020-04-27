@@ -19,6 +19,7 @@ package sql
 
 import (
 	"github.com/jinzhu/gorm"
+
 	// GORM dialect packages
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
@@ -27,31 +28,11 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 )
 
-type (
-	DB struct {
-		db *gorm.DB
-	}
-)
-
-func NewDB(dbType, connection string) *DB {
-	gormDB, err := gorm.Open(dbType, connection)
-	if err != nil {
-		panic(err)
-	}
-
-	gormDB.AutoMigrate(&models.Feed{})
-	gormDB.AutoMigrate(&models.Category{})
-	gormDB.AutoMigrate(&models.User{})
-	gormDB.AutoMigrate(&models.Entry{})
-	gormDB.AutoMigrate(&models.Tag{})
-	gormDB.AutoMigrate(&models.APIKey{})
-
-	return &DB{
-		db: gormDB,
-	}
-}
-
-// Close ends connections with the repo
-func (db DB) Close() error {
-	return db.db.Close()
+func AutoMigrateTables(db *gorm.DB) {
+	db.AutoMigrate(&models.Feed{})
+	db.AutoMigrate(&models.Category{})
+	db.AutoMigrate(&models.User{})
+	db.AutoMigrate(&models.Entry{})
+	db.AutoMigrate(&models.Tag{})
+	db.AutoMigrate(&models.APIKey{})
 }

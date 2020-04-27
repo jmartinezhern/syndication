@@ -15,17 +15,19 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package sql
+package sql_test
 
 import (
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
+	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
@@ -33,7 +35,7 @@ type FeedsSuite struct {
 	suite.Suite
 
 	repo repo.Feeds
-	db   *DB
+	db   *gorm.DB
 	user *models.User
 	ctg  models.Category
 }
@@ -146,14 +148,14 @@ func (s *FeedsSuite) TestMark() {
 			Published: time.Now(),
 		}
 
-		s.db.db.Model(s.user).Association("Entries").Append(&entry)
-		s.db.db.Model(&feed).Association("Entries").Append(&entry)
+		s.db.Model(s.user).Association("Entries").Append(&entry)
+		s.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
 	err := s.repo.Mark(s.user.ID, feed.ID, models.MarkerRead)
 	s.NoError(err)
 
-	entries, _ := NewEntries(s.db).ListFromFeed(s.user.ID, models.Page{
+	entries, _ := sql.NewEntries(s.db).ListFromFeed(s.user.ID, models.Page{
 		FilterID:       feed.ID,
 		ContinuationID: "",
 		Count:          5,
@@ -188,7 +190,7 @@ func (s *FeedsSuite) TestStats() {
 			Published: time.Now(),
 		}
 
-		s.db.db.Model(&feed).Association("Entries").Append(&entry)
+		s.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
 	stats, err := s.repo.Stats(s.user.ID, feed.ID)
@@ -200,21 +202,26 @@ func (s *FeedsSuite) TestStats() {
 }
 
 func (s *FeedsSuite) SetupTest() {
-	s.db = NewDB("sqlite3", ":memory:")
+	var err error
+
+	s.db, err = gorm.Open("sqlite3", ":memory:")
+	s.Require().NoError(err)
+
+	sql.AutoMigrateTables(s.db)
 
 	s.user = &models.User{
 		ID:       utils.CreateID(),
 		Username: "test_feeds",
 	}
-	s.db.db.Create(s.user.ID)
+	s.db.Create(s.user.ID)
 
 	s.ctg = models.Category{
 		ID:   utils.CreateID(),
 		Name: "category",
 	}
-	s.db.db.Create(&s.ctg)
+	s.db.Create(&s.ctg)
 
-	s.repo = NewFeeds(s.db)
+	s.repo = sql.NewFeeds(s.db)
 }
 
 func (s *FeedsSuite) TearDownTest() {

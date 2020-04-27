@@ -20,6 +20,7 @@ package services_test
 import (
 	"testing"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -34,7 +35,7 @@ type CategoriesSuite struct {
 
 	service services.CategoriesService
 
-	db       *sql.DB
+	db       *gorm.DB
 	ctgsRepo repo.Categories
 	user     *models.User
 }
@@ -292,7 +293,12 @@ func (t *CategoriesSuite) TestMissingCategoryStats() {
 }
 
 func (t *CategoriesSuite) SetupTest() {
-	t.db = sql.NewDB("sqlite3", ":memory:")
+	var err error
+
+	t.db, err = gorm.Open("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	sql.AutoMigrateTables(t.db)
 
 	t.ctgsRepo = sql.NewCategories(t.db)
 

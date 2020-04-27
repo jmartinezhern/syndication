@@ -15,15 +15,17 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package sql
+package sql_test
 
 import (
 	"testing"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
+	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
@@ -31,7 +33,7 @@ type TagsSuite struct {
 	suite.Suite
 
 	user *models.User
-	db   *DB
+	db   *gorm.DB
 	repo repo.Tags
 }
 
@@ -81,15 +83,21 @@ func (s *TagsSuite) TestUpdate() {
 }
 
 func (s *TagsSuite) SetupTest() {
-	s.db = NewDB("sqlite3", ":memory:")
+	var err error
+
+	s.db, err = gorm.Open("sqlite3", ":memory:")
+	s.Require().NoError(err)
+
+	sql.AutoMigrateTables(s.db)
 
 	s.user = &models.User{
 		ID:       utils.CreateID(),
 		Username: "test_tags",
 	}
-	s.db.db.Create(s.user.ID)
 
-	s.repo = NewTags(s.db)
+	s.db.Create(s.user.ID)
+
+	s.repo = sql.NewTags(s.db)
 }
 
 func (s *TagsSuite) TearDownTest() {

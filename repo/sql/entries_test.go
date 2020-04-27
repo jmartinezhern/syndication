@@ -15,24 +15,26 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package sql
+package sql_test
 
 import (
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
+	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
 type EntriesSuite struct {
 	suite.Suite
 
-	db   *DB
+	db   *gorm.DB
 	user *models.User
 	repo repo.Entries
 }
@@ -99,7 +101,7 @@ func (s *EntriesSuite) TestListFromCategory() {
 		Name: "test_category",
 	}
 
-	s.db.db.Model(s.user).Association("Categories").Append(&ctg)
+	s.db.Model(s.user).Association("Categories").Append(&ctg)
 
 	feed := models.Feed{
 		ID:           utils.CreateID(),
@@ -107,8 +109,8 @@ func (s *EntriesSuite) TestListFromCategory() {
 		Subscription: "http://example.com",
 	}
 
-	s.db.db.Model(s.user).Association("Feeds").Append(&feed)
-	s.db.db.Model(&ctg).Association("Feeds").Append(&feed)
+	s.db.Model(s.user).Association("Feeds").Append(&feed)
+	s.db.Model(&ctg).Association("Feeds").Append(&feed)
 
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
@@ -120,8 +122,8 @@ func (s *EntriesSuite) TestListFromCategory() {
 			Published: time.Now(),
 		}
 
-		s.db.db.Model(s.user).Association("Entries").Append(&entry)
-		s.db.db.Model(&feed).Association("Entries").Append(&entry)
+		s.db.Model(s.user).Association("Entries").Append(&entry)
+		s.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
 	entries, next := s.repo.ListFromCategory(s.user.ID, models.Page{
@@ -157,7 +159,7 @@ func (s *EntriesSuite) TestListFromFeed() {
 		Subscription: "http://example.com",
 	}
 
-	s.db.db.Model(s.user).Association("Feeds").Append(&feed)
+	s.db.Model(s.user).Association("Feeds").Append(&feed)
 
 	for i := 0; i < 5; i++ {
 		entry := models.Entry{
@@ -169,8 +171,8 @@ func (s *EntriesSuite) TestListFromFeed() {
 			Published: time.Now(),
 		}
 
-		s.db.db.Model(s.user).Association("Entries").Append(&entry)
-		s.db.db.Model(&feed).Association("Entries").Append(&entry)
+		s.db.Model(s.user).Association("Entries").Append(&entry)
+		s.db.Model(&feed).Association("Entries").Append(&entry)
 	}
 
 	entries, next := s.repo.ListFromFeed(s.user.ID, models.Page{
@@ -293,14 +295,14 @@ func (s *EntriesSuite) TestListFromTags() {
 
 	firstTagID := utils.CreateID()
 
-	s.db.db.Model(s.user).Association("Tags").Append(&models.Tag{
+	s.db.Model(s.user).Association("Tags").Append(&models.Tag{
 		ID:   firstTagID,
 		Name: "first",
 	})
 
 	secondTagID := utils.CreateID()
 
-	s.db.db.Model(s.user).Association("Tags").Append(&models.Tag{
+	s.db.Model(s.user).Association("Tags").Append(&models.Tag{
 		ID:   secondTagID,
 		Name: "first",
 	})
@@ -335,7 +337,7 @@ func (s *EntriesSuite) TestStats() {
 			Published: time.Now(),
 		}
 
-		s.db.db.Model(s.user).Association("Entries").Append(&entry)
+		s.db.Model(s.user).Association("Entries").Append(&entry)
 	}
 
 	stats := s.repo.Stats(s.user.ID)
@@ -346,15 +348,21 @@ func (s *EntriesSuite) TestStats() {
 }
 
 func (s *EntriesSuite) SetupTest() {
-	s.db = NewDB("sqlite3", ":memory:")
+	var err error
+
+	s.db, err = gorm.Open("sqlite3", ":memory:")
+	s.Require().NoError(err)
+
+	sql.AutoMigrateTables(s.db)
 
 	s.user = &models.User{
 		ID:       utils.CreateID(),
 		Username: "test_entries",
 	}
-	s.db.db.Create(s.user.ID)
 
-	s.repo = NewEntries(s.db)
+	s.db.Create(s.user.ID)
+
+	s.repo = sql.NewEntries(s.db)
 }
 
 func (s *EntriesSuite) TearDownTest() {

@@ -20,6 +20,7 @@ package services_test
 import (
 	"testing"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -34,7 +35,7 @@ type TagsSuite struct {
 
 	service  services.Tags
 	tagsRepo repo.Tags
-	db       *sql.DB
+	db       *gorm.DB
 	user     *models.User
 }
 
@@ -91,7 +92,12 @@ func (t *TagsSuite) TestEditUnknownTag() {
 }
 
 func (t *TagsSuite) SetupTest() {
-	t.db = sql.NewDB("sqlite3", ":memory:")
+	var err error
+
+	t.db, err = gorm.Open("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	sql.AutoMigrateTables(t.db)
 
 	t.user = &models.User{
 		ID:       utils.CreateID(),

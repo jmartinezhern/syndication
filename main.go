@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	log "github.com/sirupsen/logrus"
@@ -71,7 +72,13 @@ func configureMiddleware(e *echo.Echo) {
 
 func main() {
 	config := config()
-	db := sql.NewDB(config.Database.Type, config.Database.Connection)
+
+	db, err := gorm.Open(config.Database.Type, config.Database.Connection)
+	if err != nil {
+		panic(err)
+	}
+
+	sql.AutoMigrateTables(db)
 
 	usersRepo := sql.NewUsers(db)
 	ctgsRepo := sql.NewCategories(db)

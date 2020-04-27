@@ -18,17 +18,19 @@
 package sql
 
 import (
+	"github.com/jinzhu/gorm"
+
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 )
 
 type (
 	Tags struct {
-		db *DB
+		db *gorm.DB
 	}
 )
 
-func NewTags(db *DB) Tags {
+func NewTags(db *gorm.DB) Tags {
 	return Tags{
 		db,
 	}
@@ -36,24 +38,24 @@ func NewTags(db *DB) Tags {
 
 // Create a new Tag for user
 func (t Tags) Create(userID string, tag *models.Tag) {
-	t.db.db.Model(&models.User{ID: userID}).Association("Tags").Append(tag)
+	t.db.Model(&models.User{ID: userID}).Association("Tags").Append(tag)
 }
 
 // TagWithName returns a Tag that has a matching name and belongs to the given user
 func (t Tags) TagWithName(userID, name string) (tag models.Tag, found bool) {
-	found = !t.db.db.Model(&models.User{ID: userID}).Where("name = ?", name).Related(&tag).RecordNotFound()
+	found = !t.db.Model(&models.User{ID: userID}).Where("name = ?", name).Related(&tag).RecordNotFound()
 	return
 }
 
 // TagWithID returns a Tag with id that belongs to user
 func (t Tags) TagWithID(userID, id string) (tag models.Tag, found bool) {
-	found = !t.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&tag).RecordNotFound()
+	found = !t.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&tag).RecordNotFound()
 	return
 }
 
 // List all Tags owned by user
 func (t Tags) List(userID string, page models.Page) (tags []models.Tag, next string) {
-	query := t.db.db.Model(&models.User{ID: userID})
+	query := t.db.Model(&models.User{ID: userID})
 
 	if page.ContinuationID != "" {
 		if tag, found := t.TagWithID(userID, page.ContinuationID); found {
@@ -74,7 +76,7 @@ func (t Tags) List(userID string, page models.Page) (tags []models.Tag, next str
 // Update a tag owned by user
 func (t Tags) Update(userID string, tag *models.Tag) error {
 	if dbTag, found := t.TagWithID(userID, tag.ID); found {
-		t.db.db.Model(&dbTag).Updates(tag)
+		t.db.Model(&dbTag).Updates(tag)
 		return nil
 	}
 
@@ -84,7 +86,7 @@ func (t Tags) Update(userID string, tag *models.Tag) error {
 // Delete a tag owned by user
 func (t Tags) Delete(userID, id string) error {
 	if tag, found := t.TagWithID(userID, id); found {
-		t.db.db.Delete(&tag)
+		t.db.Delete(&tag)
 
 		return nil
 	}

@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -34,7 +35,7 @@ type AuthSuite struct {
 	suite.Suite
 
 	service   services.Auth
-	db        *sql.DB
+	db        *gorm.DB
 	usersRepo repo.Users
 }
 
@@ -126,8 +127,15 @@ func (t *AuthSuite) TestRenewWithInvalidKey() {
 }
 
 func (t *AuthSuite) SetupTest() {
-	t.db = sql.NewDB("sqlite3", ":memory:")
+	var err error
+
+	t.db, err = gorm.Open("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	sql.AutoMigrateTables(t.db)
+
 	t.usersRepo = sql.NewUsers(t.db)
+
 	t.service = services.NewAuthService("secret", t.usersRepo)
 }
 

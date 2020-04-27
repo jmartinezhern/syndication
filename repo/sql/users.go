@@ -20,17 +20,19 @@
 package sql
 
 import (
+	"github.com/jinzhu/gorm"
+
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 )
 
 type (
 	Users struct {
-		db *DB
+		db *gorm.DB
 	}
 )
 
-func NewUsers(db *DB) Users {
+func NewUsers(db *gorm.DB) Users {
 	return Users{
 		db,
 	}
@@ -38,7 +40,7 @@ func NewUsers(db *DB) Users {
 
 // Create a new user
 func (u Users) Create(user *models.User) {
-	u.db.db.Create(user)
+	u.db.Create(user)
 }
 
 // Update a user
@@ -48,14 +50,14 @@ func (u Users) Update(user *models.User) error {
 		return repo.ErrModelNotFound
 	}
 
-	u.db.db.Model(&dbUser).Updates(user).RecordNotFound()
+	u.db.Model(&dbUser).Updates(user).RecordNotFound()
 
 	return nil
 }
 
 // UserWithID returns a User with id
 func (u Users) UserWithID(id string) (user models.User, found bool) {
-	found = !u.db.db.First(&user, "id = ?", id).RecordNotFound()
+	found = !u.db.First(&user, "id = ?", id).RecordNotFound()
 	return
 }
 
@@ -66,14 +68,14 @@ func (u Users) Delete(id string) error {
 		return repo.ErrModelNotFound
 	}
 
-	u.db.db.Delete(user)
+	u.db.Delete(user)
 
 	return nil
 }
 
 // List all users
 func (u Users) List(page models.Page) (users []models.User, next string) {
-	query := u.db.db.Limit(page.Count + 1)
+	query := u.db.Limit(page.Count + 1)
 
 	if page.ContinuationID != "" {
 		user, found := u.UserWithID(page.ContinuationID)
@@ -94,6 +96,6 @@ func (u Users) List(page models.Page) (users []models.User, next string) {
 
 // UserWithName returns a User with username
 func (u Users) UserWithName(name string) (user models.User, found bool) {
-	found = !u.db.db.First(&user, "username = ?", name).RecordNotFound()
+	found = !u.db.First(&user, "username = ?", name).RecordNotFound()
 	return
 }

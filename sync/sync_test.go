@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -126,7 +127,7 @@ type (
 		suite.Suite
 
 		ts          *httptest.Server
-		db          *sql.DB
+		db          *gorm.DB
 		ctgsRepo    repo.Categories
 		feedsRepo   repo.Feeds
 		usersRepo   repo.Users
@@ -147,7 +148,12 @@ func RandStringRunes(n int) string {
 }
 
 func (s *SyncTestSuite) SetupTest() {
-	s.db = sql.NewDB("sqlite3", ":memory:")
+	var err error
+
+	s.db, err = gorm.Open("sqlite3", ":memory:")
+	s.Require().NoError(err)
+
+	sql.AutoMigrateTables(s.db)
 
 	s.usersRepo = sql.NewUsers(s.db)
 

@@ -22,6 +22,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -37,7 +38,7 @@ type ExporterSuite struct {
 	service services.OPMLExporter
 	user    *models.User
 	repo    repo.Categories
-	db      *sql.DB
+	db      *gorm.DB
 }
 
 func (t *ExporterSuite) TestOPMLExporter() {
@@ -79,7 +80,13 @@ func (t *ExporterSuite) TestOPMLExporter() {
 }
 
 func (t *ExporterSuite) SetupTest() {
-	t.db = sql.NewDB("sqlite3", ":memory:")
+	var err error
+
+	t.db, err = gorm.Open("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	sql.AutoMigrateTables(t.db)
+
 	t.repo = sql.NewCategories(t.db)
 
 	t.service = services.NewOPMLExporter(t.repo)

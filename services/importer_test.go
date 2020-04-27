@@ -21,6 +21,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -59,7 +60,7 @@ type ImporterSuite struct {
 	importer  services.OPMLImporter
 	ctgsRepo  repo.Categories
 	feedsRepo repo.Feeds
-	db        *sql.DB
+	db        *gorm.DB
 	user      *models.User
 }
 
@@ -89,7 +90,12 @@ func (t *ImporterSuite) TestOPMLImporter() {
 }
 
 func (t *ImporterSuite) SetupTest() {
-	t.db = sql.NewDB("sqlite3", ":memory:")
+	var err error
+
+	t.db, err = gorm.Open("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	sql.AutoMigrateTables(t.db)
 
 	t.user = &models.User{
 		ID:       utils.CreateID(),

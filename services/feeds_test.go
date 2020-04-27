@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -37,7 +38,7 @@ type FeedsSuite struct {
 
 	service services.Feeds
 
-	db          *sql.DB
+	db          *gorm.DB
 	feedsRepo   repo.Feeds
 	entriesRepo repo.Entries
 	ctgsRepo    repo.Categories
@@ -176,7 +177,13 @@ func (t *FeedsSuite) TestMissingFeedStats() {
 }
 
 func (t *FeedsSuite) SetupTest() {
-	t.db = sql.NewDB("sqlite3", ":memory:")
+	var err error
+
+	t.db, err = gorm.Open("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	sql.AutoMigrateTables(t.db)
+
 	t.feedsRepo = sql.NewFeeds(t.db)
 	t.entriesRepo = sql.NewEntries(t.db)
 	t.ctgsRepo = sql.NewCategories(t.db)

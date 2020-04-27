@@ -18,17 +18,19 @@
 package sql
 
 import (
+	"github.com/jinzhu/gorm"
+
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 )
 
 type (
 	Feeds struct {
-		db *DB
+		db *gorm.DB
 	}
 )
 
-func NewFeeds(db *DB) Feeds {
+func NewFeeds(db *gorm.DB) Feeds {
 	return Feeds{
 		db,
 	}
@@ -36,14 +38,14 @@ func NewFeeds(db *DB) Feeds {
 
 // Create a new feed owned by user
 func (f Feeds) Create(userID string, feed *models.Feed) {
-	f.db.db.Model(&models.User{ID: userID}).Association("Feeds").Append(feed)
+	f.db.Model(&models.User{ID: userID}).Association("Feeds").Append(feed)
 
 	if feed.Category.ID != "" {
 		var ctg models.Category
 
-		found := !f.db.db.Model(&models.User{ID: userID}).Where("id = ?", feed.Category.ID).Related(&ctg).RecordNotFound()
+		found := !f.db.Model(&models.User{ID: userID}).Where("id = ?", feed.Category.ID).Related(&ctg).RecordNotFound()
 		if found {
-			f.db.db.Model(&ctg).Association("Feeds").Append(feed)
+			f.db.Model(&ctg).Association("Feeds").Append(feed)
 		}
 	}
 }
@@ -55,7 +57,7 @@ func (f Feeds) Update(userID string, feed *models.Feed) error {
 		return repo.ErrModelNotFound
 	}
 
-	f.db.db.Model(&dbFeed).Updates(feed)
+	f.db.Model(&dbFeed).Updates(feed)
 
 	return nil
 }
@@ -67,16 +69,16 @@ func (f Feeds) Delete(userID, id string) error {
 		return repo.ErrModelNotFound
 	}
 
-	f.db.db.Delete(&feed)
+	f.db.Delete(&feed)
 
 	return nil
 }
 
 // FeedWithID returns a Feed with id and owned by user
 func (f Feeds) FeedWithID(userID, id string) (feed models.Feed, found bool) {
-	found = !f.db.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&feed).RecordNotFound()
+	found = !f.db.Model(&models.User{ID: userID}).Where("id = ?", id).Related(&feed).RecordNotFound()
 	if found {
-		f.db.db.Model(&feed).Related(&feed.Category)
+		f.db.Model(&feed).Related(&feed.Category)
 	}
 
 	return
@@ -84,7 +86,7 @@ func (f Feeds) FeedWithID(userID, id string) (feed models.Feed, found bool) {
 
 // List all Feeds owned by user
 func (f Feeds) List(userID string, page models.Page) (feeds []models.Feed, next string) {
-	query := f.db.db.Model(&models.User{ID: userID})
+	query := f.db.Model(&models.User{ID: userID})
 
 	if page.ContinuationID != "" {
 		if feed, found := f.FeedWithID(userID, page.ContinuationID); found {
@@ -106,7 +108,7 @@ func (f Feeds) List(userID string, page models.Page) (feeds []models.Feed, next 
 func (f Feeds) Mark(userID, id string, marker models.Marker) error {
 	if feed, found := f.FeedWithID(userID, id); found {
 		entry := models.Entry{Mark: marker}
-		f.db.db.Model(&entry).Where("user_id = ? AND feed_id = ?", userID, feed.ID).Update(&entry)
+		f.db.Model(&entry).Where("user_id = ? AND feed_id = ?", userID, feed.ID).Update(&entry)
 
 		return nil
 	}
@@ -121,7 +123,7 @@ func (f Feeds) Stats(userID, id string) (models.Stats, error) {
 		return models.Stats{}, repo.ErrModelNotFound
 	}
 
-	query := f.db.db.Model(&feed)
+	query := f.db.Model(&feed)
 
 	stats := models.Stats{}
 

@@ -20,6 +20,7 @@ package services_test
 import (
 	"testing"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
@@ -33,7 +34,7 @@ type EntriesSuite struct {
 	suite.Suite
 
 	service     services.Entries
-	db          *sql.DB
+	db          *gorm.DB
 	entriesRepo repo.Entries
 	feedsRepo   repo.Feeds
 	user        *models.User
@@ -127,7 +128,13 @@ func (t *EntriesSuite) TestMarkAll() {
 }
 
 func (t *EntriesSuite) SetupTest() {
-	t.db = sql.NewDB("sqlite3", ":memory:")
+	var err error
+
+	t.db, err = gorm.Open("sqlite3", ":memory:")
+	t.Require().NoError(err)
+
+	sql.AutoMigrateTables(t.db)
+
 	t.entriesRepo = sql.NewEntries(t.db)
 	t.service = services.NewEntriesService(t.entriesRepo)
 

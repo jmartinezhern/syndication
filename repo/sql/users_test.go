@@ -15,22 +15,24 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package sql
+package sql_test
 
 import (
 	"testing"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
+	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
 type UsersSuite struct {
 	suite.Suite
 
-	db   *DB
+	db   *gorm.DB
 	repo repo.Users
 }
 
@@ -122,9 +124,14 @@ func (s *UsersSuite) TestUserWithUnknownName() {
 }
 
 func (s *UsersSuite) SetupTest() {
-	s.db = NewDB("sqlite3", ":memory:")
+	var err error
 
-	s.repo = NewUsers(s.db)
+	s.db, err = gorm.Open("sqlite3", ":memory:")
+	s.Require().NoError(err)
+
+	sql.AutoMigrateTables(s.db)
+
+	s.repo = sql.NewUsers(s.db)
 }
 
 func (s *UsersSuite) TearDownTest() {
