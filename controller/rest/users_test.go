@@ -15,20 +15,20 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rest
+package rest_test
 
 import (
-	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/jmartinezhern/syndication/controller/rest"
 	"github.com/jmartinezhern/syndication/models"
-	"github.com/jmartinezhern/syndication/repo"
-	"github.com/jmartinezhern/syndication/repo/sql"
 	"github.com/jmartinezhern/syndication/services"
 	"github.com/jmartinezhern/syndication/utils"
 )
@@ -37,27 +37,27 @@ type (
 	UsersSuite struct {
 		suite.Suite
 
+		ctrl      *gomock.Controller
+		mockUsers *services.MockUsers
+
+		controller *rest.UsersController
 		e          *echo.Echo
-		db         *sql.DB
-		usersRepo  repo.Users
-		service    services.Users
-		controller *UsersController
 	}
 )
 
 func (s *UsersSuite) TestDeleteUser() {
 	user := models.User{
-		ID:       utils.CreateID(),
-		Username: "gopher",
+		ID: utils.CreateID(),
 	}
-	s.usersRepo.Create(&user)
+
+	s.mockUsers.EXPECT().DeleteUser(gomock.Eq(user.ID)).Return(nil)
 
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := s.e.NewContext(req, rec)
 	ctx.Set(userContextKey, user.ID)
-
 	ctx.SetPath("/v1/users")
 
 	s.NoError(s.controller.DeleteUser(ctx))
@@ -65,9 +65,12 @@ func (s *UsersSuite) TestDeleteUser() {
 }
 
 func (s *UsersSuite) TestDeleteMissingUser() {
+	s.mockUsers.EXPECT().DeleteUser(gomock.Any()).Return(services.ErrUserNotFound)
+
 	req := httptest.NewRequest(echo.DELETE, "/", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := s.e.NewContext(req, rec)
 	ctx.Set(userContextKey, "bogus")
 
@@ -79,36 +82,53 @@ func (s *UsersSuite) TestDeleteMissingUser() {
 	)
 }
 
+func (s *UsersSuite) TestDeleteUserInternalError() {
+	s.mockUsers.EXPECT().DeleteUser(gomock.Any()).Return(errors.New("error"))
+
+	req := httptest.NewRequest(echo.DELETE, "/", nil)
+
+	rec := httptest.NewRecorder()
+
+	ctx := s.e.NewContext(req, rec)
+	ctx.Set(userContextKey, "bogus")
+
+	ctx.SetPath("/v1/users")
+
+	s.EqualError(
+		s.controller.DeleteUser(ctx),
+		echo.NewHTTPError(http.StatusInternalServerError).Error(),
+	)
+}
+
 func (s *UsersSuite) TestGetUser() {
 	user := models.User{
 		ID:       utils.CreateID(),
 		Username: "gopher",
 	}
-	s.usersRepo.Create(&user)
+
+	s.mockUsers.EXPECT().User(gomock.Eq(user.ID)).Return(user, true)
 
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := s.e.NewContext(req, rec)
 	ctx.Set(userContextKey, user.ID)
-
 	ctx.SetPath("/v1/users")
 
 	s.NoError(s.controller.GetUser(ctx))
-
-	var respUser models.User
-
-	s.NoError(json.Unmarshal(rec.Body.Bytes(), &respUser))
-	s.Equal(user.Username, respUser.Username)
+	s.Equal(http.StatusOK, rec.Code)
 }
 
 func (s *UsersSuite) TestGetMissingUser() {
+	s.mockUsers.EXPECT().User(gomock.Any()).Return(models.User{}, false)
+
 	req := httptest.NewRequest(echo.GET, "/", nil)
 
 	rec := httptest.NewRecorder()
+
 	ctx := s.e.NewContext(req, rec)
 	ctx.Set(userContextKey, "bogus")
-
 	ctx.SetPath("/v1/users")
 
 	s.EqualError(
@@ -118,17 +138,18 @@ func (s *UsersSuite) TestGetMissingUser() {
 }
 
 func (s *UsersSuite) SetupTest() {
+	s.ctrl = gomock.NewController(s.T())
+
 	s.e = echo.New()
 	s.e.HideBanner = true
 
-	s.db = sql.NewDB("sqlite3", ":memory:")
-	s.usersRepo = sql.NewUsers(s.db)
-	s.service = services.NewUsersService(s.usersRepo)
-	s.controller = NewUsersController(s.service, s.e)
+	s.mockUsers = services.NewMockUsers(s.ctrl)
+
+	s.controller = rest.NewUsersController(s.mockUsers, s.e)
 }
 
 func (s *UsersSuite) TearDownTest() {
-	s.NoError(s.db.Close())
+	s.ctrl.Finish()
 }
 
 func TestUsersSuite(t *testing.T) {

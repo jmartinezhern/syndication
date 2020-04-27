@@ -25,6 +25,8 @@ import (
 	"github.com/jmartinezhern/syndication/utils"
 )
 
+//go:generate mockgen -source=users.go -destination=users_mock.go -package=services
+
 type (
 	// Users interface defines the Users services
 	Users interface {
