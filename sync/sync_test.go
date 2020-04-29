@@ -15,13 +15,15 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package sync
+package sync_test
 
 import (
 	"fmt"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -31,6 +33,7 @@ import (
 	"github.com/jmartinezhern/syndication/models"
 	"github.com/jmartinezhern/syndication/repo"
 	"github.com/jmartinezhern/syndication/repo/sql"
+	"github.com/jmartinezhern/syndication/sync"
 	"github.com/jmartinezhern/syndication/utils"
 )
 
@@ -118,13 +121,14 @@ const (
 	</rss>
 	`
 
-	rssFeedTag       = "123456"
-	testSyncInterval = time.Second * 5
+	rssFeedTag = "123456"
 )
 
 type (
 	SyncTestSuite struct {
 		suite.Suite
+
+		syncDBPath string
 
 		ts          *httptest.Server
 		db          *gorm.DB
@@ -137,7 +141,7 @@ type (
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func RandStringRunes(n int) string {
+func randStringRunes(n int) string {
 	b := make([]rune, n)
 
 	for i := range b {
@@ -145,25 +149,6 @@ func RandStringRunes(n int) string {
 	}
 
 	return string(b)
-}
-
-func (s *SyncTestSuite) SetupTest() {
-	var err error
-
-	s.db, err = gorm.Open("sqlite3", ":memory:")
-	s.Require().NoError(err)
-
-	sql.AutoMigrateTables(s.db)
-
-	s.usersRepo = sql.NewUsers(s.db)
-
-	s.ctgsRepo = sql.NewCategories(s.db)
-	s.feedsRepo = sql.NewFeeds(s.db)
-	s.entriesRepo = sql.NewEntries(s.db)
-}
-
-func (s *SyncTestSuite) TearDownTest() {
-	s.NoError(s.db.Close())
 }
 
 func (s *SyncTestSuite) TestPullUnreachableFeed() {
@@ -185,7 +170,7 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 
 	user := &models.User{
 		ID:       utils.CreateID(),
-		Username: RandStringRunes(8),
+		Username: randStringRunes(8),
 	}
 	s.usersRepo.Create(user)
 
@@ -199,8 +184,9 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 		s.entriesRepo.Create(user.ID, &entries[idx])
 	}
 
-	serv := NewService(testSyncInterval, s.feedsRepo, s.usersRepo, s.entriesRepo)
-	serv.syncUser(user.ID)
+	serv := sync.NewService(s.feedsRepo, s.usersRepo, s.entriesRepo)
+
+	serv.SyncUser(user.ID)
 
 	entries, _ = s.entriesRepo.ListFromFeed(user.ID, models.Page{
 		FilterID:       feed.ID,
@@ -215,7 +201,7 @@ func (s *SyncTestSuite) TestSyncWithEtags() {
 func (s *SyncTestSuite) TestSyncUser() {
 	user := &models.User{
 		ID:       utils.CreateID(),
-		Username: RandStringRunes(8),
+		Username: randStringRunes(8),
 	}
 	s.usersRepo.Create(user)
 
@@ -226,8 +212,9 @@ func (s *SyncTestSuite) TestSyncUser() {
 	}
 	s.feedsRepo.Create(user.ID, &feed)
 
-	serv := NewService(testSyncInterval, s.feedsRepo, s.usersRepo, s.entriesRepo)
-	serv.syncUser(user.ID)
+	serv := sync.NewService(s.feedsRepo, s.usersRepo, s.entriesRepo)
+
+	serv.SyncUser(user.ID)
 
 	entries, _ := s.entriesRepo.ListFromFeed(user.ID, models.Page{
 		FilterID:       feed.ID,
@@ -240,11 +227,73 @@ func (s *SyncTestSuite) TestSyncUser() {
 }
 
 func (s *SyncTestSuite) TestSyncService() {
-	serv := NewService(time.Second, s.feedsRepo, s.usersRepo, s.entriesRepo)
+	for i := 0; i < 10; i++ {
+		user := models.User{
+			ID:       utils.CreateID(),
+			Username: "test" + strconv.Itoa(i),
+		}
+		s.usersRepo.Create(&user)
 
-	serv.Start()
+		feed := models.Feed{
+			ID:           utils.CreateID(),
+			Title:        "Sync Test",
+			Subscription: s.ts.URL + "/rss_minimal.xml",
+		}
+		s.feedsRepo.Create(user.ID, &feed)
+	}
+
+	serv := sync.NewService(s.feedsRepo, s.usersRepo, s.entriesRepo)
+
+	serv.Start(time.Second)
+
+	time.Sleep(time.Second + (time.Millisecond * 500))
 
 	serv.Stop()
+
+	users, _ := s.usersRepo.List(models.Page{
+		ContinuationID: "",
+		Count:          10,
+	})
+
+	s.Require().Len(users, 10)
+
+	for idx := range users {
+		entries, _ := s.entriesRepo.List(users[idx].ID, models.Page{
+			ContinuationID: "",
+			Count:          100,
+			Newest:         true,
+			Marker:         models.MarkerAny,
+		})
+		s.Len(entries, 5, "Entries are missing for user with id %s", users[idx].ID)
+	}
+}
+
+func (s *SyncTestSuite) SetupTest() {
+	sql.AutoMigrateTables(s.db)
+
+	s.usersRepo = sql.NewUsers(s.db)
+	s.ctgsRepo = sql.NewCategories(s.db)
+	s.feedsRepo = sql.NewFeeds(s.db)
+	s.entriesRepo = sql.NewEntries(s.db)
+}
+
+func (s *SyncTestSuite) SetupSuite() {
+	var err error
+
+	// There is a bug in gorm's in-memory sqlite implementation that causes strange behavior
+	// when making concurrent writes.
+	//
+	// We setup a sqlite file here as a workaround for these tests.
+	s.syncDBPath = fmt.Sprintf("%s/sync_test_%s.db", os.TempDir(), randStringRunes(8))
+
+	s.db, err = gorm.Open("sqlite3", s.syncDBPath)
+	s.Require().NoError(err)
+}
+
+func (s *SyncTestSuite) TearDownSuite() {
+	s.NoError(s.db.Close())
+
+	s.NoError(os.Remove(s.syncDBPath))
 }
 
 func TestSyncTestSuite(t *testing.T) {

@@ -109,8 +109,9 @@ func main() {
 	rest.NewExporterController(rest.Exporters{
 		"text/xml": services.NewOPMLExporter(ctgsRepo)}, e)
 
-	syncService := sync.NewService(config.Sync.Interval, feedsRepo, usersRepo, entriesRepo)
-	syncService.Start()
+	syncService := sync.NewService(feedsRepo, usersRepo, entriesRepo)
+
+	syncService.Start(config.Sync.Interval)
 
 	defer syncService.Stop()
 

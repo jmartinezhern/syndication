@@ -41,8 +41,6 @@ type Service struct {
 	quit      chan bool
 	userQueue chan models.User
 
-	dbLock sync.Mutex
-
 	wg sync.WaitGroup
 
 	interval time.Duration
@@ -61,7 +59,7 @@ func (s *Service) syncUserHandler() {
 			return
 		}
 
-		s.syncUser(user.ID)
+		s.SyncUser(user.ID)
 	}
 }
 
@@ -92,28 +90,7 @@ func (s *Service) updateFeed(userID string, feed *models.Feed) {
 	}
 }
 
-func (s *Service) syncUsers() {
-	for {
-		// List up to maxThreads of users per iteration
-		users, continuationID := s.usersRepo.List(models.Page{ContinuationID: "", Count: maxThreads})
-		if len(users) == 0 {
-			break
-		}
-
-		for idx := range users {
-			s.userQueue <- users[idx]
-		}
-
-		if continuationID == "" {
-			break
-		}
-	}
-}
-
-func (s *Service) syncUser(userID string) {
-	s.dbLock.Lock()
-	defer s.dbLock.Unlock()
-
+func (s *Service) SyncUser(userID string) {
 	var (
 		feeds          []models.Feed
 		continuationID string
@@ -127,6 +104,24 @@ func (s *Service) syncUser(userID string) {
 
 		for idx := range feeds {
 			s.updateFeed(userID, &feeds[idx])
+		}
+
+		if continuationID == "" {
+			break
+		}
+	}
+}
+
+func (s *Service) syncUsers() {
+	for {
+		// List up to maxThreads of users per iteration
+		users, continuationID := s.usersRepo.List(models.Page{ContinuationID: "", Count: maxThreads})
+		if len(users) == 0 {
+			break
+		}
+
+		for idx := range users {
+			s.userQueue <- users[idx]
 		}
 
 		if continuationID == "" {
@@ -149,7 +144,9 @@ func (s *Service) scheduleTask() {
 }
 
 // Start a SyncService
-func (s *Service) Start() {
+func (s *Service) Start(interval time.Duration) {
+	s.interval = interval
+
 	s.userQueue = make(chan models.User, maxThreads)
 
 	s.wg.Add(maxThreads)
@@ -174,11 +171,10 @@ func (s *Service) Stop() {
 }
 
 // NewService creates a new SyncService object
-func NewService(interval time.Duration, feedsRepo repo.Feeds, usersRepo repo.Users, entriesRepo repo.Entries) Service {
+func NewService(feedsRepo repo.Feeds, usersRepo repo.Users, entriesRepo repo.Entries) Service {
 	return Service{
 		quit:        make(chan bool),
 		wg:          sync.WaitGroup{},
-		interval:    interval,
 		feedsRepo:   feedsRepo,
 		usersRepo:   usersRepo,
 		entriesRepo: entriesRepo,
