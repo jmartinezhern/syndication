@@ -1,5 +1,5 @@
 name: Go
-on: push
+on: [push, pull_request]
 
 jobs:
 
@@ -15,14 +15,18 @@ jobs:
 
     steps:
 
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
-
       - name: Set up Go ${{ matrix.go }}
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
         id: go
+
+      - name: Install Linter
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh |
+          sh -s -- -b $(go env GOPATH)/bin v1.25.1
+
+      - name: Run Linter
+        run: $(go env GOPATH)/bin/golangci-lint run
 
       - name: Run Unit Tests
         run: |
