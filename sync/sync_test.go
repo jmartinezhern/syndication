@@ -38,8 +38,7 @@ import (
 )
 
 const (
-	rssFile = `
-	<rss>
+	rssFile = `<rss version="2.0">
 	  <channel>
 	    <title>RSS Test</title>
 	    <link>http://localhost:8090</link>
@@ -96,8 +95,7 @@ const (
 	</rss>
 	`
 
-	rssMinimalFile = `
-	<rss>
+	rssMinimalFile = `<rss version="2.0">
 	  <channel>
 	    <title>Science News of yesterday, today!</title>
 	    <link>https://example.com/news</link>
