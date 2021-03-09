@@ -10,7 +10,7 @@ require (
 	github.com/labstack/echo/v4 v4.2.0
 	github.com/mmcdole/gofeed v1.1.0
 	github.com/mmcdole/goxpp v0.0.0-20200921145534-2f3784f67354 // indirect
-	github.com/sirupsen/logrus v1.8.0
+	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v0.0.7
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.7.0
