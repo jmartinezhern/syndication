@@ -5,34 +5,35 @@
 package services
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
-// MockExporter is a mock of Exporter interface
+// MockExporter is a mock of Exporter interface.
 type MockExporter struct {
 	ctrl     *gomock.Controller
 	recorder *MockExporterMockRecorder
 }
 
-// MockExporterMockRecorder is the mock recorder for MockExporter
+// MockExporterMockRecorder is the mock recorder for MockExporter.
 type MockExporterMockRecorder struct {
 	mock *MockExporter
 }
 
-// NewMockExporter creates a new mock instance
+// NewMockExporter creates a new mock instance.
 func NewMockExporter(ctrl *gomock.Controller) *MockExporter {
 	mock := &MockExporter{ctrl: ctrl}
 	mock.recorder = &MockExporterMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockExporter) EXPECT() *MockExporterMockRecorder {
 	return m.recorder
 }
 
-// Export mocks base method
+// Export mocks base method.
 func (m *MockExporter) Export(userID string) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Export", userID)
@@ -41,7 +42,7 @@ func (m *MockExporter) Export(userID string) ([]byte, error) {
 	return ret0, ret1
 }
 
-// Export indicates an expected call of Export
+// Export indicates an expected call of Export.
 func (mr *MockExporterMockRecorder) Export(userID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Export", reflect.TypeOf((*MockExporter)(nil).Export), userID)

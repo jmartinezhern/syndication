@@ -5,94 +5,36 @@
 package services
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	models "github.com/jmartinezhern/syndication/models"
-	reflect "reflect"
 )
 
-// MockTags is a mock of Tags interface
+// MockTags is a mock of Tags interface.
 type MockTags struct {
 	ctrl     *gomock.Controller
 	recorder *MockTagsMockRecorder
 }
 
-// MockTagsMockRecorder is the mock recorder for MockTags
+// MockTagsMockRecorder is the mock recorder for MockTags.
 type MockTagsMockRecorder struct {
 	mock *MockTags
 }
 
-// NewMockTags creates a new mock instance
+// NewMockTags creates a new mock instance.
 func NewMockTags(ctrl *gomock.Controller) *MockTags {
 	mock := &MockTags{ctrl: ctrl}
 	mock.recorder = &MockTagsMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockTags) EXPECT() *MockTagsMockRecorder {
 	return m.recorder
 }
 
-// New mocks base method
-func (m *MockTags) New(userID, name string) (models.Tag, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "New", userID, name)
-	ret0, _ := ret[0].(models.Tag)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// New indicates an expected call of New
-func (mr *MockTagsMockRecorder) New(userID, name interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "New", reflect.TypeOf((*MockTags)(nil).New), userID, name)
-}
-
-// List mocks base method
-func (m *MockTags) List(userID string, page models.Page) ([]models.Tag, string) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List", userID, page)
-	ret0, _ := ret[0].([]models.Tag)
-	ret1, _ := ret[1].(string)
-	return ret0, ret1
-}
-
-// List indicates an expected call of List
-func (mr *MockTagsMockRecorder) List(userID, page interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockTags)(nil).List), userID, page)
-}
-
-// Delete mocks base method
-func (m *MockTags) Delete(userID, id string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", userID, id)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Delete indicates an expected call of Delete
-func (mr *MockTagsMockRecorder) Delete(userID, id interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockTags)(nil).Delete), userID, id)
-}
-
-// Update mocks base method
-func (m *MockTags) Update(userID, id, newName string) (models.Tag, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", userID, id, newName)
-	ret0, _ := ret[0].(models.Tag)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Update indicates an expected call of Update
-func (mr *MockTagsMockRecorder) Update(userID, id, newName interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockTags)(nil).Update), userID, id, newName)
-}
-
-// Apply mocks base method
+// Apply mocks base method.
 func (m *MockTags) Apply(userID, id string, entries []string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Apply", userID, id, entries)
@@ -100,28 +42,27 @@ func (m *MockTags) Apply(userID, id string, entries []string) error {
 	return ret0
 }
 
-// Apply indicates an expected call of Apply
+// Apply indicates an expected call of Apply.
 func (mr *MockTagsMockRecorder) Apply(userID, id, entries interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Apply", reflect.TypeOf((*MockTags)(nil).Apply), userID, id, entries)
 }
 
-// Tag mocks base method
-func (m *MockTags) Tag(userID, id string) (models.Tag, bool) {
+// Delete mocks base method.
+func (m *MockTags) Delete(userID, id string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Tag", userID, id)
-	ret0, _ := ret[0].(models.Tag)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "Delete", userID, id)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// Tag indicates an expected call of Tag
-func (mr *MockTagsMockRecorder) Tag(userID, id interface{}) *gomock.Call {
+// Delete indicates an expected call of Delete.
+func (mr *MockTagsMockRecorder) Delete(userID, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Tag", reflect.TypeOf((*MockTags)(nil).Tag), userID, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockTags)(nil).Delete), userID, id)
 }
 
-// Entries mocks base method
+// Entries mocks base method.
 func (m *MockTags) Entries(userID string, page models.Page) ([]models.Entry, string) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Entries", userID, page)
@@ -130,8 +71,68 @@ func (m *MockTags) Entries(userID string, page models.Page) ([]models.Entry, str
 	return ret0, ret1
 }
 
-// Entries indicates an expected call of Entries
+// Entries indicates an expected call of Entries.
 func (mr *MockTagsMockRecorder) Entries(userID, page interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Entries", reflect.TypeOf((*MockTags)(nil).Entries), userID, page)
+}
+
+// List mocks base method.
+func (m *MockTags) List(userID string, page models.Page) ([]models.Tag, string) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", userID, page)
+	ret0, _ := ret[0].([]models.Tag)
+	ret1, _ := ret[1].(string)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockTagsMockRecorder) List(userID, page interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockTags)(nil).List), userID, page)
+}
+
+// New mocks base method.
+func (m *MockTags) New(userID, name string) (models.Tag, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "New", userID, name)
+	ret0, _ := ret[0].(models.Tag)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// New indicates an expected call of New.
+func (mr *MockTagsMockRecorder) New(userID, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "New", reflect.TypeOf((*MockTags)(nil).New), userID, name)
+}
+
+// Tag mocks base method.
+func (m *MockTags) Tag(userID, id string) (models.Tag, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Tag", userID, id)
+	ret0, _ := ret[0].(models.Tag)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// Tag indicates an expected call of Tag.
+func (mr *MockTagsMockRecorder) Tag(userID, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Tag", reflect.TypeOf((*MockTags)(nil).Tag), userID, id)
+}
+
+// Update mocks base method.
+func (m *MockTags) Update(userID, id, newName string) (models.Tag, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", userID, id, newName)
+	ret0, _ := ret[0].(models.Tag)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockTagsMockRecorder) Update(userID, id, newName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockTags)(nil).Update), userID, id, newName)
 }

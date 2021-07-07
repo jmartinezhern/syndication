@@ -5,35 +5,36 @@
 package services
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	models "github.com/jmartinezhern/syndication/models"
-	reflect "reflect"
 )
 
-// MockAuth is a mock of Auth interface
+// MockAuth is a mock of Auth interface.
 type MockAuth struct {
 	ctrl     *gomock.Controller
 	recorder *MockAuthMockRecorder
 }
 
-// MockAuthMockRecorder is the mock recorder for MockAuth
+// MockAuthMockRecorder is the mock recorder for MockAuth.
 type MockAuthMockRecorder struct {
 	mock *MockAuth
 }
 
-// NewMockAuth creates a new mock instance
+// NewMockAuth creates a new mock instance.
 func NewMockAuth(ctrl *gomock.Controller) *MockAuth {
 	mock := &MockAuth{ctrl: ctrl}
 	mock.recorder = &MockAuthMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockAuth) EXPECT() *MockAuthMockRecorder {
 	return m.recorder
 }
 
-// Login mocks base method
+// Login mocks base method.
 func (m *MockAuth) Login(username, password string) (models.APIKeyPair, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Login", username, password)
@@ -42,13 +43,13 @@ func (m *MockAuth) Login(username, password string) (models.APIKeyPair, error) {
 	return ret0, ret1
 }
 
-// Login indicates an expected call of Login
+// Login indicates an expected call of Login.
 func (mr *MockAuthMockRecorder) Login(username, password interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockAuth)(nil).Login), username, password)
 }
 
-// Register mocks base method
+// Register mocks base method.
 func (m *MockAuth) Register(username, password string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", username, password)
@@ -56,13 +57,13 @@ func (m *MockAuth) Register(username, password string) error {
 	return ret0
 }
 
-// Register indicates an expected call of Register
+// Register indicates an expected call of Register.
 func (mr *MockAuthMockRecorder) Register(username, password interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockAuth)(nil).Register), username, password)
 }
 
-// Renew mocks base method
+// Renew mocks base method.
 func (m *MockAuth) Renew(token string) (models.APIKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Renew", token)
@@ -71,7 +72,7 @@ func (m *MockAuth) Renew(token string) (models.APIKey, error) {
 	return ret0, ret1
 }
 
-// Renew indicates an expected call of Renew
+// Renew indicates an expected call of Renew.
 func (mr *MockAuthMockRecorder) Renew(token interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Renew", reflect.TypeOf((*MockAuth)(nil).Renew), token)
