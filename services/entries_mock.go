@@ -5,50 +5,36 @@
 package services
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	models "github.com/jmartinezhern/syndication/models"
-	reflect "reflect"
 )
 
-// MockEntries is a mock of Entries interface
+// MockEntries is a mock of Entries interface.
 type MockEntries struct {
 	ctrl     *gomock.Controller
 	recorder *MockEntriesMockRecorder
 }
 
-// MockEntriesMockRecorder is the mock recorder for MockEntries
+// MockEntriesMockRecorder is the mock recorder for MockEntries.
 type MockEntriesMockRecorder struct {
 	mock *MockEntries
 }
 
-// NewMockEntries creates a new mock instance
+// NewMockEntries creates a new mock instance.
 func NewMockEntries(ctrl *gomock.Controller) *MockEntries {
 	mock := &MockEntries{ctrl: ctrl}
 	mock.recorder = &MockEntriesMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockEntries) EXPECT() *MockEntriesMockRecorder {
 	return m.recorder
 }
 
-// Entry mocks base method
-func (m *MockEntries) Entry(userID, id string) (models.Entry, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Entry", userID, id)
-	ret0, _ := ret[0].(models.Entry)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Entry indicates an expected call of Entry
-func (mr *MockEntriesMockRecorder) Entry(userID, id interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Entry", reflect.TypeOf((*MockEntries)(nil).Entry), userID, id)
-}
-
-// Entries mocks base method
+// Entries mocks base method.
 func (m *MockEntries) Entries(userID string, page models.Page) ([]models.Entry, string) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Entries", userID, page)
@@ -57,13 +43,28 @@ func (m *MockEntries) Entries(userID string, page models.Page) ([]models.Entry, 
 	return ret0, ret1
 }
 
-// Entries indicates an expected call of Entries
+// Entries indicates an expected call of Entries.
 func (mr *MockEntriesMockRecorder) Entries(userID, page interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Entries", reflect.TypeOf((*MockEntries)(nil).Entries), userID, page)
 }
 
-// Mark mocks base method
+// Entry mocks base method.
+func (m *MockEntries) Entry(userID, id string) (models.Entry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Entry", userID, id)
+	ret0, _ := ret[0].(models.Entry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Entry indicates an expected call of Entry.
+func (mr *MockEntriesMockRecorder) Entry(userID, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Entry", reflect.TypeOf((*MockEntries)(nil).Entry), userID, id)
+}
+
+// Mark mocks base method.
 func (m *MockEntries) Mark(userID, id string, marker models.Marker) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Mark", userID, id, marker)
@@ -71,25 +72,25 @@ func (m *MockEntries) Mark(userID, id string, marker models.Marker) error {
 	return ret0
 }
 
-// Mark indicates an expected call of Mark
+// Mark indicates an expected call of Mark.
 func (mr *MockEntriesMockRecorder) Mark(userID, id, marker interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mark", reflect.TypeOf((*MockEntries)(nil).Mark), userID, id, marker)
 }
 
-// MarkAll mocks base method
+// MarkAll mocks base method.
 func (m *MockEntries) MarkAll(userID string, marker models.Marker) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "MarkAll", userID, marker)
 }
 
-// MarkAll indicates an expected call of MarkAll
+// MarkAll indicates an expected call of MarkAll.
 func (mr *MockEntriesMockRecorder) MarkAll(userID, marker interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkAll", reflect.TypeOf((*MockEntries)(nil).MarkAll), userID, marker)
 }
 
-// Stats mocks base method
+// Stats mocks base method.
 func (m *MockEntries) Stats(userID string) models.Stats {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Stats", userID)
@@ -97,7 +98,7 @@ func (m *MockEntries) Stats(userID string) models.Stats {
 	return ret0
 }
 
-// Stats indicates an expected call of Stats
+// Stats indicates an expected call of Stats.
 func (mr *MockEntriesMockRecorder) Stats(userID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stats", reflect.TypeOf((*MockEntries)(nil).Stats), userID)

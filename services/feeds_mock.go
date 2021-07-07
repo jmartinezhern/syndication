@@ -5,94 +5,36 @@
 package services
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	models "github.com/jmartinezhern/syndication/models"
-	reflect "reflect"
 )
 
-// MockFeeds is a mock of Feeds interface
+// MockFeeds is a mock of Feeds interface.
 type MockFeeds struct {
 	ctrl     *gomock.Controller
 	recorder *MockFeedsMockRecorder
 }
 
-// MockFeedsMockRecorder is the mock recorder for MockFeeds
+// MockFeedsMockRecorder is the mock recorder for MockFeeds.
 type MockFeedsMockRecorder struct {
 	mock *MockFeeds
 }
 
-// NewMockFeeds creates a new mock instance
+// NewMockFeeds creates a new mock instance.
 func NewMockFeeds(ctrl *gomock.Controller) *MockFeeds {
 	mock := &MockFeeds{ctrl: ctrl}
 	mock.recorder = &MockFeedsMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockFeeds) EXPECT() *MockFeedsMockRecorder {
 	return m.recorder
 }
 
-// New mocks base method
-func (m *MockFeeds) New(title, subscription, ctgID, userID string) (models.Feed, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "New", title, subscription, ctgID, userID)
-	ret0, _ := ret[0].(models.Feed)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// New indicates an expected call of New
-func (mr *MockFeedsMockRecorder) New(title, subscription, ctgID, userID interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "New", reflect.TypeOf((*MockFeeds)(nil).New), title, subscription, ctgID, userID)
-}
-
-// Feeds mocks base method
-func (m *MockFeeds) Feeds(userID string, page models.Page) ([]models.Feed, string) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Feeds", userID, page)
-	ret0, _ := ret[0].([]models.Feed)
-	ret1, _ := ret[1].(string)
-	return ret0, ret1
-}
-
-// Feeds indicates an expected call of Feeds
-func (mr *MockFeedsMockRecorder) Feeds(userID, page interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Feeds", reflect.TypeOf((*MockFeeds)(nil).Feeds), userID, page)
-}
-
-// Feed mocks base method
-func (m *MockFeeds) Feed(userID, id string) (models.Feed, bool) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Feed", userID, id)
-	ret0, _ := ret[0].(models.Feed)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
-}
-
-// Feed indicates an expected call of Feed
-func (mr *MockFeedsMockRecorder) Feed(userID, id interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Feed", reflect.TypeOf((*MockFeeds)(nil).Feed), userID, id)
-}
-
-// Update mocks base method
-func (m *MockFeeds) Update(userID string, feed *models.Feed) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", userID, feed)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Update indicates an expected call of Update
-func (mr *MockFeedsMockRecorder) Update(userID, feed interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockFeeds)(nil).Update), userID, feed)
-}
-
-// Delete mocks base method
+// Delete mocks base method.
 func (m *MockFeeds) Delete(userID, id string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", userID, id)
@@ -100,27 +42,13 @@ func (m *MockFeeds) Delete(userID, id string) error {
 	return ret0
 }
 
-// Delete indicates an expected call of Delete
+// Delete indicates an expected call of Delete.
 func (mr *MockFeedsMockRecorder) Delete(userID, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockFeeds)(nil).Delete), userID, id)
 }
 
-// Mark mocks base method
-func (m *MockFeeds) Mark(userID, id string, marker models.Marker) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Mark", userID, id, marker)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Mark indicates an expected call of Mark
-func (mr *MockFeedsMockRecorder) Mark(userID, id, marker interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mark", reflect.TypeOf((*MockFeeds)(nil).Mark), userID, id, marker)
-}
-
-// Entries mocks base method
+// Entries mocks base method.
 func (m *MockFeeds) Entries(userID string, page models.Page) ([]models.Entry, string) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Entries", userID, page)
@@ -129,13 +57,72 @@ func (m *MockFeeds) Entries(userID string, page models.Page) ([]models.Entry, st
 	return ret0, ret1
 }
 
-// Entries indicates an expected call of Entries
+// Entries indicates an expected call of Entries.
 func (mr *MockFeedsMockRecorder) Entries(userID, page interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Entries", reflect.TypeOf((*MockFeeds)(nil).Entries), userID, page)
 }
 
-// Stats mocks base method
+// Feed mocks base method.
+func (m *MockFeeds) Feed(userID, id string) (models.Feed, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Feed", userID, id)
+	ret0, _ := ret[0].(models.Feed)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// Feed indicates an expected call of Feed.
+func (mr *MockFeedsMockRecorder) Feed(userID, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Feed", reflect.TypeOf((*MockFeeds)(nil).Feed), userID, id)
+}
+
+// Feeds mocks base method.
+func (m *MockFeeds) Feeds(userID string, page models.Page) ([]models.Feed, string) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Feeds", userID, page)
+	ret0, _ := ret[0].([]models.Feed)
+	ret1, _ := ret[1].(string)
+	return ret0, ret1
+}
+
+// Feeds indicates an expected call of Feeds.
+func (mr *MockFeedsMockRecorder) Feeds(userID, page interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Feeds", reflect.TypeOf((*MockFeeds)(nil).Feeds), userID, page)
+}
+
+// Mark mocks base method.
+func (m *MockFeeds) Mark(userID, id string, marker models.Marker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Mark", userID, id, marker)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Mark indicates an expected call of Mark.
+func (mr *MockFeedsMockRecorder) Mark(userID, id, marker interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mark", reflect.TypeOf((*MockFeeds)(nil).Mark), userID, id, marker)
+}
+
+// New mocks base method.
+func (m *MockFeeds) New(title, subscription, ctgID, userID string) (models.Feed, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "New", title, subscription, ctgID, userID)
+	ret0, _ := ret[0].(models.Feed)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// New indicates an expected call of New.
+func (mr *MockFeedsMockRecorder) New(title, subscription, ctgID, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "New", reflect.TypeOf((*MockFeeds)(nil).New), title, subscription, ctgID, userID)
+}
+
+// Stats mocks base method.
 func (m *MockFeeds) Stats(userID, id string) (models.Stats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Stats", userID, id)
@@ -144,8 +131,22 @@ func (m *MockFeeds) Stats(userID, id string) (models.Stats, error) {
 	return ret0, ret1
 }
 
-// Stats indicates an expected call of Stats
+// Stats indicates an expected call of Stats.
 func (mr *MockFeedsMockRecorder) Stats(userID, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stats", reflect.TypeOf((*MockFeeds)(nil).Stats), userID, id)
+}
+
+// Update mocks base method.
+func (m *MockFeeds) Update(userID string, feed *models.Feed) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", userID, feed)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockFeedsMockRecorder) Update(userID, feed interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockFeeds)(nil).Update), userID, feed)
 }
